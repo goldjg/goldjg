@@ -1,0 +1,95 @@
+$ SET LISTDOLLAR ERRLIST LINEINFO STACK                                 00001000          
+BEGIN                                                                   00002000          
+                                                                        00003000          
+   FILE SURVEY (KIND=PACK,DEPENDENTSPECS);                              00004000          
+                                                                        00005000          
+   FILE STREAM (KIND = PACK, PACKNAME = "##REDACTED##.",                00006000          
+                TITLE= "GXG/D/FILEPRIVILEGE/"""OUT.CSV""".",            00007000          
+                FILEKIND = DATA, FILESTRUCTURE = STREAM,                00008000          
+                BLOCKSTRUCTURE = FIXED,                                 00009000          
+                MAXRECSIZE = 150,                                       00010000          
+                FRAMESIZE = 8,                                          00011000          
+                INTMODE = EBCDIC,                                       00012000          
+                EXTMODE = ASCII,                                        00013000          
+                PROTECTION = SAVE                                       00014000          
+               );                                                       00015000          
+                                                                        00016000          
+   ARRAY WORK[0:21];                                                    00017000          
+   EBCDIC ARRAY BUFFIN[0] = WORK[*];                                    00018000          
+   EBCDIC ARRAY BUFFOUT[0:150];                                         00019000          
+                                                                        00020000          
+   DEFINE FNAME   =     0#    ,FNAME_LEN  =     62#                     00021000          
+         ,FKIND   =     62#   ,FKIND_LEN  =     15#                     00022000          
+         ,SEC     =     78#   ,SEC_LEN    =      4#                     00023000          
+         ,PU      =     84#   ,PU_LEN     =      3#                     00024000          
+         ,SA      =     88#   ,SA_LEN     =      3#                     00025000          
+         ,TK      =     92#   ,TK_LEN     =      2#                     00026000          
+         ,SAD     =     95#   ,SAD_LEN    =      3#                     00027000          
+         ,KRB     =     99#   ,KRB_LEN    =      3#                     00028000          
+         ,CMP     =     103#  ,CMP_LEN    =      3#                     00029000          
+         ,CTL     =     107#  ,CTL_LEN    =      3#                     00030000          
+         ,SUP     =     111#  ,SUP_LEN    =      3#                     00031000          
+         ,RSD     =     115#  ,RSD_LEN    =      3#                     00032000          
+         ,TAD     =     119#  ,TAD_LEN    =      3#                     00033000          
+         ,RST     =     123#  ,RST_LEN    =      3#                     00034000          
+         ,LP      =     127#  ,LP_LEN     =      2#                     00035000          
+         ;                                                              00036000          
+                                                                        00037000          
+   EBCDIC ARRAY MYHEAD[0:149],                                          00038000          
+                MYPACK[0:16]                                            00039000          
+                  ;                                                     00041000          
+                                                                        00041500          
+   TRANSLATETABLE SP2NUL(EBCDIC TO EBCDIC, 48"40" TO 48"00");           00042000          
+                                                                        00043000          
+   POINTER PIN                                                          00044000          
+          ;                                                             00045000          
+                                                                        00046000          
+   REPLACE MYHEAD[0] BY "FILENAME,FILEKIND,SEC,PU,SA,TK,SAD,",          00047000          
+                       "KRB,CMP,CTL,SUP,RSD,TAD,RST,LP,PACK,",          00048000          
+                       48"40" FOR 77,48"0D",48"25";                     00049000          
+                                                                        00050000          
+   WRITE(STREAM,150,MYHEAD[0]);                                         00051000          
+                                                                        00052000          
+   WHILE NOT READ(SURVEY,132,WORK) DO                                   00053000          
+   BEGIN                                                                00054000          
+      REPLACE PIN:= BUFFOUT[0] BY " " FOR SIZE(BUFFOUT);                00055000          
+                                                                        00056000          
+      IF BUFFIN[0] EQL "DISKFILE PRIVILEGES REPORT ON " FOR 30 THEN     00057000          
+      BEGIN                                                             00058000          
+          REPLACE MYPACK[0] BY " " FOR 17;                              00059000          
+          REPLACE MYPACK[0] BY BUFFIN[30] FOR 17;                       00060000          
+      END;                                                              00061000          
+                                                                        00062000          
+      IF  (BUFFIN[0] EQL "("  FOR 1 OR                                  00063000          
+           BUFFIN[0] EQL "*"  FOR 1) AND                                00064000          
+           BUFFIN[0] NEQ "**" FOR 2 THEN                                00065000          
+      BEGIN                                                             00066000          
+         REPLACE PIN:PIN BY   BUFFIN[FNAME]  FOR   FNAME_LEN,   ",",    00067000          
+                              BUFFIN[FKIND]  FOR   FKIND_LEN,   ",",    00068000          
+                              BUFFIN[SEC]    FOR   SEC_LEN,     ",",    00069000          
+                              BUFFIN[PU]     FOR   PU_LEN,      ",",    00070000          
+                              BUFFIN[SA]     FOR   SA_LEN,      ",",    00071000          
+                              BUFFIN[TK]     FOR   TK_LEN,      ",",    00072000          
+                              BUFFIN[SAD]    FOR   SAD_LEN,     ",",    00073000          
+                              BUFFIN[KRB]    FOR   KRB_LEN,     ",",    00074000          
+                              BUFFIN[CMP]    FOR   CMP_LEN,     ",",    00075000          
+                              BUFFIN[CTL]    FOR   CTL_LEN,     ",",    00076000          
+                              BUFFIN[SUP]    FOR   SUP_LEN,     ",",    00077000          
+                              BUFFIN[RSD]    FOR   RSD_LEN,     ",",    00078000          
+                              BUFFIN[TAD]    FOR   TAD_LEN,     ",",    00079000          
+                              BUFFIN[RST]    FOR   RST_LEN,     ",",    00080000          
+                              BUFFIN[LP]     FOR   LP_LEN,      ",",    00081000          
+                              MYPACK[0]      FOR   17,          ",",    00082000          
+                              48"0D",48"25"                             00083000          
+                              ;                                         00084000          
+                                                                        00085000          
+         REPLACE BUFFOUT[0] BY BUFFOUT[0] FOR SIZE(BUFFOUT) WITH SP2NUL;00086000          
+         WRITE(STREAM,150,BUFFOUT[0]);                                  00087000          
+                                                                        00088000          
+      END;                                                              00089000          
+                                                                        00090000          
+   END;                                                                 00091000          
+                                                                        00092000          
+   LOCK(STREAM,CRUNCH);                                                 00093000          
+                                                                        00094000          
+END.                                                                    00095000          

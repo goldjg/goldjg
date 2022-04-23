@@ -1,0 +1,29 @@
+:tryagain
+call:unique MTAFILE
+
+if exist e:\dev_grab (
+  copy %1 e:\dev_grab\%MTAFILE%
+  if %errorlevel% equ 0 (
+  echo.copied %1 to e:\dev_grab\%MTAFILE% >> "e:\server\apps\UNISYS\enterprise output manager\user jobs\retitle.txt"
+  ) else (
+  echo.copy %1 to e:\dev_grab\%MTAFILE% not copied >> "e:\server\apps\UNISYS\enterprise output manager\user jobs\retitle.txt"
+  )
+)
+
+ren %1 %MTAFILE%
+goto res%errorlevel%
+:res0
+echo.retitled %1 to %MTAFILE% >> "e:\server\apps\UNISYS\enterprise output manager\user jobs\retitle.txt"
+goto:eof
+:res1
+echo.retitle %1 to %MTAFILE% failed !!!! >> "e:\server\apps\UNISYS\enterprise output manager\user jobs\retitle.txt"
+if exist %1 goto tryagain 
+goto:eof
+
+
+:Unique ret -- returns YYYYMMDDhhmmsscc - from http://www.dostips.com
+SETLOCAL
+for /f "tokens=1-7 delims=/:. " %%A in ("%date%:%time: =0%") do set "UNIQUE=%%C%%B%%A%%D%%E%%F%%G.MTA"
+ENDLOCAL & IF "%~1" NEQ "" (SET %~1=%UNIQUE%) ELSE echo.%UNIQUE%
+EXIT /b
+

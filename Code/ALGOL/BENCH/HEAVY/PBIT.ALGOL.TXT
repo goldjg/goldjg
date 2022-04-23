@@ -1,0 +1,101 @@
+                                                                        
+ $ SET LISTDOLLAR LIST ERRLIST LINEINFO STACK NOXREFLIST                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  THIS PROGRAM CAUSES HEAVY PBITTING. A LOCAL ARRAY IS DECLARED AND    
+%  ACCESSED FOR HOWLONG SECONDS (ALSO PROC ENTRY & EXIT).               
+%                                                                       
+%  N.B. USE WITH CARE AS THIS PROGRAM CAN SERIOUSLY DEGRADE THE SYSTEM. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PROCEDURE PBIT(HOWLONG);                                                
+INTEGER HOWLONG;                                                        
+BEGIN                                                                   
+   TASK PBITTASK;                                                       
+   EVENT START,STOP;                                                    
+   EBCDIC ARRAY TASK_NAME[0:47];                                        
+                                                                        
+PROCEDURE DO_PBITS(START,STOP);                                         
+  % Procedure which is processed off to perform PBITing                 
+EVENT START,STOP;                                                       
+BEGIN                                                                   
+                                                                        
+   DEFINE                                                               
+     SAY = REPLACE OUTARRAY[0] BY#,                                     
+     CLEAROUTARRAY = REPLACE OUTARRAY[0] BY " " FOR 132#;               
+                                                                        
+   EBCDIC ARRAY OUTARRAY[0:131];                                        
+   FILE REPORT(KIND=PRINTER);                                           
+   REAL TIME7,PTSTART,PTSTOP,IOSTART,IOSTOP,ETSTART,ETSTOP;             
+   INTEGER COUNT;                                                       
+                                                                        
+   PROCEDURE LOCAL_ARRAY;                                               
+     % Procedure called to generate initial PBIT                        
+   BEGIN                                                                
+      ARRAY PBIT[0:83]; % MAKE IT BIG ENOUGH SO IT'S NOT INSTACK        
+      PBIT[0] := 999999;                                                
+   END;                                                                 
+                                                                        
+   INTERRUPT HI;                     % Attach message to interrupt      
+     DISPLAY("====> HAVE CALLED PROCEDURE "                             
+             !!STRING(COUNT,*)!!" TIMES");                              
+                                                                        
+                                     % Attach interrupt to event        
+   ATTACH HI TO MYSELF.EXCEPTIONEVENT;                                  
+                                                                        
+                                                                        
+   WAIT(START);                      % Wait for start event             
+   PTSTART := TIME(12);              % Note initial times               
+   IOSTART := TIME(13);                                                 
+   ETSTART := TIME(14);                                                 
+   WHILE NOT HAPPENED(STOP) DO       % Create initial PBITs until STOP  
+   BEGIN                                                                
+     LOCAL_ARRAY;                                                       
+     COUNT := * + 1;                                                    
+   END;                                                                 
+   PTSTOP := TIME(12);               % Note final times                 
+   IOSTOP := TIME(13);                                                  
+   ETSTOP := TIME(14);                                                  
+   CLEAROUTARRAY;                    % Write results to report          
+   SAY "=== H E A V Y  P B I T ==="," " FOR 10,"[ON ",MYSELF.HOSTNAME   
+       ,"]";                                                            
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   TIME7 := TIME(7);                                                    
+   SAY STRING(TIME7.[23:6],*),":",STRING(TIME7.[17:6],*),":",           
+       STRING(TIME7.[11:6],*),"   ",                                    
+       STRING(TIME7.[29:6],*),"/",STRING(TIME7.[35:6],*),"/",           
+       DROP(STRING(TIME7.[47:12],*),2);                                 
+   WRITE(REPORT[SPACE 4],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "ELAPSED TIME   = ",                                             
+        STRING((ETSTOP - ETSTART) * 2.4@-6,*)," SECONDS";               
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "PROCESSOR TIME = ",                                             
+        STRING((PTSTOP - PTSTART) * 2.4@-6,*)," SECONDS";               
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "I/O TIME       = ",                                             
+        STRING((IOSTOP-IOSTART) * 2.4@-6,*)," SECONDS";                 
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "PERFORMED PROC WITH LOCAL ARRAY ", STRING(COUNT,*)," TIMES";    
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   LOCK(REPORT);                                                        
+END;                                                                    
+                                     % Initialise task name             
+   REPLACE TASK_NAME[0] BY "BENCH/HEAVY/PBIT.";                         
+   REPLACE PBITTASK.NAME BY TASK_NAME;                                  
+   PBITTASK.OPTIONS := MYSELF.OPTIONS;                                  
+                                     % Process of PBIT procedure        
+   PROCESS DO_PBITS(START,STOP)[PBITTASK];                              
+                                                                        
+                                     % Wait until process has started   
+   WHILE PBITTASK.STATUS < 0 DO WAITANDRESET(MYSELF.EXCEPTIONEVENT);    
+   DISPLAY("====> HEAVY PBIT STARTING");                                
+   CAUSE(START);                     % Start PBIT test                  
+   WHEN(HOWLONG);                    % Wait for specified time          
+   CAUSE(STOP);                      % Stop PBIT test                   
+                                                                        
+                                     % Wait until process has finished  
+   WHILE PBITTASK.STATUS > 0 DO WAITANDRESET(MYSELF.EXCEPTIONEVENT);    
+END.                                                                    

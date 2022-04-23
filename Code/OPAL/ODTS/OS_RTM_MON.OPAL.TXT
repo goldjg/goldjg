@@ -1,0 +1,182 @@
+DEFINE * SITU OS_RTM_MON (log=21,1):                                            
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% OS_RTM_MON SITUATION                                                     %%  
+%% ====================                                                     %%  
+%% MONITORS CHANGE IN STATE OF LOCUM REALTIME MONITOR CONNECTIONS FROM      %%  
+%% PRDIP (PRDHST) AND DEVIP (DEVHST).                %%  
+%%                                                                          %%  
+%% *** NOTE - IF SERVER IP ADDRESSES CHANGE, THIS SCRIPT WILL NEED AMENDED  %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               APR '15 GXG    %%  
+%% VERSION 02 INTERFACE/2 CONNECTIONS ONLY         JUN 17          
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+(LOGTEXT EQW "=1_2_3_4=" OR LOGTEXT EQW "=1_2_3_4=") AND               
+LOGTEXT EQW "=INTERFACE/2="                                                     
+\                                                                               
+TT DEF * ODTS OS_RTM_MON (LOG):                                                 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% OS_RTM_MON ODTSEQUENCE                                                   %%  
+%% ======================                                                   %%  
+%% ANALYSES LOCUM REALTIME SERVICE STATE CHANGE LOG ENTRIES RELATING TO     %%  
+%% PRDHST AND DEVHST. GENERATES EMAIL ALERTS TO HAVE SERVICE ON   %%  
+%% APPROPRIATE SERVER RESTARTED IF CONNECTION HAS BEEN LOST AND NOT RESTORED%%  
+%%                                                                          %%  
+%% *** NOTE - IF SERVER IP ADDRESSES CHANGE, THIS SCRIPT WILL NEED AMENDED  %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               APR '15 GXG    %%  
+%% VERSION 02 RTMS BECOMES RTS                    24/08/17 LW        
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+                                                                                
+%exit if not the correct logtext                                                
+IF NOT LOGTEXT EQW {"=Close connection=","=Open connection=",                   
+                    "=Logoff=","=Secadmin Logon="} THEN                         
+BEGIN                                                                           
+EXIT;                                                                           
+END;                                                                            
+                                                                                
+%Get the ip address from the log entry using decat option 1                     
+%(return the text after the text being searched for)                            
+$SRV_IP:=DECAT(LOGTEXT,"Station IP",1);                                         
+                                                                                
+%Use CASE statement to populate $SRV variabe based on ip address                
+CASE $SRV_IP OF                                                                 
+BEGIN                                                                           
+"1_2_3_4":                                                                  
+            $SRV:="PRDHST";                                                
+"1_2_3_4":                                                                 
+            $SRV:="DEVHST";                                                
+END;                                                                            
+                                                                                
+%if log entry was a connection close, create/update connection dynamic variable 
+%for that site to be 0                                                          
+IF LOGTEXT EQW "=Close connection=" THEN                                        
+BEGIN                                                                           
+   $DYN_CON:=#($SRV,"_CON");                                                    
+   #$DYN_CON.GLOBAL:=0;                                                         
+   $DYN_LOG:=#($SRV,"_LOG");                                                    
+   #$DYN_LOG.GLOBAL:=0;                                                         
+END;                                                                            
+                                                                                
+%if log entry was a connection open, create/update connection dynamic variable  
+%for that site to be 1                                                          
+IF LOGTEXT EQW "=Open connection=" THEN                                         
+BEGIN                                                                           
+   $DYN_CON:=#($SRV,"_CON");                                                    
+   #$DYN_CON.GLOBAL:=1;                                                         
+   $DYN_LOG:=#($SRV,"_LOG");                                                    
+   #$DYN_LOG.GLOBAL:=0;                                                         
+END;                                                                            
+                                                                                
+%if log entry was a logoff, create/update logon dynamic variable                
+%for that site to be 0                                                          
+IF LOGTEXT EQW "=Logoff=" THEN                                                  
+BEGIN                                                                           
+   $DYN_LOG:=#($SRV,"_LOG");                                                    
+   #$DYN_LOG.GLOBAL:=0;                                                         
+   $DYN_CON:=#($SRV,"_CON");                                                    
+   #$DYN_CON.GLOBAL:=1;                                                         
+END;                                                                            
+                                                                                
+%if log entry was a logon, create/update logon dynamic variable                 
+%for that site to be 2                                                          
+IF LOGTEXT EQW "=Secadmin Logon=" THEN                                          
+BEGIN                                                                           
+   $DYN_LOG:=#($SRV,"_LOG");                                                    
+   #$DYN_LOG.GLOBAL:=2;                                                         
+   $DYN_CON:=#($SRV,"_CON");                                                    
+   #$DYN_CON.GLOBAL:=1;                                                         
+END;                                                                            
+                                                                                
+%create/update status dynamic variable for each site to be total of             
+%connection and logon status values (possible status values 0, 1 or 3),         
+%and for STE description.                                                       
+$DYN_STS:=#($SRV,"_STS");                                                       
+$DYN_STE:=#($SRV,"_STE");                                                       
+#$DYN_STS.GLOBAL :=#$DYN_LOG.GLOBAL + #$DYN_CON.GLOBAL;                         
+                                                                                
+%create a status message based on the site status value.                        
+%because there are 2 ways to have a status of 1, check what the log event was   
+CASE #$DYN_STS.GLOBAL OF                                                        
+BEGIN                                                                           
+0: $$DYN_STE.GLOBAL:="disconnected and not logged on";                          
+1: BEGIN                                                                        
+      IF LOGTEXT EQW "=Logoff=" THEN                                            
+      BEGIN                                                                     
+         $$DYN_STE.GLOBAL:="logged off but still connected";                    
+      END;                                                                      
+                                                                                
+      IF LOGTEXT EQW "=Open connection=" THEN                                   
+      BEGIN                                                                     
+         $$DYN_STE.GLOBAL:="reconnected but not logged on";                     
+      END;                                                                      
+   END                                                                          
+3: $$DYN_STE.GLOBAL:="reconnected and logged on";                               
+Else: $$DYN_STE.GLOBAL:=#("STATUS=",#$DYN_STS.GLOBAL );                         
+END;                                                                            
+                                                                                
+%enable alert flag and create email subject/body for status 0                   
+%(not connected, or logged on to mainframe)                                     
+IF #$DYN_STS.GLOBAL EQL 0 THEN                                                  
+BEGIN                                                                           
+   #SEND_ALERT:=1;                                                              
+   $ERRSUB:=#(HOSTNAME,": ",$SRV," RealTime Service server ",$$DYN_STE.GLOBAL); 
+   $ERRBOD:=#("Please restart Locum Real Time Service on server ",              
+              $SRV," if not advised within 5 minutes that the ",                
+              "service has reconnected and logged on.",/,/,                     
+              "The restart procedure is documented in section 17 of the ",      
+              "following document:",/,                                          
+              "http://##REDACTED##/",               
+              "No security events are currently being forwarded to ",           
+              "##REDACTED## from this mainframe.",/,/,            
+              "Event that caused this alert was: ",/,                           
+              LOGTEXT);                                                         
+END;                                                                            
+                                                                                
+%enable alert flag and create email subject/body for status 1                   
+%(not logged on, may either be diconnected or reconnected)                      
+IF #$DYN_STS.GLOBAL EQL 1 THEN                                                  
+BEGIN                                                                           
+   #SEND_ALERT:=1;                                                              
+   $ERRSUB:=#(HOSTNAME,": ",$SRV," RealTime Service Server ",$$DYN_STE.GLOBAL); 
+   $ERRBOD:=#("Please restart Locum Real Time Service on server ",              
+              $SRV," if not advised within 5 minutes that the ",                
+              "service has reconnected and logged on.",/,/,                     
+              "The restart procedure is documented in section 17 of the ",      
+              "following document:",/,                                          
+              "http://##REDACTED##/",               
+              "No security events are currently being forwarded to ",           
+              "##REDACTED## from this mainframe.",/,/,            
+              "Event that caused this alert was: ",/,                           
+              LOGTEXT);                                                         
+END;                                                                            
+                                                                                
+%enable alert flag and create email subject/body for status 3                   
+%(reconnected and logged on)                                                    
+IF #$DYN_STS.GLOBAL EQL 3 THEN                                                  
+BEGIN                                                                           
+   #SEND_ALERT:=1;                                                              
+   $ERRSUB:=#(HOSTNAME,": ",$SRV," RealTime Service Server ",$$DYN_STE.GLOBAL); 
+   $ERRBOD:=#("Locum Real Time Service on server ",                             
+              $SRV," now connected and logged in.",/,/,                         
+              "Event that caused this alert was: ",/,                           
+               LOGTEXT);                                                        
+END;                                                                            
+                                                                                
+%send email if alert flag set                                                   
+IF #SEND_ALERT EQL 1 THEN                                                       
+BEGIN                                                                           
+$ERRMAIL:="##REDACTED##";                       
+#ML:=MAIL(#("TO:",$ERRMAIL,";SUBJECT:",                                         
+    $ERRSUB),$ERRBOD);                                                          
+                                                                                
+%if return code from mail command not 0 (failed in some way)                    
+%generate a waiting entry instead so that operators know there is an issue      
+IF #ML < 0 THEN                                                                 
+   BEGIN                                                                        
+   ODT(#('BEGIN JOB RTM_MON/MAILERROR',';CLASS=9; STRING S; ',                  
+       'S:=ACCEPT("RTM ALERT EMAIL FAILED. ERROR: ',MAILERROR(#ML),'");',       
+       'S:=ACCEPT("',HOSTNAME,': ',$SRV,,$$DYN_STE.GLOBAL,'");'));              
+   END                                                                          
+END;                                                                            

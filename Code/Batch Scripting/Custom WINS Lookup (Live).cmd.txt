@@ -1,0 +1,30 @@
+@TITLE=Looking up WINS records in Live environment...
+@echo off
+if exist WINSList.csv del WINSList.csv
+echo Date , Wins Server , Name Requested , Requested Suffix , Name Returned , Record Type , IP Address >> WINSList.csv
+::          list of name servers
+for %%i in (1.2.3.4
+	    4.3.2.1      ) do (
+::            list of sites  
+for %%j in     (10.9.8.7
+		7.8.9.10	) do (
+::list of suffixes
+for %%k in (00
+	    03
+	    20	) do (
+    for /f "tokens=1*" %%l in ('nblookup /s %%i /x %%k %%j') do (
+      if [%%l]==[Querying] set s1=%%m
+      if [%%l]==[NetBIOS] set s2=%%m
+      if [%%l]==[Suffix:] set s3=%%m
+      if [%%l]==[Name] set s4=%%m
+      if [%%l]==[The] set s4=Not Found
+      if [%%l]==[The] set s5=Not Found
+      if [%%l]==[The] set s6=Not Found
+      if [%%l]==[Record] set s5=%%m
+      if [%%l]==[IP] set s6=%%m)
+    call echo %date% , %%s1%% , %%s2%% , %%s3%% , %%s4%% , %%s5%% , %%s6%% >> WINSList.csv
+  )
+ )
+)
+echo Lookup complete. For results, see WINSList.csv in same path as script 
+pause

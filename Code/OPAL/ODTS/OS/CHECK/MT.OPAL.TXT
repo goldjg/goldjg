@@ -1,0 +1,108 @@
+  TT DEFINE + SITUATION OS_CHECK_MT(TIME,PER=MT-):                              
+                                                                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%      SITUATION TO CHECK STATUS OF TAPE DRIVES AND RUN             %%         
+%%      OS_CHECK_MT ODTSEQUENCE WHEN DRIVES HAVE A PATH              %%         
+%%      THAT IS NOT ONLINE OR DRIVE IS FREED/SAVED/RESERVED.         %%         
+%%                                                                   %%         
+%%      IF NOT RUNNING ON  OR DR, DON'T ALERT FOR          %%         
+%%      MT182 OR MT183 AS THEY DON'T EXIST                           %%         
+%%                                                                   %%         
+%%      VERSION 01 - #### - INITIAL IMPLEMENTATION  NOV '08 GXG  %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+ UNITNO={123,321}                                                               
+     OR                                                                         
+(UNITNO={456,654} AND HOSTNAME = {"", "DR"})                          
+\                                                                               
+ TT DEFINE + ODTSEQUENCE OS_CHECK_MT(PER):                                      
+                                                                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+%%      ODTSEQUENCE TO REPORT WHEN TAPE DRIVES                        %%        
+%%      HAVE NO PATH ONLINE OR UNIT IS FREED/SAVED/RESERVED.          %%        
+%%                                                                    %%        
+%%      INITIATED BY OS_CHECK_MT SITUATION                            %%        
+%%                                                                    %%        
+%%      VERSION 01 - - INITIAL IMPLEMENTATION  NOV '08 GXG   %%        
+%%      VERSION 02 - - Add Debug Logging     Feb '16 GXG   %%        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+                                                                                
+%% Create 'dynamic' variable using unit number                                  
+$UNIT:=#(@);                                                                    
+                                                                                
+%% Drop out if no condition and ensure Unit variable set to null                
+If UNITACTIVESTATUS Eql 0 And                                                   
+   AVAILABLETOGROUP And Not (FREED Or SAVED Or URED) Then                       
+Begin                                                                           
+   $$UNIT:=Empty;          % Deletes variable (not seen in SLOT dump)           
+   EXIT;                                                                        
+End;                                                                            
+                                                                                
+%% Convert PER Attribute values from ON/OFF to friendlier TRUE/FALSE            
+                                                                                
+IF Availabletogroup Then $AcquiredStatus := "TRUE"                              
+Else $AcquiredStatus := "FALSE";                                                
+IF Freed Then $FreedStatus := "TRUE"                                            
+Else $FreedStatus := "FALSE";                                                   
+IF Saved Then $SavedStatus := "TRUE"                                            
+Else $SavedStatus := "FALSE";                                                   
+IF Ured Then $ReservedStatus := "TRUE"                                          
+Else $ReservedStatus := "FALSE";                                                
+                                                                                
+%% Send email alert including device status information                         
+                                                                                
+%% Store a map of current status for this unit                                  
+$STATUS:=#(UNITACTIVESTATUS,AVAILABLETOGROUP,FREED,SAVED,RESERVED);             
+                                                                                
+%% Check global value with current status                                       
+If $$UNIT Neq $STATUS Then                                                      
+Begin                                                                           
+LOG(SITE,"DBG",#("OS_CHECK_MT STATUS:",$STATUS));                               
+%% Ok to send mail, we haven't already alerted for this exact issue             
+#Rslt:=Mail(#("TO:####;Subject:MT",Unitno,                    
+              " on ",Hostname," : Not Available"),                              
+ #("I/O SUSPENSION STATUS = ", Unitactivestatus,/,                              
+   /,                                                                           
+   "If I/O SUSPENSION STATUS is not NOTSUSPENDED, there may be a hardware",     
+   " error - check that the PORT and CTL are ONLINE.",/,                        
+   /,                                                                           
+   "Otherwise, check unit status is correct (Not SAVED, FREED or RESERVED).",/, 
+   "See below for information on current unit status.",/,                       
+   /,                                                                           
+   "MT",Unitno," ACQUIRED = ", $AcquiredStatus,/,                               
+   "MT",Unitno," FREED = ", $FreedStatus,/,                                     
+   "MT",Unitno," SAVED = ", $SavedStatus,/,                                     
+   "MT",Unitno," RESERVED = ", $ReservedStatus,/));                             
+End;                                                                            
+                                                                                
+%% Update new status                                                            
+$$UNIT:=$STATUS;                                                                
+                                                                                
+%% Check if alert was triggered because device path was lost                    
+If Unitactivestatus > 0 Then                                                    
+                                                                                
+%% If it was, create waiting entry for Ops in addition to email alert           
+Begin                                                                           
+$msg := #("Problem with MT",Unitno," : Path Lost to CTL or PORT");              
+$wait := #("OS/DRIVE/MONITOR/MT",Unitno);                                       
+store ("ALERTNAME", $wait);                                                     
+%%                                                                              
+%% AX any existing waiting entry of the type about to be produced               
+      IF COUNT(MX=W:NAME=GETSTR("ALERTNAME")                                    
+               AND STORE("MIXNO",MIXNUMBER)="") > 0 THEN                        
+         ODT(STRING(GET("MIXNO"),*) & "AX");                                    
+      WAIT(2);                                                                  
+      IF COUNT(MX=W:NAME=GETSTR("ALERTNAME")) <= 0 THEN                         
+   Begin                                                                        
+                                                                                
+%% produce a waiting entry to alert on lost path                                
+      store ("ALERTWFL", "BEGIN JOB " & GETSTR("ALERTNAME") & "; " &            
+                      "CLASS=9; STRING S; " &                                   
+                      "S:=ACCEPT(""" &                                          
+                      $msg &                                                    
+                      """);");                                                  
+   ODT (GETSTR("ALERTWFL"));                                                    
+   End;                                                                         
+End;                                                                            
+\                                                                               
+                                                                                

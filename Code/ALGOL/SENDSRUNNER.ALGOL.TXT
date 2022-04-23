@@ -1,0 +1,1249 @@
+$$ SET LIST ERRLIST STACK LINEINFO FORMAT NOXREFLIST LISTDOLLAR         
+$$ SET LEVEL 2                                                          
+PROCEDURE THERUNNER(INPUT_PARAMS);                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%% OS/P/SENDRUNNER                                           %%         
+%% ===============                                           %%         
+%% PROGRAM RUN FROM   WINDOW ON ##REDACTED##                     %%         
+%%                                                           %%         
+%% FUNCTION: CREATES OPSRUNNER REQUEST FILE FROM             %%         
+%%           INPUT PARAMETERS.                               %%         
+%%                                                           %%         
+%% MUST BE PP'D IN ORDER TO CREATE FILES UNDER * ON DISK     %%         
+%% SINCE  USERCODE IS NOT PRIVILEGED                     %%         
+%%                                                           %%         
+%% INPUT PARAMS                                              %%         
+%% ============                                              %%         
+%% SINGLE INPUT STRING FORMATTED AS FOLLOWS:-                %%         
+%% "REQID,MULTICOPY,SRCFAM,SRCUSR,SRCTITLE,SRCFILE,SRCTAPE,  %%         
+%%  SRCSERIAL,SRCTAPENAME,DSTFAM,DSTUSR,DSTTITLE,EMAIL"      %%         
+%%                                                           %%         
+%% REQID - ALPHANUMERIC, SHOULD MATCH AN AUTHORISED          %%         
+%%         CHANGE ID (REQUIRED) - MAX 8 CHARS                %%         
+%%                                                           %%         
+%% MULTICOPY - Y OR N - ARE MULTIPLE FILES/DIRS BEING        %%         
+%%             COPIED IN THIS REQUEST? (REQUIRED)            %%         
+%%                                                           %%         
+%% SRCFAM - WHICH FAMILY SHOULD FILES BE COPIED FROM?        %%         
+%%          ONLY REQUIRED IF SRCFILE=Y                       %%         
+%%          ONLY ##REDACTED##, ##REDACTED## OR PACK ALLOWED       %%         
+%%                                                           %%         
+%% SRCUSR - SOURCE USERCODE (REQUIRED). MUST BE ##REDACTED##       %%         
+%%                                                           %%         
+%% SRCTITLE - TITLE(S) OF FILE(S)/DIR(S) TO BE COPIED (REQD) %%         
+%%            IF MULTICOPY = Y THEN LIST TITLES DELIMITED    %%         
+%%            BY ! E.G. FILE/1!DIRECTORY/1/=                 %%         
+%%                                                           %%         
+%% SRCFILE - ARE FILES BEING COPIED FROM DISK(Y) OR TAPE(N)  %%         
+%%           CANNOT BE THE SAME AS SRCTAPE (BOTH REQUIRED)   %%         
+%%                                                           %%         
+%% SRCTAPE - ARE FILES BEING COPIED FROM TAPE(Y) OR DISK(N)  %%         
+%%           CANNOT BE THE SAME AS SRCFILE (BOTH REQUIRED)   %%         
+%%                                                           %%         
+%% SRCSERIAL - SERIAL NUMBER OF TAPE TO COPY FILES FROM      %%         
+%%             ONLY REQUIRED IF SRCTAPE = Y                  %%         
+%%             6 ALPHANUMBER CHARS, EITHER GETGnn OR nnnnnn  %%         
+%%                                                           %%         
+%% SRCTAPENAME - NAME OF TAPE (ALPHANUMERIC - 17 CHARS MAX)  %%         
+%%               (REQUIRED)                                  %%         
+%%                                                           %%         
+%% DSTFAM - WHICH FAMILY SHOULD FILES BE COPIED TO?          %%         
+%%          (REQUIRED)                                       %%         
+%%          ONLY NON-SYSTEM FAMILIES ALLOWED (E.G NOT DISK)  %%         
+%%                                                           %%         
+%% DSTUSR - DEST USERCODE (REQUIRED).                        %%         
+%%          MUST BE ##REDACTED##, ##REDACTED## or ##REDACTED##                 %%         
+%%                                                           %%         
+%% DSTTITLE - NAMES TO COPY FILES AS (PREFIXED BY REQID)     %%         
+%%            IF MULTICOPY = Y THEN LIST TITLES DELIMITED    %%         
+%%            BY ! E.G. FILE/1!DIRECTORY/1/= (REQUIRED)      %%         
+%%                                                           %%         
+%% EMAIL - ADDRESS OR ADDRESSES (DELIMITED BY COMMAS) TO     %%         
+%%         SEND EMAIL REPORT TO WHEN REQUEST FILE IS         %%         
+%%         PROCESSED (REQUIRED)                              %%         
+%%                                                           %%         
+%% OUTPUTS                                                   %%         
+%% =======                                                   %%         
+%% CREATES FILE *PRM/D/OPSRUNNER/<REQID> ON ##REDACTED##.        %%         
+%%                                                           %%         
+%% IF FILE ALREADY EXISTS, WILL BE PROMPTED TO CONFIRM       %%         
+%% OK TO OVERWRITE.                                          %%         
+%%                                                           %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                                                           %%         
+%% VERSION 01 INITIAL IMPLEMENTATION   OCT 2010 GXG %%         
+%% VERSION 02 BUG FIXES FOR LONG SOURCE/DEST TITLES %%         
+%%                         AND INCORRECT DELIMITER PLACEMENT %%         
+%%                                              NOV 2010 GXG %%         
+%% VERSION 03 CHANGE REQUEST FILE FAMILY TO ##REDACTED## %%         
+%%                                              JUN 2011 GXG %%         
+%% VERSION 04 RECOMPILE FOR MCP 17    JUN 2015 %%          
+%% VERSION 05 ADD STEST USERCODES     MAR 2016 GXG %%         
+%%                                                           %%         
+%% VERSION 06 ALLOW SINGLE QUOTE IN EMAIL NAME     11/07/17 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+ARRAY INPUT_PARAMS[*];                                                  
+                                                                        
+BEGIN                                                                   
+                                                                        
+DEFINE                                                                  
+  DOT                               = "."#                              
+ ,NULLS                             = 48"00"#                           
+ ,BLANKS                            = " "#                              
+ ,COMMA                             = ","#                              
+ ,BANG                              = "!"#                              
+ ,UCODE_LEN                         = 17#  %% MAX USERCODE LENGTH       
+ ,FAM_LEN                           = 17#  %% MAX FAMILY LENGTH         
+ ,SERIAL_LEN                        = 6#   %% MAX TAPE SERIAL LENGTH    
+ ,TNAME_LEN                         = 17#  %% MAX TAPE NAME LENGTH      
+ ,FILE_LEN                          = 255# %% MAX 255 CHARS SINGLE FILE 
+ ,EMAIL_LEN                         = 255#                              
+ ,REQID_LEN                         = 10#  %% LENGTH OF FORM FIELD      
+ ,TITLE_LEN                         = 40#  %% REQUEST FILE TITLE LENGTH 
+ ,REC_LEN                           = 264#                              
+ % HUNT_COMMA = scan along to next comma                                
+ ,HUNT_COMMA = IF PINPUT NEQ COMMA THEN                                 
+             SCAN PINPUT:PINPUT UNTIL = COMMA;                          
+          PINPUT:=PINPUT+1#                                             
+ % COUNT_BANGS = find/count exclamation marks (bangs) in array row      
+ ,COUNT_BANGS = IF PSCAN NEQ BANG THEN                                  
+             SCAN PSCAN:PSCAN FOR FILE_LEN-(OFFSET(PSCAN)+1)            
+                   WHILE NEQ BANG;                                      
+          IF PSCAN = BANG THEN COUNTER:=COUNTER+1;                      
+          PSCAN:=PSCAN+1#                                               
+ ,CHARACTERSPERWORD                 = 6#                                
+ ;                                                                      
+                                                                        
+POINTER                                                                 
+  PINPUT                                                                
+ ,PSCAN                                                                 
+ ,PSRC                                                                  
+ ,PDST                                                                  
+ ;                                                                      
+                                                                        
+LABEL                                                                   
+  XIT                                                                   
+ ;                                                                      
+                                                                        
+INTEGER                                                                 
+  REMAINDER                                                             
+ ,PARAM_ERROR                                                           
+ ,SRCBANGS                                                              
+ ,DSTBANGS                                                              
+ ,SRC_POS                                                               
+ ,DST_POS                                                               
+ ,COUNTER                                                               
+ ,EMAILCHARCOUNT                                                        
+ ,SERIALCOUNT                                                           
+ ;                                                                      
+                                                                        
+TRUTHSET                                                                
+  NUMS         ("0123456789")                                           
+ ,ALPHANUM     (ALPHA OR NUMS)                                          
+ ,EMAILERRSET  ("[]\/;:<>")                                             
+ ;                                                                      
+                                                                        
+EBCDIC ARRAY                                                            
+  REQID                          [0:REQID_LEN-1]                        
+ ,SRCFAM                         [0:FAM_LEN-1]                          
+ ,SRCUSR                         [0:UCODE_LEN-1]                        
+ ,SRCTITLE                       [0:FILE_LEN]                           
+ ,SRCSERIAL                      [0:SERIAL_LEN-1]                       
+ ,SRCTAPENAME                    [0:TNAME_LEN-1]                        
+ ,DSTFAM                         [0:FAM_LEN-1]                          
+ ,DSTUSR                         [0:UCODE_LEN-1]                        
+ ,DSTTITLE                       [0:FILE_LEN-1]                         
+ ,EMAIL                          [0:EMAIL_LEN-1]                        
+ ,PARAMETER_ARRAY                [0:1]                                  
+ ,COPY_CMD                       [0:FILE_LEN*6]                         
+ ,FILETITLE                      [0:TITLE_LEN-1]                        
+ ,FILE_REC                       [0:REC_LEN]                            
+ ;                                                                      
+                                                                        
+EBCDIC STRING                                                           
+   ESCANBUF1                                                            
+  ,ESCANBUF2                                                            
+  ,SRCTTL                                                               
+  ,DSTTTL                                                               
+  ,ACCEPTMESS                                                           
+  ;                                                                     
+                                                                        
+BOOLEAN                                                                 
+  MULTICOPY                                                             
+ ,SRCFILE                                                               
+ ,SRCTAPE                                                               
+ ,BYGEN                                                                 
+ ,NOSERIAL                                                              
+ ;                                                                      
+                                                                        
+PROCEDURE CHECK_PARAMS;                                                 
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
+ %%  SPLIT INPUT PARAMS AND VALIDATE INPUT/DISPLAY ERRORS %%            
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%            
+ BEGIN                                                                  
+                                                                        
+ LABEL DISPLAYIT;                                                       
+                                                                        
+ EXCEPTION PROCEDURE CHECK_PARAM_FAILED;                                
+   BEGIN                                                                
+   PROGRAMDUMP(ALL);                                                    
+   END;                                                                 
+                                                                        
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                       
+ %% INITIALISE ARRAYS/BOOLEANS %%                                       
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                                       
+ REPLACE REQID[0] BY BLANKS FOR REQID_LEN;                              
+ REPLACE SRCFAM[0] BY BLANKS FOR FAM_LEN;                               
+ REPLACE SRCUSR[0] BY BLANKS FOR UCODE_LEN;                             
+ REPLACE SRCTITLE[0]  BY BLANKS FOR FILE_LEN;                           
+ REPLACE SRCSERIAL[0] BY BLANKS FOR SERIAL_LEN;                         
+ REPLACE SRCTAPENAME[0]  BY BLANKS FOR TNAME_LEN;                       
+ REPLACE DSTFAM[0] BY BLANKS FOR FAM_LEN;                               
+ REPLACE DSTUSR[0] BY BLANKS FOR UCODE_LEN;                             
+ REPLACE DSTTITLE[0] BY BLANKS FOR FILE_LEN;                            
+ REPLACE EMAIL[0] BY BLANKS FOR EMAIL_LEN;                              
+ REPLACE COPY_CMD[0] BY BLANKS FOR FILE_LEN*6;                          
+ MULTICOPY := FALSE;                                                    
+ SRCFILE := FALSE;                                                      
+ SRCTAPE := FALSE;                                                      
+ BYGEN := FALSE;                                                        
+ NOSERIAL := FALSE;                                                     
+                                                                        
+ REMAINDER:=SIZE(INPUT_PARAMS)*CHARACTERSPERWORD;                       
+ RESIZE(PARAMETER_ARRAY,REMAINDER,DISCARD);                             
+ REPLACE PARAMETER_ARRAY BY POINTER(INPUT_PARAMS) FOR REMAINDER;        
+                                                                        
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                        
+ %% SCAN PARAMETER_ARRAY AND SPLIT OUT PARAMS %%                        
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                        
+                                                                        
+ PINPUT:=PARAMETER_ARRAY[0];                                            
+                                                                        
+ %% REQUEST ID                                                          
+ REPLACE REQID[0] BY                                                    
+    PINPUT:PINPUT FOR REQID_LEN WHILE NEQ COMMA;                        
+ HUNT_COMMA;                                                            
+                                                                        
+ %% SET MULTICOPY MODE IF POINTER = "Y"                                 
+ IF PINPUT = "Y" THEN MULTICOPY := TRUE;                                
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET SOURCE FAMILY                                                   
+ REPLACE SRCFAM[0] BY                                                   
+    PINPUT:PINPUT FOR FAM_LEN WHILE NEQ COMMA;                          
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET SOURCE USERCODE                                                 
+ REPLACE SRCUSR[0] BY                                                   
+    PINPUT:PINPUT FOR UCODE_LEN WHILE NEQ COMMA;                        
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET SOURCE TITLE OR TITLE LIST                                      
+ REPLACE SRCTITLE[0] BY                                                 
+    PINPUT:PINPUT FOR FILE_LEN WHILE NEQ COMMA;                         
+ HUNT_COMMA;                                                            
+                                                                        
+ %% SET FILE MODE IF POINTER = "Y"                                      
+ IF PINPUT = "Y" THEN SRCFILE := TRUE;                                  
+ HUNT_COMMA;                                                            
+                                                                        
+ %% SET TAPE MODE IF POINTER = "Y"                                      
+ IF PINPUT = "Y" THEN SRCTAPE := TRUE;                                  
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET TAPE SERIAL NUMBER FOR TAPE MODE                                
+ REPLACE SRCSERIAL[0] BY                                                
+    PINPUT:PINPUT FOR SERIAL_LEN WHILE NEQ COMMA;                       
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET TAPE NAME FOR TAPE MODE                                         
+ REPLACE SRCTAPENAME[0] BY                                              
+    PINPUT:PINPUT FOR TNAME_LEN WHILE NEQ COMMA;                        
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET DESTINATION FAMILY                                              
+ REPLACE DSTFAM[0] BY                                                   
+    PINPUT:PINPUT FOR FAM_LEN WHILE NEQ COMMA;                          
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET DESTINATION USERCODE                                            
+ REPLACE DSTUSR[0] BY                                                   
+    PINPUT:PINPUT FOR UCODE_LEN WHILE NEQ COMMA;                        
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET DESTINATION TITLE OR TITLE LIST                                 
+ REPLACE DSTTITLE[0] BY                                                 
+    PINPUT:PINPUT FOR FILE_LEN WHILE NEQ COMMA;                         
+ HUNT_COMMA;                                                            
+                                                                        
+ %% GET EMAIL ADDRESS TO SEND REPORT TO WHEN RUNNER PROCESSED           
+ REPLACE EMAIL[0] BY                                                    
+    PINPUT:PINPUT WHILE NEQ NULLS;                                      
+                                                                        
+ %% INITIALISE PARAM_ERROR BEFORE INPUT VALIDATION STARTS               
+ PARAM_ERROR := 0;                                                      
+                                                                        
+ %%%%%%%%%%%%%%%%%%%%%%                                                 
+ %% VALIDATION START %%                                                 
+ %%%%%%%%%%%%%%%%%%%%%%                                                 
+                                                                        
+ %% CHECK THAT A REQUEST ID WAS SUPPLIED                                
+ SCAN PSCAN:REQID[0] FOR 1 WHILE NEQ NULLS;                             
+                                                                        
+ %% IF FIRST CHAR IS NULL/BLANK, REQID INVALID/EMPTY                    
+ IF PSCAN = NULLS OR                                                    
+    PSCAN = BLANKS THEN                                                 
+   BEGIN                                                                
+   %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                        
+   %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                       
+   PARAM_ERROR := 18;                                                   
+   GO DISPLAYIT;                                                        
+   END                                                                  
+   %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE            
+   ELSE PARAM_ERROR := PARAM_ERROR;                                     
+                                                                        
+                                                                        
+ %% CHECK THAT ONLY SRCTAPE **OR** SRCFILE IS SET, NOT BOTH             
+                                                                        
+ %%BOTH SET                                                             
+ IF SRCFILE AND SRCTAPE THEN                                            
+   BEGIN                                                                
+   %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                        
+   %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                       
+   PARAM_ERROR := 1;                                                    
+   GO DISPLAYIT;                                                        
+   END                                                                  
+   %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE            
+   ELSE PARAM_ERROR := PARAM_ERROR;                                     
+                                                                        
+ %% BOTH RESET                                                          
+ IF NOT SRCFILE THEN                                                    
+   IF NOT SRCTAPE THEN                                                  
+   BEGIN                                                                
+   %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                        
+   %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                       
+   PARAM_ERROR := 1;                                                    
+   GO DISPLAYIT;                                                        
+   END                                                                  
+   %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE            
+   ELSE PARAM_ERROR := PARAM_ERROR;                                     
+                                                                        
+ %% CHECK THAT MULTI FILE DELIMITER (!/BANG) NOT PRESENT                
+ %% IN SRC/DST TITLE PARAMS WHEN NOT IN MULTICOPY MODE                  
+ SCAN PSCAN:SRCTITLE[0] FOR FILE_LEN-1 WHILE NEQ BANG;                  
+ IF NOT MULTICOPY THEN                                                  
+   IF PSCAN = BANG THEN                                                 
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 2;                                                 
+      GO DISPLAYIT;                                                     
+      END;                                                              
+                                                                        
+ SCAN PSCAN:DSTTITLE[0] FOR FILE_LEN-1 WHILE NEQ BANG;                  
+ IF NOT MULTICOPY THEN                                                  
+   IF PSCAN = BANG THEN                                                 
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 2;                                                 
+      GO DISPLAYIT;                                                     
+      END;                                                              
+                                                                        
+ %% CHECK THAT MULTI FILE DELIMITER (!/BANG) IS PRESENT                 
+ %% IN SRC/DST TITLE PARAMS WHEN IN MULTICOPY MODE.                     
+ %% ALSO COUNT BANGS FOUND IN SRC/DST.                                  
+                                                                        
+ %% SCAN UNTIL END OF SRCTITLE ARRAY OR UNTIL WE FIND A BANG            
+ SCAN PSCAN:SRCTITLE[0] FOR FILE_LEN-1 WHILE NEQ BANG;                  
+ IF MULTICOPY THEN                                                      
+   IF PSCAN NEQ BANG THEN                                               
+      %% WE'VE REACHED THE END OF THE ARRAY AND NO BANG                 
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 3;                                                 
+      GO DISPLAYIT;                                                     
+      END                                                               
+       ELSE                                                             
+         %% WE FOUND A BANG                                             
+         BEGIN                                                          
+         PSCAN:=SRCTITLE[0];                                            
+         COUNTER:=0;                                                    
+         DO                                                             
+         %% INCREASE COUNTER FOR EACH BANG FOUND                        
+            BEGIN                                                       
+            COUNT_BANGS;                                                
+            END                                                         
+         UNTIL OFFSET(PSCAN) = FILE_LEN;                                
+         %% MOVE COUNTER VALUE TO SRCBANGS FOR COMPARISON               
+         SRCBANGS := COUNTER;                                           
+         END;                                                           
+                                                                        
+ %% SCAN UNTIL END OF DSTTITLE ARRAY OR UNTIL WE FIND A BANG            
+ SCAN PSCAN:DSTTITLE[0] FOR FILE_LEN-1 WHILE NEQ BANG;                  
+ IF MULTICOPY THEN                                                      
+   IF PSCAN NEQ BANG THEN                                               
+      %% WE'VE REACHED THE END OF THE ARRAY AND NO BANG                 
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 3;                                                 
+      GO DISPLAYIT;                                                     
+      END                                                               
+       ELSE                                                             
+         %% WE FOUND A BANG                                             
+         BEGIN                                                          
+         PSCAN:=DSTTITLE[0];                                            
+         COUNTER:=0;                                                    
+         DO                                                             
+         %% INCREASE COUNTER FOR EACH BANG FOUND                        
+            BEGIN                                                       
+            COUNT_BANGS;                                                
+            END                                                         
+         UNTIL OFFSET(PSCAN) = FILE_LEN;                                
+         %% MOVE COUNTER VALUE TO DSTBANGS FOR COMPARISON               
+         DSTBANGS := COUNTER;                                           
+         END;                                                           
+                                                                        
+ %% COMPARE SRC AND DST BANG COUNTS.                                    
+ %% IF THEY'RE NOT THE SAME, THE NUMBER OF SOURCE                       
+ %% AND DEST TITLES DON'T MATCH.                                        
+ IF SRCBANGS NEQ DSTBANGS THEN                                          
+   BEGIN                                                                
+   %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                        
+   %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                       
+   PARAM_ERROR := 4;                                                    
+   GO DISPLAYIT;                                                        
+   END                                                                  
+   %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE            
+   ELSE PARAM_ERROR := PARAM_ERROR;                                     
+                                                                        
+ %% CHECK THAT EACH SOURCE/DEST PAIR ARE THE SAME TYPE                  
+ %% E.G. CAN'T COPY A FILE AS A DIRECTORY OR VICE VERSA.                
+                                                                        
+ %% CONVERT SRCTITLE TO EBCDIC STRING                                   
+ SCAN PSRC:SRCTITLE[0] FOR FILE_LEN-1 WHILE NEQ BLANKS;                 
+ SRC_POS:= OFFSET(PSRC);                                                
+ SRCTTL:=STRING8(SRCTITLE,SRC_POS);                                     
+                                                                        
+ %% CONVERT DSTTITLE TO EBCDIC STRING                                   
+ SCAN PDST:DSTTITLE[0] FOR FILE_LEN-1 WHILE NEQ BLANKS;                 
+ DST_POS:= OFFSET(PDST);                                                
+ DSTTTL:=STRING8(DSTTITLE,DST_POS);                                     
+                                                                        
+ %% GRAB LAST 2 CHARS IN SRC/DST AND PUT IN BUFFERS                     
+ ESCANBUF1:= DROP(SRCTTL,(LENGTH(SRCTTL)-2));                           
+ ESCANBUF2:= DROP(DSTTTL,(LENGTH(DSTTTL)-2));                           
+                                                                        
+ %% IF EITHER BUFFER CONTAINS "/=" THEN THE OTHER MUST MATCH            
+ IF ESCANBUF1 = "/=" OR                                                 
+    ESCANBUF2 = "/=" THEN                                               
+    IF ESCANBUF2 NEQ ESCANBUF1 THEN                                     
+       BEGIN                                                            
+       %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                    
+       %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                   
+       PARAM_ERROR := 17;                                               
+       GO DISPLAYIT;                                                    
+       END                                                              
+       %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE        
+       ELSE PARAM_ERROR:= PARAM_ERROR;                                  
+                                                                        
+%% REPEAT FOR MULTICOPY MODE                                            
+IF MULTICOPY THEN                                                       
+   BEGIN                                                                
+   SCAN PSRC:SRCTITLE[0] FOR FILE_LEN-1 WHILE NEQ BANG;                 
+   SRC_POS:= OFFSET(PSRC);                                              
+   SRCTTL:=STRING8(SRCTITLE,SRC_POS);                                   
+                                                                        
+   SCAN PDST:DSTTITLE[0] FOR FILE_LEN-1 WHILE NEQ BANG;                 
+   DST_POS:= OFFSET(PDST);                                              
+   DSTTTL:=STRING8(DSTTITLE,DST_POS);                                   
+                                                                        
+   %%CHECK THAT TITLES DON'T START OR END WITH BANGS                    
+                                                                        
+   %% CHECK THE START                                                   
+   PSCAN:=SRCTITLE[0];                                                  
+   PINPUT:=DSTTITLE[0];                                                 
+   IF PSCAN = BANG OR                                                   
+      PINPUT = BANG THEN                                                
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 19;                                                
+      GO DISPLAYIT;                                                     
+      END                                                               
+      %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE         
+      ELSE PARAM_ERROR:= PARAM_ERROR;                                   
+                                                                        
+   %% CHECK THE END                                                     
+   SCAN PSCAN:SRCTITLE[0] FOR FILE_LEN-1 WHILE NEQ BLANKS;              
+   PSCAN := PSCAN -1;                                                   
+                                                                        
+   SCAN PINPUT:DSTTITLE[0] FOR FILE_LEN-1 WHILE NEQ BLANKS;             
+   PINPUT := PINPUT -1;                                                 
+   IF PSCAN = BANG OR                                                   
+      PINPUT = BANG THEN                                                
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 19;                                                
+      GO DISPLAYIT;                                                     
+      END                                                               
+      %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE         
+      ELSE PARAM_ERROR:= PARAM_ERROR;                                   
+                                                                        
+   %% START BUILDING UP COPY COMMAND WHILE SCANNING FILE LISTS ANYWAY   
+   REPLACE COPY_CMD[0] BY COPY_CMD[0] UNTIL = BLANKS                    
+                              ,"COPY (",SRCUSR[0] UNTIL = BLANKS,")"    
+                              ,SRCTTL                                   
+                              ," AS "                                   
+                              ,"(",DSTUSR[0] UNTIL = BLANKS,")"         
+                              ,REQID[0] WHILE IN ALPHANUM,"/"           
+                              ,DSTTTL                                   
+                              ,"@";                                     
+                                                                        
+   ESCANBUF1:= DROP(SRCTTL,(LENGTH(SRCTTL)-2));                         
+   ESCANBUF2:= DROP(DSTTTL,(LENGTH(DSTTTL)-2));                         
+                                                                        
+   %% IF EITHER BUFFER CONTAINS "/=" THEN THE OTHER MUST MATCH          
+   IF ESCANBUF1 = "/=" OR                                               
+      ESCANBUF2 = "/=" THEN                                             
+      IF ESCANBUF2 NEQ ESCANBUF1 THEN                                   
+         BEGIN                                                          
+         %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                  
+         %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                 
+         PARAM_ERROR := 17;                                             
+         GO DISPLAYIT;                                                  
+         END                                                            
+         %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE      
+         ELSE PARAM_ERROR:= PARAM_ERROR;                                
+                                                                        
+   %% MOVE POINTERS ALONG ONE CHAR AND INCREASE COUNTER                 
+   PSRC:=PSRC+1;                                                        
+   PDST:=PDST+1;                                                        
+   COUNTER:=1;                                                          
+                                                                        
+   %% KEEP SCANNING WHILE THERE ARE MORE FILES IN THE ARRAYS            
+   WHILE COUNTER LEQ SRCBANGS DO                                        
+      BEGIN                                                             
+      SRCTTL := HEAD(HEAD(STRING8(PSRC,FILE_LEN-SRC_POS),NOT BANG),     
+         NOT BLANKS);                                                   
+      DSTTTL := HEAD(HEAD(STRING8(PDST,FILE_LEN-DST_POS),NOT BANG),     
+         NOT BLANKS);                                                   
+                                                                        
+      %% ADD NEXT PAIR OF SOURCE/DEST TITLES TO COPY COMMAND            
+      REPLACE COPY_CMD[0] BY COPY_CMD[0] UNTIL = "@"                    
+                                 ,", "                                  
+                                 ,"(",SRCUSR[0] UNTIL = BLANKS,")"      
+                                 ,SRCTTL                                
+                                 ," AS "                                
+                                 ,"(",DSTUSR[0] UNTIL = BLANKS,")"      
+                                 ,REQID[0] WHILE IN ALPHANUM,"/"        
+                                 ,DSTTTL                                
+                                 ,"@";                                  
+                                                                        
+      ESCANBUF1:= DROP(SRCTTL,(LENGTH(SRCTTL)-2));                      
+      ESCANBUF2:= DROP(DSTTTL,(LENGTH(DSTTTL)-2));                      
+                                                                        
+      %% IF EITHER BUFFER CONTAINS "/=" THEN THE OTHER MUST MATCH       
+      IF ESCANBUF1 = "/=" OR                                            
+         ESCANBUF2 = "/=" THEN                                          
+         IF ESCANBUF2 NEQ ESCANBUF1 THEN                                
+            BEGIN                                                       
+            %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS               
+            %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM              
+            PARAM_ERROR := 17;                                          
+            GO DISPLAYIT;                                               
+            END                                                         
+            %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE   
+            ELSE PARAM_ERROR:= PARAM_ERROR;                             
+                                                                        
+      %% MOVE POINTERS, RESCAN, UPDATE COUNTER                          
+      PSRC:=PSRC+1;                                                     
+      SCAN PSRC:PSRC FOR FILE_LEN-SRC_POS-1                             
+         WHILE NEQ BANG;                                                
+      SRC_POS:= OFFSET(PSRC)+2;                                         
+      PDST:=PDST+1;                                                     
+      SCAN PDST:PDST FOR FILE_LEN-DST_POS-1                             
+         WHILE NEQ BANG;                                                
+      DST_POS:= OFFSET(PDST)+2;                                         
+      COUNTER:=COUNTER+1;                                               
+      PSRC:=PSRC+1;                                                     
+      PDST:=PDST+1;                                                     
+      END;                                                              
+   END;                                                                 
+                                                                        
+ %% CHECK THAT SOURCE USERCODE IS ##REDACTED##                                
+ IF SRCUSR[0] NEQ "##REDACTED##" THEN                                         
+   BEGIN                                                                
+   %% IF NOT, SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                
+   %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                       
+   PARAM_ERROR := 5;                                                    
+   GO DISPLAYIT;                                                        
+   END                                                                  
+   %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE            
+   ELSE PARAM_ERROR := PARAM_ERROR;                                     
+                                                                        
+ %% CHECK THAT DESTINATION USERCODE IS EITHER A                         
+ %% ##REDACTED##, ##REDACTED##, ##REDACTED## or ##REDACTED## USERCODE.                          
+ SCAN PSCAN:DSTUSR[0] FOR 6 WHILE NEQ BLANKS;                           
+ ESCANBUF1 := STRING8(DSTUSR,OFFSET(PSCAN));                            
+ ESCANBUF2 := HEAD(ESCANBUF1,NOT NUMS);                                 
+ IF NOT ESCANBUF2 = "##REDACTED##" THEN                                          
+   IF NOT ESCANBUF2 = "##REDACTED##" THEN                                      
+      IF NOT ESCANBUF2 = "##REDACTED##" THEN                                    
+         IF NOT ESCANBUF2 = "##REDACTED##" THEN                                
+         BEGIN                                                          
+         %% IF NOT, SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS          
+         %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                 
+         PARAM_ERROR :=6;                                               
+         GO DISPLAYIT;                                                  
+         END;                                                           
+                                                                        
+ %% CHECK SOME MORE FILE MODE SPECIFIC PARAMS                           
+ IF SRCFILE THEN                                                        
+    BEGIN                                                               
+                                                                        
+    %% SRCSERIAL NOT TO BE SUPPLIED WHEN NOT COPYING FROM TAPE          
+    ESCANBUF1:=STRING8(SRCSERIAL,SERIAL_LEN);                           
+    ESCANBUF2:=HEAD(ESCANBUF1,NOT BLANKS);                              
+    IF LENGTH (ESCANBUF2) > 0 THEN PARAM_ERROR := 16;                   
+                                                                        
+    %% SRCTAPENAME NOT TO BE SUPPLIED WHEN NOT COPYING FROM TAPE        
+    ESCANBUF1:=STRING8(SRCTAPENAME,TNAME_LEN);                          
+    ESCANBUF2:=HEAD(ESCANBUF1,NOT BLANKS);                              
+    IF LENGTH (ESCANBUF2) > 0 THEN PARAM_ERROR := 16;                   
+                                                                        
+    %% IF SOURCE FAMILY ISN'T ##REDACTED##, ##REDACTED## OR PACK             
+    %% THEN SET ERROR MODE.                                             
+    SCAN PSCAN:SRCFAM[0] FOR FAM_LEN-1 WHILE NEQ BLANKS;                
+    ESCANBUF1 := STRING8(SRCFAM,OFFSET(PSCAN));                         
+    IF ESCANBUF1 NEQ "##REDACTED##" THEN                                    
+      IF ESCANBUF1 NEQ "##REDACTED##" THEN                               
+         IF ESCANBUF1 NEQ "##REDACTED##" THEN                                   
+            BEGIN                                                       
+            %% IF NOT, SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS       
+            %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM              
+            PARAM_ERROR := 7;                                           
+            GO DISPLAYIT;                                               
+            END                                                         
+       %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE        
+       ELSE PARAM_ERROR := PARAM_ERROR;                                 
+    END;                                                                
+                                                                        
+ %% IF DESTINATION FAMILY IS A SYSTEM FAMILY THEN SET ERROR MODE        
+ SCAN PSCAN:DSTFAM[0] WHILE NEQ BLANKS;                                 
+ ESCANBUF1 := STRING8(DSTFAM,OFFSET(PSCAN));                            
+ IF ESCANBUF1 = "##REDACTED##" OR                                         
+    ESCANBUF1 = "##REDACTED##" OR                                            
+    ESCANBUF1 = "##REDACTED##" OR                                           
+    ESCANBUF1 = "##REDACTED##" OR                                               
+    ESCANBUF1 = "##REDACTED##" OR                                         
+    ESCANBUF1 = "##REDACTED##" OR                                           
+    ESCANBUF1 = "##REDACTED##" OR                                             
+    ESCANBUF1 = "##REDACTED##" OR                                         
+    ESCANBUF1 = "##REDACTED##" OR                                       
+    ESCANBUF1 = "##REDACTED##" OR                                        
+    ESCANBUF1 = "##REDACTED##" OR                                           
+    ESCANBUF1 = "##REDACTED##" OR                                       
+    ESCANBUF1 = "##REDACTED##" OR                                        
+    ESCANBUF1 = "##REDACTED##" OR                                           
+    ESCANBUF1 = "##REDACTED##" OR                                             
+    ESCANBUF1 = "##REDACTED##" OR                                         
+    ESCANBUF1 = "##REDACTED##" OR                                        
+    ESCANBUF1 = "##REDACTED##" OR                                         
+    TAKE(ESCANBUF1,3) = "##REDACTED##" THEN                                      
+      BEGIN                                                             
+      %% IF NOT, SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS             
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR :=8;                                                  
+      GO DISPLAYIT;                                                     
+      END                                                               
+      %% NO ERROR FOUND SO LEAVE PARAM_ERROR ALONE AND CONTINUE         
+      ELSE PARAM_ERROR := PARAM_ERROR;                                  
+                                                                        
+   %% SCAN FOR INVALID CHARACTERS IN EMAIL PARAM                        
+   SCAN PSCAN:EMAIL[0] FOR EMAIL_LEN-1 WHILE NEQ BLANKS;                
+   EMAILCHARCOUNT:=OFFSET(PSCAN);                                       
+   ESCANBUF1:=STRING8(EMAIL,EMAILCHARCOUNT);                            
+   ESCANBUF2:=HEAD(ESCANBUF1,NOT EMAILERRSET);                          
+   IF LENGTH(ESCANBUF2) < EMAILCHARCOUNT THEN                           
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR:=9;                                                   
+      GO DISPLAYIT;                                                     
+      END;                                                              
+                                                                        
+   %% SCAN FOR NON-ALPHANUMERIC IN LAST CHARACTER OF EMAIL PARAM        
+   SCAN PSCAN:EMAIL[0] FOR EMAILCHARCOUNT -1 WHILE NEQ BLANKS;          
+   IF NOT PSCAN IN ALPHANUM THEN                                        
+      BEGIN                                                             
+      %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                     
+      %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                    
+      PARAM_ERROR := 10;                                                
+      GO DISPLAYIT;                                                     
+      END;                                                              
+                                                                        
+   %% CHECK SOME MORE TAPE MODE SPECIFIC PARAMS                         
+   IF SRCTAPE THEN                                                      
+      BEGIN                                                             
+      ESCANBUF1:=STRING8(SRCSERIAL,SERIAL_LEN);                         
+      ESCANBUF2:=HEAD(ESCANBUF1,NOT BLANKS);                            
+      SERIALCOUNT := LENGTH(ESCANBUF2);                                 
+                                                                        
+      %% CHECK IF SERIAL SUPPLIED, AND IF SO IS IT A GETGnn             
+      IF SERIALCOUNT = 0 THEN  NOSERIAL := TRUE;                        
+      IF SERIALCOUNT = 6 THEN ESCANBUF2:= TAKE(ESCANBUF2,4);            
+      IF ESCANBUF2 = "GETG" THEN BYGEN := TRUE;                         
+                                                                        
+      ESCANBUF1:=STRING8(SRCTAPENAME,TNAME_LEN);                        
+      ESCANBUF2:=HEAD(ESCANBUF1,NOT BLANKS);                            
+                                                                        
+      %% CHECK IF TAPENAME HAS BEEN SUPPLIED                            
+      %% WHEN SERIAL IS A GETGnn(GET TAPE BY GENERATION NO.)            
+      IF LENGTH(ESCANBUF2) = 0 THEN                                     
+         IF BYGEN THEN                                                  
+            BEGIN                                                       
+            %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS               
+            %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM              
+            PARAM_ERROR := 12;                                          
+            GO DISPLAYIT;                                               
+            END;                                                        
+                                                                        
+      %% CHECK IF SERIAL HAS BEEN SUPPLIED,                             
+      %% MUST BE SUPPLIED IN TAPE MODE                                  
+      IF NOSERIAL THEN                                                  
+         BEGIN                                                          
+         %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                  
+         %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                 
+         PARAM_ERROR := 11;                                             
+         GO DISPLAYIT;                                                  
+         END;                                                           
+                                                                        
+      %% CHECK FOR ANY NON-ALPHANUMERIC CHARS IN SERIAL                 
+      ESCANBUF1:=STRING8(SRCSERIAL,SERIAL_LEN);                         
+      ESCANBUF2:=HEAD(ESCANBUF1,ALPHANUM);                              
+      IF LENGTH(ESCANBUF2) > 0 THEN                                     
+         IF LENGTH(ESCANBUF2) < LENGTH(ESCANBUF1) THEN                  
+            BEGIN                                                       
+            %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS               
+            %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM              
+            PARAM_ERROR := 13;                                          
+            GO DISPLAYIT;                                               
+            END;                                                        
+                                                                        
+      %% CHECK FOR ANY NON-ALPHANUMERIC CHARS IN TAPENAME               
+      ESCANBUF1:=STRING8(SRCTAPENAME,TNAME_LEN);                        
+      ESCANBUF1:=HEAD(ESCANBUF1,NOT BLANKS);                            
+      ESCANBUF2:=HEAD(ESCANBUF1,ALPHANUM);                              
+      IF LENGTH(ESCANBUF2) < LENGTH(ESCANBUF1)THEN                      
+            BEGIN                                                       
+            %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS               
+            %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM              
+            PARAM_ERROR := 14;                                          
+            GO DISPLAYIT;                                               
+            END;                                                        
+                                                                        
+      %% CHECK IF SOURCE FAMILY SUPPLIED (NOT ALLOWED IN TAPE MODE)     
+      ESCANBUF1:=STRING8(SRCFAM,8);                                     
+      ESCANBUF2:=HEAD(ESCANBUF1,NOT BLANKS);                            
+      IF LENGTH(ESCANBUF2) > 0 THEN                                     
+         BEGIN                                                          
+         %% SET PARAM_ERROR AND JUMP TO ERROR DISPLAYS                  
+         %% NO FURTHER VALIDATION DUE TO ERROR IN PARAM                 
+         PARAM_ERROR := 15;                                             
+         GO DISPLAYIT;                                                  
+         END;                                                           
+      END;                                                              
+                                                                        
+ %%%%%%%%%%%%%%%%%%%%%%%                                                
+ %% VALIDATION FINISH %%                                                
+ %%%%%%%%%%%%%%%%%%%%%%%                                                
+                                                                        
+ DISPLAYIT:                                                             
+   CASE PARAM_ERROR OF                                                  
+      BEGIN                                                             
+                                                                        
+      %% DISPLAY APPROPRIATE ERROR/SUCCESS MESSAGE                      
+      1:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Select either TAPE or DISK mode **");                      
+        END;                                                            
+      2:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Delimiter '!' not allowed in file lists **");              
+        DISPLAY                                                         
+        ("** when MULTICOPY mode has not been set    **");              
+        END;                                                            
+      3:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Delimiter '!' required in file lists **");                 
+        DISPLAY                                                         
+        ("** when MULTICOPY mode is set           **");                 
+        END;                                                            
+      4:BEGIN                                                           
+        DISPLAY                                                         
+        ("** # of files/dirs in source file list and **");              
+        DISPLAY                                                         
+        ("** destination file list must be the same  **");              
+        END;                                                            
+      5:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Source usercode other than ##REDACTED## not allowed **");        
+        END;                                                            
+      6:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Destination user must be ##REDACTED##/##REDACTED##/##REDACTED##/##REDACTED## **"); 
+        END;                                                            
+      7:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Source family must be ##REDACTED##, ##REDACTED## or ##REDACTED## **");  
+        END;                                                            
+      8:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Destination family must not be a system family **");       
+        END;                                                            
+      9:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Invalid chars in email parameter. **");                    
+        DISPLAY                                                         
+        ("** Cannot be any of  []\/;:<>    **");                        
+        END;                                                            
+      10:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Email parameter must end in alphanumeric character **");   
+        END;                                                            
+      11:BEGIN                                                          
+        DISPLAY                                                         
+        ("** 6 Character Tape Serial # must be supplied **");           
+        END;                                                            
+      12:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Tape name must be supplied if identifying tape **");       
+        DISPLAY                                                         
+        ("** by generation e.g. serialno = GETGnn           **");       
+        END;                                                            
+      13:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Only Alphanumeric characters allowed in Tape Serial # **");
+        END;                                                            
+      14:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Only Alphanumeric characters allowed in Tape Name **");    
+        END;                                                            
+      15:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Can't specify a source family in TAPE mode **");           
+        END;                                                            
+      16:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Can't specify tape serial/name in DISK mode **");          
+        END;                                                            
+      17:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Source and destination types (file or directory) **");     
+        DISPLAY                                                         
+        ("** must match for each source/destination pair      **");     
+        END;                                                            
+      18:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Request ID must be supplied **");                          
+        END;                                                            
+      19:BEGIN                                                          
+        DISPLAY                                                         
+        ("** Delimiter '!' must not be at start/end of file lists **"); 
+        END;                                                            
+      0:BEGIN                                                           
+        DISPLAY                                                         
+        ("** Parameter validation successful **");                      
+        END;                                                            
+      END;                                                              
+                                                                        
+ END;                                                                   
+                                                                        
+PROCEDURE BUILD_REQUEST;                                                
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+ %%  BUILD MODE-SPECIFIC COPY COMMANDS AND GET USER ACCEPTANCE %%       
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+ BEGIN                                                                  
+                                                                        
+   EXCEPTION PROCEDURE BUILD_REQUEST_FAILED;                            
+    BEGIN                                                               
+    PROGRAMDUMP(ALL);                                                   
+    END;                                                                
+                                                                        
+ %% BUILDING COPY COMMANDS FOR COPIES FROM DISK                         
+ IF SRCFILE THEN                                                        
+   BEGIN                                                                
+   IF MULTICOPY THEN                                                    
+      BEGIN                                                             
+      %% BUILD COMMAND FOR COPYING MULTIPLE DEST/SOURCE TITLE PAIRS     
+      %% USING PARTIAL COMMAND FROM CHECK_PARAMS PROCEDURE.             
+      REPLACE COPY_CMD[0] BY COPY_CMD[0] UNTIL = "@",                   
+                             " FROM ",                                  
+                             SRCFAM[0] UNTIL = BLANKS,                  
+                             "(PACK) TO ",                              
+                             DSTFAM[0] UNTIL = BLANKS,                  
+                             "(PACK,HOSTNAME=##REDACTED##)",                    
+                             "@";                                       
+      SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                               
+      %% RESIZE COPY_CMD TO SHRINK IT                                   
+      %% AND RETAIN THE CONTENTS.                                       
+      RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                           
+      END                                                               
+   ELSE                                                                 
+      BEGIN                                                             
+      %% SINGLE COPY MODE SO BUILD COMMAND FROM SCRATCH                 
+      %% USING VALIDATED PARAMS.                                        
+      REPLACE COPY_CMD[0] BY "COPY (",                                  
+                             SRCUSR[0] UNTIL = BLANKS,                  
+                             ")",                                       
+                             SRCTITLE[0] UNTIL = BLANKS,                
+                             " AS (",                                   
+                             DSTUSR[0] UNTIL = BLANKS,                  
+                             ")",                                       
+                             REQID[0] WHILE IN ALPHANUM,"/",            
+                             DSTTITLE[0] UNTIL = BLANKS,                
+                             " FROM ",                                  
+                             SRCFAM[0] UNTIL = BLANKS,                  
+                             "(PACK) TO ",                              
+                             DSTFAM[0] UNTIL = BLANKS,                  
+                             "(PACK,HOSTNAME=##REDACTED##)","@";                
+      SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                               
+      %% RESIZE COPY_CMD TO SHRINK IT                                   
+      %% AND RETAIN THE CONTENTS.                                       
+      RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                           
+      END;                                                              
+   END;                                                                 
+                                                                        
+ %% BUILDING COPY COMMANDS FOR COPIES FROM TAPE                         
+ IF SRCTAPE THEN                                                        
+   %% BUILDING COMMANDS FOR MULTICOPY                                   
+   IF MULTICOPY THEN                                                    
+      BEGIN                                                             
+      IF BYGEN THEN                                                     
+         BEGIN                                                          
+         %% NO SERIAL SUPPLIED BUT TAPENAME SUPPLIED                    
+         %% SO GET 1ST GEN BY DEFAULT (GETG01).                         
+         IF NOSERIAL THEN                                               
+            BEGIN                                                       
+            REPLACE COPY_CMD[0] BY COPY_CMD[0] UNTIL = "@",             
+                                   " FROM ",                            
+                                   SRCTAPENAME[0] UNTIL = BLANKS,       
+                                   "(SERIALNO=",48"7F",                 
+                                   "GETG01",48"7F",") TO ",             
+                                   DSTFAM[0] UNTIL = BLANKS,            
+                                   "(PACK,HOSTNAME=##REDACTED##)","@";          
+            SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                         
+            %% RESIZE COPY_CMD TO SHRINK IT                             
+            %% AND RETAIN THE CONTENTS.                                 
+            RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                     
+            END                                                         
+         ELSE                                                           
+            %% GENERATION SUPPLIED SO USE IT.                           
+            BEGIN                                                       
+            REPLACE COPY_CMD[0] BY COPY_CMD[0] UNTIL = "@",             
+                                   " FROM ",                            
+                                   SRCTAPENAME[0] UNTIL = BLANKS,       
+                                   "(SERIALNO=",48"7F",                 
+                                   SRCSERIAL[0] FOR SERIAL_LEN,         
+                                   48"7F",") TO ",                      
+                                   DSTFAM[0] UNTIL = BLANKS,            
+                                   "(PACK,HOSTNAME=##REDACTED##)","@";          
+            SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                         
+            %% RESIZE COPY_CMD TO SHRINK IT                             
+            %% AND RETAIN THE CONTENTS.                                 
+            RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                     
+            END;                                                        
+         END                                                            
+      ELSE                                                              
+         BEGIN                                                          
+         REPLACE COPY_CMD[0] BY COPY_CMD[0] UNTIL = "@",                
+                                " FROM ",                               
+                                SRCTAPENAME[0] FOR TNAME_LEN            
+                                 UNTIL = BLANKS,                        
+                                "(SERIALNO=",                           
+                                SRCSERIAL[0] FOR SERIAL_LEN,            
+                                ") TO ",                                
+                                DSTFAM[0] UNTIL = BLANKS,               
+                                "(PACK,HOSTNAME=##REDACTED##)","@";             
+         SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                            
+         %% RESIZE COPY_CMD TO SHRINK IT                                
+         %% AND RETAIN THE CONTENTS.                                    
+         RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                        
+         END;                                                           
+      END                                                               
+   ELSE                                                                 
+      %% SINGLE COPY MODE                                               
+      BEGIN                                                             
+      IF BYGEN THEN                                                     
+         %% NO SERIAL SUPPLIED BUT TAPENAME SUPPLIED                    
+         %% SO GET 1ST GEN BY DEFAULT (GETG01).                         
+         BEGIN                                                          
+         IF NOSERIAL THEN                                               
+            BEGIN                                                       
+            REPLACE COPY_CMD[0] BY "COPY (",                            
+                                   SRCUSR[0] UNTIL = BLANKS,            
+                                   ")",                                 
+                                   SRCTITLE[0] UNTIL = BLANKS,          
+                                   " AS (",                             
+                                   DSTUSR[0] UNTIL = BLANKS,            
+                                   ")",                                 
+                                   REQID[0] WHILE IN ALPHANUM,"/",      
+                                   DSTTITLE[0] UNTIL = BLANKS,          
+                                   " FROM ",                            
+                                   SRCTAPENAME[0] FOR TNAME_LEN         
+                                    UNTIL = BLANKS,                     
+                                   "(SERIALNO=",48"7F",                 
+                                   "GETG01",48"7F",") TO ",             
+                                   DSTFAM[0] UNTIL = BLANKS,            
+                                   "(PACK,HOSTNAME=##REDACTED##)","@";          
+            SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                         
+            %% RESIZE COPY_CMD TO SHRINK IT                             
+            %% AND RETAIN THE CONTENTS.                                 
+            RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                     
+            END                                                         
+         ELSE                                                           
+            %% GENERATION SUPPLIED SO USE IT.                           
+            BEGIN                                                       
+            REPLACE COPY_CMD[0] BY "COPY (",                            
+                                   SRCUSR[0] UNTIL = BLANKS,            
+                                   ")",                                 
+                                   SRCTITLE[0] UNTIL = BLANKS,          
+                                   " AS (",                             
+                                   DSTUSR[0] UNTIL = BLANKS,            
+                                   ")",                                 
+                                   REQID[0] WHILE IN ALPHANUM,"/",      
+                                   DSTTITLE[0] UNTIL = BLANKS,          
+                                   " FROM ",                            
+                                   SRCTAPENAME[0] FOR TNAME_LEN         
+                                    UNTIL = BLANKS,                     
+                                   "(SERIALNO=",48"7F",                 
+                                   SRCSERIAL[0] FOR SERIAL_LEN,         
+                                   48"7F",") TO ",                      
+                                   DSTFAM[0] UNTIL = BLANKS,            
+                                   "(PACK,HOSTNAME=##REDACTED##)","@";          
+            SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                         
+            %% RESIZE COPY_CMD TO SHRINK IT                             
+            %% AND RETAIN THE CONTENTS.                                 
+            RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                     
+            END;                                                        
+         END                                                            
+      ELSE                                                              
+         %% SERIAL SUPPLIED IS NOT A GETGnn FORMAT                      
+         BEGIN                                                          
+         REPLACE COPY_CMD[0] BY "COPY (",                               
+                                SRCUSR[0] UNTIL = BLANKS,               
+                                ")",                                    
+                                SRCTITLE[0] UNTIL = BLANKS,             
+                                " AS (",                                
+                                DSTUSR[0] UNTIL = BLANKS,               
+                                ")",                                    
+                                REQID[0] WHILE IN ALPHANUM,"/",         
+                                DSTTITLE[0] UNTIL = BLANKS,             
+                                " FROM ",                               
+                                SRCTAPENAME[0] FOR TNAME_LEN            
+                                 UNTIL = BLANKS,                        
+                                "(SERIALNO=",                           
+                                SRCSERIAL[0] FOR SERIAL_LEN,            
+                                ") TO ",                                
+                                DSTFAM[0] UNTIL = BLANKS,               
+                                "(PACK,HOSTNAME=##REDACTED##)","@";             
+         SCAN PSCAN:COPY_CMD[0] UNTIL = "@";                            
+         %% RESIZE COPY_CMD TO SHRINK IT                                
+         %% AND RETAIN THE CONTENTS.                                    
+         RESIZE (COPY_CMD,OFFSET(PSCAN),RETAIN);                        
+         END;                                                           
+      END;                                                              
+                                                                        
+      %% DISPLAY GENERATED COMMAND TO USER                              
+      %% TO SHOW WHAT THE REQUEST WILL DO WHEN PROCESSED                
+      DISPLAY ("** Request will perform the following copy: **");       
+                                                                        
+      PSCAN := COPY_CMD[0];                                             
+      REMAINDER := SIZE(COPY_CMD);                                      
+      %%IF COPY_CMD GREATER THAN 430 CHAR MAX DISPLAY MSG SIZE          
+      %%SCAN/DISPLAY COPY_CMD IN 430 CHAR CHUNKS                        
+      WHILE REMAINDER - OFFSET(PSCAN)+1 GTR 430 DO                      
+                                                                        
+         BEGIN                                                          
+         DISPLAY (PSCAN);                                               
+         SCAN PSCAN:PSCAN FOR 430 WHILE NEQ 48"00";                     
+         END;                                                           
+                                                                        
+      %% DISPLAY FINAL CHUNK OF <= 430 CHARS                            
+      DISPLAY (PSCAN);                                                  
+                                                                        
+      %% GET OK OR OTHERWISE FROM USER                                  
+      ACCEPTMESS := "AX Y to submit. Any other response will quit";     
+                                                                        
+      ACCEPT(ACCEPTMESS);                                               
+                                                                        
+      IF ACCEPTMESS = "Y" THEN                                          
+         DISPLAY ("** Submitting Request **")                           
+      ELSE                                                              
+         %% QUIT IF AX RESPONSE IS NOT Y                                
+         BEGIN                                                          
+         DISPLAY ("** Quitting without submitting request **");         
+         GO XIT;                                                        
+         END;                                                           
+                                                                        
+      %%SETUP FILE TITLE FOR WRITE_REQUEST PROCEDURE                    
+      REPLACE FILETITLE[0] BY BLANKS FOR TITLE_LEN;                     
+      REPLACE FILETITLE[0] BY "*PRM/D/OPSRUNNER/",                      
+                              REQID[0] FOR REQID_LEN WHILE NEQ BLANKS,  
+                              " ON ##REDACTED##.";                          
+   END;                                                                 
+                                                                        
+PROCEDURE WRITE_REQUEST;                                                
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%                                           
+ %% WRITE OUT REQUEST FILE %%                                           
+ %%%%%%%%%%%%%%%%%%%%%%%%%%%%                                           
+ BEGIN                                                                  
+                                                                        
+   EXCEPTION PROCEDURE WRITE_REQUEST_FAILED;                            
+    BEGIN                                                               
+    PROGRAMDUMP(ALL);                                                   
+    END;                                                                
+                                                                        
+ %% DECLARE FILE WITH APPROPRIATE STRUCTURE TO BE READ BY               
+ %% SUPERVISOR SCRIPT, AND WITH LONG ENOUGH RECORDS.                    
+ %% DON'T SET AS NEWFILE YET, MESSES WITH FILE RESIDENCE CHECK          
+ FILE                                                                   
+   REQUEST (KIND=DISK,                                                  
+            MAXRECSIZE=REC_LEN,                                         
+            FRAMESIZE=8,                                                
+            BLOCKSIZE=REC_LEN*3,                                        
+            NEWFILE = FALSE,                                            
+            MYUSE=OUT,                                                  
+            FILEKIND=DATA,                                              
+            TITLE=FILETITLE[0]);                                        
+                                                                        
+ %% CHECK IF FILE WE WANT TO CREATE ALREADY EXISTS OR NOT               
+ IF REQUEST.RESIDENT THEN                                               
+   BEGIN                                                                
+   %% EXISTS, SO ASK USER IF OK TO OVERWRITE OR NOT                     
+   ESCANBUF1:=STRING8(REQID,REQID_LEN);                                 
+   ESCANBUF2:=HEAD(ESCANBUF1,ALPHANUM);                                 
+                                                                        
+   ACCEPTMESS := "** Request already exists: " CAT ESCANBUF2 CAT " **"; 
+                                                                        
+   DISPLAY (ACCEPTMESS);                                                
+                                                                        
+   ACCEPTMESS := "AX Y to overwrite. Any other response will quit";     
+                                                                        
+   ACCEPT(ACCEPTMESS);                                                  
+                                                                        
+   IF ACCEPTMESS = "Y" THEN                                             
+      DISPLAY ("** Submitting Request **")                              
+   ELSE                                                                 
+      BEGIN                                                             
+      %% NOT OK TO OVERWRITE, SO QUIT                                   
+      DISPLAY ("** Quitting without submitting request **");            
+      GO XIT;                                                           
+      END;                                                              
+   END;                                                                 
+                                                                        
+ %% OK TO OVERWRITE SO SET NEWFILE-TRUE BEFORE FIRST WRITE.             
+ REQUEST.NEWFILE := TRUE;                                               
+                                                                        
+ %% WRITE OUT PARAMS INTO FILE, RECORD AT A TIME.                       
+ %% FORMAT IS <PARAMNAME>:<VALUE>                                       
+                                                                        
+ DISPLAY ("** Writing request file **");                                
+                                                                        
+ REPLACE MYSELF.FAMILY BY ".";                                          
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ IF MULTICOPY THEN                                                      
+ REPLACE FILE_REC[0] BY "MULTICOPY:Y"                                   
+ ELSE                                                                   
+ REPLACE FILE_REC[0] BY "MULTICOPY:N";                                  
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "SRCFAM:",                                      
+                        SRCFAM[0] UNTIL = BLANKS;                       
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "SRCUSR:",                                      
+                        SRCUSR[0] UNTIL = BLANKS;                       
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "SRCTITLE:",                                    
+                        SRCTITLE[0] UNTIL = BLANKS;                     
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ IF SRCFILE THEN                                                        
+ REPLACE FILE_REC[0] BY "SRCFILE:Y"                                     
+ ELSE                                                                   
+ REPLACE FILE_REC[0] BY "SRCFILE:N";                                    
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ IF SRCTAPE THEN                                                        
+ REPLACE FILE_REC[0] BY "SRCTAPE:Y"                                     
+ ELSE                                                                   
+ REPLACE FILE_REC[0] BY "SRCTAPE:N";                                    
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "SRCSERIAL:",                                   
+                        SRCSERIAL[0] FOR SERIAL_LEN;                    
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "SRCTAPENAME:",                                 
+                        SRCTAPENAME[0] FOR TNAME_LEN;                   
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "DSTFAM:",                                      
+                        DSTFAM[0] UNTIL = BLANKS;                       
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "DSTUSR:",                                      
+                        DSTUSR[0] UNTIL = BLANKS;                       
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "DSTTITLE:",                                    
+                        DSTTITLE[0] UNTIL = BLANKS;                     
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ REPLACE FILE_REC[0] BY BLANKS FOR REC_LEN;                             
+ REPLACE FILE_REC[0] BY "EMAIL:",                                       
+                        EMAIL[0] UNTIL = BLANKS;                        
+ WRITE (REQUEST,REC_LEN,FILE_REC);                                      
+                                                                        
+ DISPLAY ("** Closing request file **");                                
+                                                                        
+ %% CLOSE WITH CRUNCH, THIS FILE NOT TO BE ADDED TO                     
+ CLOSE (REQUEST,CRUNCH);                                                
+                                                                        
+ DISPLAY ("** File written ok, end of run **");                         
+                                                                        
+ END;                                                                   
+                                                                        
+%%%%%%%%%%%%%%%%%%%%%                                                   
+%% MAIN PROCESSING %%                                                   
+%%%%%%%%%%%%%%%%%%%%%                                                   
+%% VALIDATE PARAMS                                                      
+CHECK_PARAMS;                                                           
+%% IF NO ERRORS FOUND, BUILD THE REQUEST ELSE QUIT                      
+IF PARAM_ERROR = 0 THEN BUILD_REQUEST                                   
+   ELSE GO XIT;                                                         
+%% WRITE THE REQUEST FILE                                               
+WRITE_REQUEST;                                                          
+                                                                        
+XIT:                                                                    
+%%%%%%%%%%%%%                                                           
+%% THE END %%                                                           
+%%%%%%%%%%%%%                                                           
+END.                                                                    

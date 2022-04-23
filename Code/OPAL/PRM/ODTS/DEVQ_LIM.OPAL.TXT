@@ -1,0 +1,88 @@
+%% Scripts to impose/lift/manage Dev queue restrictions over            
+%% Xmas and New Year period with limited mainframe support cover.       
+                                                                        
+DEFINE * ODTS OS_DEVQ_INIT(MSG):                                        
+$FILE:=#("(##REDACTED##)PRM/D/DEV_LIM ON TECHPACK");                           
+$FC:=$$FILE.READ(NOSEQ);                                                
+$DEVQ_LIST.GLOBAL := "";                                                
+WHILE $Q:=$FC.SPLIT(/) NEQ EMPTY DO                                     
+   BEGIN                                                                
+      $DEVQ_LIST.GLOBAL.INSERT($Q);                                     
+   END;                                                                 
+\                                                                       
+                                                                        
+DEFINE * ODTS OS_DEVQ_RESTRICT(MSG):                                    
+IF $DEVQ_LIST.GLOBAL = EMPTY THEN                                       
+   BEGIN                                                                
+      CALL DO "OS_DEVQ_INIT"                                            
+   END                                                                  
+ELSE                                                                    
+   BEGIN                                                                
+      $PARAM:=UPPER(TRIM(TEXT));                                        
+      IF $PARAM = "ALL" THEN                                            
+      BEGIN                                                             
+         SHOW("Processing RESTRICT request for ALL queues in list");    
+         $QLIST:=$DEVQ_LIST.GLOBAL;                                     
+         WHILE $Q:=$QLIST.SPLIT NEQ EMPTY DO                            
+         BEGIN                                                          
+            DISPLAY(#("RESTRICTing Queue",,$Q));                        
+            ODT(#("MQ",,$Q,,"DEF(PROCESSTIME=3600),",                   
+                             "LIM(PROCESSTIME=3600)"));                 
+         END;                                                           
+      END;                                                              
+                                                                        
+      IF $PARAM NEQ "ALL" THEN                                          
+      BEGIN                                                             
+         SHOW(#("Checking queue",,$PARAM,,"is in the list"));           
+         IF $DEVQ_LIST.GLOBAL.COPY($PARAM) NEQ EMPTY THEN               
+         BEGIN                                                          
+            SHOW(#("RESTRICTing Queue",,$PARAM));                       
+            ODT(#("MQ",,$PARAM,,"DEF(PROCESSTIME=3600),",               
+                             "LIM(PROCESSTIME=3600)"));                 
+         END                                                            
+         ELSE                                                           
+         BEGIN                                                          
+            SHOW(#("Queue",,$PARAM,,"is not in the restricted list"));  
+         END;                                                           
+      END;                                                              
+                                                                        
+   END;                                                                 
+\                                                                       
+DEFINE * ODTS OS_DEVQ_RELEASE(MSG):                                     
+IF $DEVQ_LIST.GLOBAL = EMPTY THEN                                       
+   BEGIN                                                                
+      CALL DO "OS_DEVQ_INIT"                                            
+   END                                                                  
+ELSE                                                                    
+   BEGIN                                                                
+      $PARAM:=UPPER(TRIM(TEXT));                                        
+      IF $PARAM = "ALL" THEN                                            
+      BEGIN                                                             
+         SHOW("Processing RELEASE request for ALL queues in list");     
+         $QLIST:=$DEVQ_LIST.GLOBAL;                                     
+         WHILE $Q:=$QLIST.SPLIT NEQ EMPTY DO                            
+         BEGIN                                                          
+            DISPLAY(#("RELEASing Queue",,$Q));                          
+            ODT(#("MQ",,$Q,,"DEF(PROCESSTIME-),",                       
+                             "LIM(PROCESSTIME-)"));                     
+         END;                                                           
+      END;                                                              
+                                                                        
+      IF $PARAM NEQ "ALL" THEN                                          
+      BEGIN                                                             
+         SHOW(#("Checking queue",,$PARAM,,"is in the list"));           
+         IF $DEVQ_LIST.GLOBAL.COPY($PARAM) NEQ EMPTY THEN               
+         BEGIN                                                          
+            SHOW(#("RELEASing Queue",,$PARAM));                         
+            ODT(#("MQ",,$PARAM,,"DEF(PROCESSTIME-),",                   
+                             "LIM(PROCESSTIME-)"));                     
+         END                                                            
+         ELSE                                                           
+         BEGIN                                                          
+            SHOW(#("Queue",,$PARAM,,"is not in the restricted list"));  
+         END;                                                           
+      END;                                                              
+                                                                        
+   END;                                                                 
+\                                                                       
+                                                                        

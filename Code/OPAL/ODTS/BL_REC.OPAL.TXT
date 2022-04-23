@@ -1,0 +1,662 @@
+DEFINE * ODTS BL_REC_CHECK (MSG):                                               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% BL_REC_CHECK ODTSEQUENCE TO RUN BL_REC EVERY 30 MINUTES                  %%  
+%%                                                                          %%  
+%% CALLS BL_REC                                                             %%  
+%%                                                                          %%  
+%% MUST BE RUN EITHER WITH NO PARAMS, OR TWO COMMA SEPERATED PARAMS         %%  
+%%                                                                          %%  
+%% NOPARAMS                                                                 %%  
+%% ========                                                                 %%  
+%% SCAN DIR WILL BE (##REDACTED##)BPR/= ON ##REDACTED##                                 %%  
+%% DESTINATION HOST WILL BE ##REDACTED##                                            %%  
+%%                                                                          %%  
+%% SCAN DIR,HOSTNAME SUPPLIED                                               %%  
+%% ==========================                                               %%  
+%% SCAN DIR WILL BE DIRECTORY PASSED IN 1ST PARAM                           %%  
+%% DESTINATION HOST WILL BE HOSTNAME PASSED IN 2ND PARAM                    %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               JUL '10 GXG %%  
+%% VERSION 02 FIX CUMULATIVE FILE COUNT BUG        JUL '10 GXG    %%  
+%% VERSION 03 IMPROVE ERROR HANDLING AND           SEP '10 GXG    %%  
+%%            CHECK DEST PACK HAS ENOUGH SPACE                              %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+WHILE TRUE DO                                                                   
+BEGIN                                                                           
+   IF HostName NEQ ""                                                           
+   THEN                                                                         
+   BEGIN                                                                        
+      IF TEXT = EMPTY THEN                                                      
+      ODT("TT DO BL_REC")                                                       
+      ELSE                                                                      
+      ODT(#("TT DO BL_REC",TEXT));                                              
+   END;                                                                         
+   WAIT(1800 SECONDS);                                                          
+                                                                                
+END;                                                                            
+\                                                                               
+TT DEF * ODTS BL_REC (MSG):                                                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% BL_REC ODTSEQUENCE TO COPY RECOVERED BLPACK FILES FROM ##REDACTED## TO ##REDACTED##     %%  
+%% UNDER DEVELOPMENT USERCODES TO DEVELOPMENT PACKS                         %%  
+%%                                                                          %%  
+%% MUST BE RUN EITHER WITH NO PARAMS, OR TWO COMMA SEPERATED PARAMS         %%  
+%%                                                                          %%  
+%% NOPARAMS                                                                 %%  
+%% ========                                                                 %%  
+%% SCAN DIR WILL BE (##REDACTED##)BPR/= ON ##REDACTED##                                 %%  
+%% DESTINATION HOST WILL BE ##REDACTED##                                            %%  
+%%                                                                          %%  
+%% SCAN DIR,HOSTNAME SUPPLIED                                               %%  
+%% ==========================                                               %%  
+%% SCAN DIR WILL BE DIRECTORY PASSED IN 1ST PARAM                           %%  
+%% DESTINATION HOST WILL BE HOSTNAME PASSED IN 2ND PARAM                    %%  
+%%                                                                          %%  
+%% WILL NOT COPY TO ##REDACTED## OR TO CURRENT HOST                                %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               JUL '10 GXG %%  
+%% VERSION 02 FIX CUMULATIVE FILE COUNT BUG        JUL '10 GXG    %%  
+%% VERSION 03 IMPROVE ERROR HANDLING AND           SEP '10 GXG    %%  
+%%            CHECK DEST PACK HAS ENOUGH SPACE                              %%  
+%% VERSION 04 ADD EMAIL ADDRESS STORED IN RELEASEID FEB '13      %%  
+%% VERSION 05 Launch using AFTER TRIGGER in place of VIA 255 mechanism          
+%%                                                  FEB '13          
+%% VERSION 06 Bugfix for > 50 files in 1 run (WFL Slot Limit)               %%  
+%%                                                  SEP '13 GXG    %%  
+%% VERSION 07 Bugfix to detour myself(inputparam) issue                     %%  
+%%                                                  CHG66993 SEP '13 GXG    %%  
+%% VERSION 08 Use a different file attribute for the email address.         %%  
+%%                                                CHG1861707 22/01/19 LW    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+                                                                                
+%% CHECK IF PARAMETER SUPPLIED                                                  
+IF TEXT = EMPTY THEN                                                            
+                                                                                
+   %% IF NO PARAM SUPPLIED, SET DEFAULT SCAN DIR AND DEST HOST                  
+   BEGIN                                                                        
+   %% SETUP SCAN DIRECTORY                                                      
+   $DIR:="(##REDACTED##)BPR/= ON ##REDACTED##";                                             
+   $DESTHOST:="##REDACTED##";                                                           
+   END                                                                          
+ELSE                                                                            
+                                                                                
+   %% IF PARAMS SUPPLIED, PARSE FOR VALIDITY                                    
+   BEGIN                                                                        
+   $PARAM:=(UPPER(TRIM(TEXT)));                                                 
+                                                                                
+   %% IF PARAM SUPPLIED, MUST BE 2 PARAMS SEPERATED BY COMMA                    
+   %% DISPLAY ERROR AND EXIT                                                    
+   IF NOT $PARAM INCL "," THEN                                                  
+      BEGIN                                                                     
+      DISPLAY ("TWO COMMA SEPERATED PARAMETERS REQUIRED");                      
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   %% SPLIT PARAM INTO DIR AND DEST HOST                                        
+   $DIR:=$PARAM.SPLIT;                                                          
+   $DESTHOST:=$PARAM;                                                           
+                                                                                
+   %% DOUBLE CHECK NO EXTRA COMMAS IN SPLIT PARAM                               
+   %% DISPLAY ERROR AND EXIT                                                    
+   IF $DESTHOST INCL "," THEN                                                   
+      BEGIN                                                                     
+      DISPLAY ("ONLY TWO COMMA SEPERATED PARAMETERS REQUIRED");                 
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   %% IF DEST HOST PARAM VALUE MATCHES CURRENT HOSTNAME                         
+   %% DISPLAY ERROR AND EXIT                                                    
+   IF $DESTHOST = HOSTNAME THEN                                                 
+      BEGIN                                                                     
+      DISPLAY ("DESTINATION HOST CANNOT BE CURRENT HOST");                      
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   %% IF DEST HOST PARAM VALUE MATCHES PRODUCTION HOSTNAME                      
+   %% DISPLAY ERROR AND EXIT                                                    
+   IF $DESTHOST = "##REDACTED##" THEN                                                  
+      BEGIN                                                                     
+      DISPLAY ("CANNOT BE USED TO COPY FILES TO PRODUCTION HOST");              
+      EXIT;                                                                     
+      END;                                                                      
+   END;                                                                         
+                                                                                
+%% CHECK IF DIRECTORY EXISTS, IF NOT THERE ARE NO FILES, SO EXIT.               
+IF NOT PDDIRECTORY(DECAT($DIR,"/=",5)) THEN                                     
+   BEGIN                                                                        
+   DISPLAY (#("DIR DOES NOT EXIST - ",$DIR));                                   
+   EXIT;                                                                        
+   END                                                                          
+ELSE                                                                            
+   %% DIRECTORY EXISTS, SO BEGIN PROCESSING                                     
+   BEGIN                                                                        
+                                                                                
+                                                                                
+   %%BUILD UP KEYIN COMMAND TO CHECK BACKUP FAMILY                              
+   $BACKUP:=KEYIN("DL BACKUP");                                                 
+                                                                                
+   %%GET NAME OF BACKUP FAMILY FROM KEYIN RESPONSE                              
+   $BKTEMP:=$BACKUP.SPLIT(/);                                                   
+   $BKTEMP:=$BACKUP.SPLIT("ON ");                                               
+                                                                                
+   %%CHECK BACKUP FAMILY ONLINE                                                 
+   $PACKCHECK:=KEYIN(#('DU ON ',$BACKUP));                                      
+                                                                                
+   IF $PACKCHECK INCL "NOT ONLINE" THEN                                         
+      $BACKUP:="DISK";                                                          
+                                                                                
+   %% GET THE LIST OF DIRECTORIES CURRENTLY WAITING FOR TRANSFER TO ##REDACTED##        
+   $PD:=TT("DO (PD:$DIRS.INSERT(FILENAME); ) "& $DIR & ":1");                   
+                                                                                
+   %% BUILD LIST OF FILES IN EACH DIRECTORY IN A LIST VARIABLE AND COUNT THEM   
+   WHILE NOT $DIRS = EMPTY DO                                                   
+     BEGIN                                                                      
+     %% RESET COUNTS FOR EACH GROUP OF FILES COPIED                             
+     #FCOUNT:=0;                                                                
+     #PCOUNT:=0;                                                                
+     #GROUPERR:=0;                                                              
+                                                                                
+     %% GET THE NEXT DIRECTORY TO RECOVER FROM THE LIST OF DIRS BUILT EARLIER   
+     $WORKDIR:=$DIRS.SPLIT & "/= ON ##REDACTED##";;                                 
+                                                                                
+     %% GET THE LIST OF FILES IN THAT DIRECTORY                                 
+     $PD:=TT("DO (PD:$FILES.INSERT(TITLE);                                      
+                                               #FCOUNT:=#FCOUNT+1) "& $WORKDIR);
+                                                                                
+     $TMP_GLOBAL_NAME:=#("BLP_",TAKE(DROP($WORKDIR,10),4));                     
+     IF (NOT $$TMP_GLOBAL_NAME.GLOBAL = EMPTY) AND                              
+         ("," ISIN $$TMP_GLOBAL_NAME.GLOBAL) THEN                               
+      BEGIN                                                                     
+         #PCOUNT:=DECIMAL($$TMP_GLOBAL_NAME.GLOBAL.SPLIT(","));                 
+         #FCOUNT:=DECIMAL($$TMP_GLOBAL_NAME.GLOBAL);                            
+         LOG(SITE,"BLP",#("PCOUNT = ",#PCOUNT," , FCOUNT = ",#FCOUNT));         
+      END;                                                                      
+                                                                                
+     %% RESET AUDIT LOG TITLE FOR EACH GROUP OF FILES COPIED                    
+     $AUDTITLE:=#("*BD/BLREC/AUDIT/" & TAKE(DROP($WORKDIR,10),4)                
+                                 ,"/",TIMEDATE(YYYYMMDDHHMMSS),,"ON",,$BACKUP); 
+     $AUDLOG:=#("TITLE=",$AUDTITLE,", FILEKIND=SEQDATA,FILESTRUCTURE=STREAM");  
+                                                                                
+     %% DISPLAY COUNT OF FILES FOUND                                            
+     $STATUS:= #("FOUND ",#FCOUNT,,"RECOVERED BLPACK FILES",/);                 
+     DISPLAY ($STATUS);                                                         
+                                                                                
+     $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));         
+                                                                                
+     %% GO INTO LOOP PROCESSING EACH FILE IN DIR LIST VARIABLE UNTIL NONE LEFT  
+     WHILE NOT $FILES = EMPTY DO                                                
+       BEGIN                                                                    
+                                                                                
+       %% SETUP LOOP COUNTER                                                    
+       #PCOUNT:=#PCOUNT+1;                                                      
+                                                                                
+       %%SET DESTERROR TO ZERO AT START OF EACH LOOP                            
+       #DESTERR:=0;                                                             
+                                                                                
+       %% DISPLAY FILE BEING PROCESSED VS TOTAL FILES                           
+       $STATUS:=#("   **PROCESSING RECOVERED FILE ",#PCOUNT," OF ",             
+                                                                  #FCOUNT,"**");
+       DISPLAY ($STATUS);                                                       
+                                                                                
+       $WRITETOLOG:=$$AUDLOG.WRITE(" ");                                        
+       $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));       
+                                                                                
+       %% TAKE FIRST FILE FROM LIST INTO $SOURCEFL AND REMOVE FROM LIST.        
+       $SOURCEFL:=$FILES.SPLIT;                                                 
+                                                                                
+       %% GET VALUE OF PRODUCT FILE ATTRIBUTE FOR SOURCEFL TO DISPLAY IN LOG    
+       $PRODUCT:=$SOURCEFL.PD(PRODUCT);                                         
+       %% GET VALUE OF REALEASID FILE ATTRIBUTE FOR EMAIL RECIPIENT             
+       $NOTE:=$SOURCEFL.PD(NOTE);                                               
+                                                                                
+       %% WRITE LOG ENTRY DISPLAYING STATION THAT REQUESTED FILE                
+       $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",                 
+         "RECOVERY REQUESTED FROM STATION: ",$PRODUCT));                        
+                                                                                
+       %% SPLIT SOURCE TITLE INTO FILENAME AND FAMILYNAME FOR COPY STATEMENT    
+       $SOURCETITLE:=$SOURCEFL.PD(FILENAME);                                    
+       $SOURCEPK:=$SOURCEFL.PD(FAMILYNAME);                                     
+                                                                                
+       %% PUT SOURCE TITLE INTO TEMPORARY VARIABLE FOR PARSING OF DESTINATION   
+       $TEMP:=$SOURCEFL;                                                        
+                                                                                
+       %% DROP EVERYTHING UP TO THE SECOND /                                    
+       $TMP:=$TEMP.SPLIT("/");                                                  
+       $TMP:=$TEMP.SPLIT("/");                                                  
+                                                                                
+       %% TEXT UP TO NEXT / IS THE DESTINATION USERCODE                         
+       $DESTUSER:=$TEMP.SPLIT("/");                                             
+                                                                                
+       %% TEXT UP TO NEXT / IS THE DESTINATION PACK                             
+       $DESTPK:=$TEMP.SPLIT("/");                                               
+                                                                                
+       %% TEXT UP TO THE FIRST SPACE IS THE DESTINATION TITLE                   
+       $DESTTITLE:=$TEMP.SPLIT(" ");                                            
+                                                                                
+       %%BUILD UP KEYIN COMMAND TO CHECK DESTINATION HOST/FAMILY                
+       $KCMD:=#('AT ',$DESTHOST,,'DU ON ',$DESTPK);                             
+                                                                                
+       %% CHECK THAT DESTHOST AND DESTPK ARE ONLINE                             
+       $HOSTCHECK:=KEYIN($KCMD);                                                
+                                                                                
+       IF $HOSTCHECK INCL "NOT REACHABLE" THEN                                  
+       #DESTERR:=1; %%HOST NOT AVAILABLE                                        
+                                                                                
+       IF $HOSTCHECK INCL "NOT ONLINE" THEN                                     
+       #DESTERR:=2; %%DESTFAMILY NOT AVAILABLE                                  
+                                                                                
+       %% CHECK KEYIN RESPONSE FOR AVAIL SPACE ON DEST PACK                     
+       WHILE $DULINE:=$HOSTCHECK.SPLIT(/) NEQ EMPTY DO                          
+         BEGIN                                                                  
+         %% SCAN RESPONSE FOR LINE WITH AVAIL SPACE                             
+         IF $DULINE INCL "Available:" THEN                                      
+            BEGIN                                                               
+            %$ DROP EVERYTHING UPTO AND INC COLON                               
+            $TMP:=$DULINE.SPLIT(":");                                           
+                                                                                
+            %% TAKE FIRST 14 CHARS AND DROP THE REST                            
+            $DESTAVAIL:=TAKE($DULINE,14);                                       
+                                                                                
+            %% DECAT & TRIM X3 TO REMOVE COMMAS AND SPACES                      
+            %% MAX 3 COMMAS IN 13 CHAR FIELD E.G. 1,234,567,890                 
+            $DESTAVAIL:=DECAT(TRIM($DESTAVAIL),",",5);                          
+            $DESTAVAIL:=DECAT(TRIM($DESTAVAIL),",",5);                          
+            $DESTAVAIL:=DECAT(TRIM($DESTAVAIL),",",5);                          
+            END;                                                                
+         END;                                                                   
+                                                                                
+       %% GET SIZE OF SOURCE FILE                                               
+       #SOURCESIZE:=$SOURCEFL.PD(SEGMENTS);                                     
+                                                                                
+       %% CHECK IF DESTPK HAS ENOUGH SPACE FOR SOURCEFILE                       
+       IF #SOURCESIZE GTR DECIMAL($DESTAVAIL) THEN                              
+         #DESTERR:=3; %%NOT ENOUGH SPACE ON DESTFAMILY                          
+                                                                                
+       CASE #DESTERR OF                                                         
+       BEGIN                                                                    
+       1: BEGIN                                                                 
+         $STATUS:=#("HOST ",$DESTHOST,,"NOT AVAILABLE, SKIPPING COPY");         
+         DISPLAY ($STATUS);                                                     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",               
+            "     *** FILE NOT COPIED ***"));                                   
+         CALL DO "BL_REC_SKIPFILE";  %%ODTS TO REMOVE FILE                      
+         #GROUPERR:=1 %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY        
+         END;                                                                   
+                                                                                
+       2: BEGIN                                                                 
+         $STATUS:=#("FAMILY ",$DESTPK,,"NOT ONLINE AT ",$DESTHOST,              
+            ", SKIPPING COPY");                                                 
+         DISPLAY ($STATUS);                                                     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",               
+            "     *** FILE NOT COPIED ***"));                                   
+         CALL DO "BL_REC_SKIPFILE";  %%ODTS TO REMOVE FILE                      
+         #GROUPERR:=1 %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY        
+         END;                                                                   
+                                                                                
+       3: BEGIN                                                                 
+         $STATUS:=#("NOT ENOUGH SPACE ON FAMILY ",$DESTPK,,"AT ",$DESTHOST,     
+            ", SKIPPING COPY");                                                 
+         DISPLAY ($STATUS);                                                     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",               
+            "     *** FILE NOT COPIED - ",#SOURCESIZE,,                         
+            "SECTORS REQUIRED;",$DESTAVAIL,,"AVAILABLE ***"));                  
+         CALL DO "BL_REC_SKIPFILE";  %%ODTS TO REMOVE FILE                      
+         #GROUPERR:=1 %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY        
+         END;                                                                   
+                                                                                
+       ELSE: BEGIN                                                              
+             IF #WFL > 96 THEN %limit = 100 per slot, uses 2/file - leave space 
+                BEGIN                                                           
+                LOG(SITE,"BLP","About to hit WFL monitor limit. Restarting");   
+                $STATUS:=#("About to hit WFL monitor limit. Restarting");       
+                $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                              
+                        TIME(TIMEOFDAY)," - ",$STATUS));                        
+                #WFL:=0;                                                        
+                $TMP_GLOBAL_NAME:=#("BLP_",TAKE(DROP($WORKDIR,10),4));          
+                $$TMP_GLOBAL_NAME.GLOBAL:=#(#PCOUNT-1,",",#FCOUNT);             
+                ODT("TT DO BL_REC ",TEXT);                                      
+                EXIT;                                                           
+                END                                                             
+             ELSE                                                               
+               BEGIN                                                            
+                  DISPLAY ("DESTINATION HOST/FAMILY OK, STARTING COPY");        
+                  CALL DO "BL_REC_COPYFILE";  %%ODTS TO COPY FILE               
+               END;                                                             
+             END;                                                               
+                                                                                
+       END; %% CASE #DESTERR OF                                                 
+                                                                                
+       END; %% WHILE NOT $FILES = EMPTY DO                                      
+     $$TMP_GLOBAL_NAME.GLOBAL:=EMPTY;                                           
+     CALL DO "BL_REC_MAIL";                                                     
+     END %% WHILE NOT $NEWDIR = EMPTY DO                                        
+   END %%%% DIRECTORY EXISTS, SO BEGIN PROCESSING                               
+\                                                                               
+DEFINE * ODTS BL_REC_COPYFILE(SYSTEM):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% BL_REC_COPYFILE ODTSEQUENCE TO COPY RECOVERED BLPACK FILES FROM ##REDACTED##%%  
+%% TO ##REDACTED## UNDER DEVELOPMENT USERCODES TO DEVELOPMENT PACKS                 %%  
+%%                                                                          %%  
+%% CALLED BY BL_REC                                                         %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               JUL '10 GXG %%  
+%% VERSION 02 FIX CUMULATIVE FILE COUNT BUG        JUL '10 GXG    %%  
+%% VERSION 03 IMPROVE ERROR HANDLING AND           SEP '10 GXG    %%  
+%%            CHECK DEST PACK HAS ENOUGH SPACE                              %%  
+%% VERSION 04 Bugfix for > 50 files in 1 run (WFL Slot Limit)               %%  
+%%                                                  SEP '13 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+      %%CHECK DESTPK IS NON-SYSTEM PACK                                         
+      IF $DESTPK = {"DISK",                                                     
+                     "##REDACTED##",                                              
+                     "##REDACTED##",                                                 
+                     "##REDACTED##",                                                
+                     "##REDACTED##",                                              
+                     "##REDACTED##",                                                
+                     "##REDACTED##",                                                  
+                     "##REDACTED##",                                              
+                     "##REDACTED##",                                            
+                     "##REDACTED##",                                             
+                     "##REDACTED##",                                                
+                     "##REDACTED##",                                            
+                     "##REDACTED##",                                             
+                     "##REDACTED##",                                                
+                     "##REDACTED##",                                                  
+                     "##REDACTED##",                                              
+                     "##REDACTED##",                                             
+                     "##REDACTED##"}                                              
+      OR $DESTPK INCL "MCP" THEN                                                
+                                                                                
+      %%NON-SYSTEM PACK SO SKIP FILE COPY                                       
+      BEGIN                                                                     
+      $STATUS:=#("FAMILY ",$DESTPK,,"NOT ALLOWED AT ",$DESTHOST,                
+            ", SKIPPING COPY");                                                 
+      DISPLAY ($STATUS);                                                        
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",                  
+         "     *** FILE NOT COPIED ***"));                                      
+      CALL DO "BL_REC_SKIPFILE";  %%ODTS TO REMOVE FILE                         
+      #GROUPERR:=1; %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY          
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+      %%CHECK DESTUSER IS NOT ##REDACTED##,##REDACTED## OR ##REDACTED##                
+      IF $DESTUSER = {"##REDACTED##",                                                 
+                      "##REDACTED##",                                             
+                      "##REDACTED##"} THEN                                     
+                                                                                
+      %%SYSTEM USER SO SKIP FILE COPY                                           
+      BEGIN                                                                     
+      $STATUS:=#("USER ",$DESTUSER,,"NOT ALLOWED AT ",$DESTHOST,                
+            ", SKIPPING COPY");                                                 
+      DISPLAY ($STATUS);                                                        
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",                  
+         "     *** FILE NOT COPIED ***"));                                      
+      CALL DO "BL_REC_SKIPFILE";  %%ODTS TO REMOVE FILE                         
+      #GROUPERR:=1; %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY          
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+            %% BUILD COPY STATEMENT INTO VARIABLE                               
+      $CMD:=(#("COPY ",$SOURCETITLE," AS (",$DESTUSER,")",$DESTTITLE,           
+         " FROM ",$SOURCEPK,"(PACK) TO ",$DESTPK,"(PACK,HOSTNAME=",             
+         $DESTHOST,")",/,/));                                                   
+                                                                                
+      %% USE WFL FUNCTION TO PERFORM THE COPY AND TRACK IT                      
+      #WFL.SUM(1);                                                              
+      IF #CPY:=WFL($CMD,#("BLPACKCOPY",#PCOUNT)) > 0 THEN                       
+                                                                                
+         %% NEGATIVE RETURN CODE FROM WFL FUNCTION = ERROR, POSITIVE = JOBNO    
+         %% IF POSITIVE THEN WFL FUNCTION RUNNING.                              
+         BEGIN                                                                  
+         ON JOBMESSAGE DO                                                       
+            BEGIN                                                               
+                                                                                
+            %% IF A MESSAGE IS DISPLAYED BY WFL FUNCTION, DISPLAY IT ON SCREEN  
+            IF JOBMSGTYPE = WFLMSG AND                                          
+               JOBTEXT INCL {"SKIPPED","COPIED","REMOVED","SECTORS"} AND        
+               NOT JOBTEXT INCL "FTRECOVERY" THEN                               
+               BEGIN                                                            
+               $STATUS:=(JOBTEXT);                                              
+               DISPLAY ($STATUS);                                               
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",         
+                  $STATUS));                                                    
+               IF JOBTEXT INCL {"SKIPPED","NOT COPIED"} THEN                    
+                  #CFAILED:=1; %% IF FILE NOT COPIED, SET FLAG                  
+               END                                                              
+                                                                                
+            %% IF EOJ RECORD, CHECK IF DSED AND DISPLAY ERROR THEN REMOVE SRC   
+            %% OR IF OK, DISPLAY SUCCESS MSG AND REMOVE SRC                     
+            ELSE                                                                
+               IF JOBMSGTYPE = WFLEOJ THEN                                      
+               BEGIN                                                            
+               $CPYERR:=WFLEOJREASON(#("BLPACKCOPY",#PCOUNT));                  
+               CASE $CPYERR OF                                                  
+                  BEGIN                                                         
+                  "BADEOJ":  %%COPY FAILED                                      
+                     #COPYRSLT:=1;                                              
+                  "GOODEOJ": %%COPY SUCCESSFUL                                  
+                     #COPYRSLT:=2;                                              
+                  ELSE:                                                         
+                     DISPLAY (#("BL_REC: DEBUG: ",$CPYERR));                    
+                  END;                                                          
+               IF $CPYERR INCL "DS" THEN                                        
+                  #COPYRSLT:=1; %% IF COPY FAILS, FLAG AS SUCH                  
+               END;                                                             
+            END;                                                                
+                                                                                
+            IF #COPYRSLT=1 THEN                                                 
+               BEGIN                                                            
+               $STATUS:=#("COPY FAILED, SKIPPING FILE: ",$SOURCETITLE);         
+               DISPLAY ($STATUS);                                               
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",         
+                  $STATUS));                                                    
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",         
+                "     *** FILE NOT COPIED ***"));                               
+                                                                                
+               CALL DO "BL_REC_SKIPFILE";                                       
+               #GROUPERR:=1; %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY 
+               EXIT;                                                            
+               END;                                                             
+                                                                                
+            IF #COPYRSLT=2 THEN                                                 
+               BEGIN                                                            
+               IF #CFAILED = 0 THEN                                             
+                  BEGIN                                                         
+                  $STATUS:=#("COPY SUCCESSFUL, REMOVING SOURCEFILE: ",          
+                                                                                
+                     $SOURCETITLE);                                             
+                  DISPLAY ($STATUS);                                            
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",      
+                     $STATUS));                                                 
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",      
+                  "     *** FILE COPIED OK ***"));                              
+                  CALL DO "BL_REC_SKIPFILE";                                    
+                  EXIT;                                                         
+                  END                                                           
+               ELSE %% COPY WENT TO GOODEOJ BUT FILE NOT COPIED                 
+                  BEGIN                                                         
+                  $STATUS:=#("COPY FAILED, REMOVING SOURCEFILE: ",              
+                     $SOURCETITLE);                                             
+                  DISPLAY ($STATUS);                                            
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",      
+                     $STATUS));                                                 
+                                                                                
+                  %% SCAN MESSAGES FOR STATUS MSG FROM DEST HOST                
+                  %% THAT INCLUDES [HOSTNAME] AND FILE TITLE AND "NOT COPIED:"  
+                  $MSGS:= KEYIN("MSG");                                         
+                  WHILE $LINE:=$MSGS.SPLIT(/) NEQ EMPTY DO                      
+                     %% SCAN EACH LINE FOR THE KEYIN RESPONSE FOR TARGETS       
+                     BEGIN                                                      
+                     IF $LINE INCL #("[",$DESTHOST,"]") AND                     
+                     $LINE INCL $DESTTITLE AND                                  
+                     $LINE INCL "NOT COPIED:" THEN %% TARGETS FOUND             
+                        BEGIN                                                   
+                        %% SPLIT ON ":" TWICE, ERR MSG AT EOL AFTER LAST ":"    
+                        $TMP:=$LINE.SPLIT(":");                                 
+                        $TMP:=$LINE.SPLIT(":");                                 
+                        $ERRMESS:=$LINE;                                        
+                        END                                                     
+                     END;                                                       
+                                                                                
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",      
+                  "     *** FILE NOT COPIED -",$ERRMESS," ***"));               
+                  CALL DO "BL_REC_SKIPFILE";                                    
+                  #GROUPERR:=1; %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIR    
+                  #CFAILED:=0; %%RESET FLAG FOR NEXT FILE                       
+                  EXIT;                                                         
+                  END;                                                          
+               END                                                              
+          END                                                                   
+      ELSE                                                                      
+                                                                                
+         %% IF -VE RETURN CODE, WFL FUNCTION FAILED, DISPLAY ERROR              
+         BEGIN                                                                  
+         $ERR:=WFLEOJREASON(#("BLPACKCOPY",#PCOUNT));                           
+         DISPLAY (#("COPY OF FILE #",#PCOUNT," FAILED: ",$ERR));                
+         #GROUPERR:=1 %% FLAG TO SEND AUDIT SHOWING ERRORS FOR DIRECTORY;       
+         END                                                                    
+\                                                                               
+DEFINE * ODTS BL_REC_SKIPFILE(SYSTEM):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% BL_REC_SKIPFILE ODTSEQUENCE TO REMOVE RECOVERED BLPACK FILES FROM ##REDACTED##  %%  
+%%                                                                          %%  
+%% CALLED BY BL_REC                                                         %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               JUL '10 GXG %%  
+%% VERSION 02 FIX CUMULATIVE FILE COUNT BUG        JUL '10 GXG    %%  
+%% VERSION 03 IMPROVE ERROR HANDLING AND           SEP '10 GXG    %%  
+%%            CHECK DEST PACK HAS ENOUGH SPACE                              %%  
+%% VERSION 04 Bugfix for > 50 files in 1 run (WFL Slot Limit)               %%  
+%%                                                  CHG65815 SEP '13 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+      %% BUILD REMOVE STATEMENT INTO VARIABLE                                   
+      $CMD:=(#("REMOVE ",$SOURCETITLE,,                                         
+         "FROM ",$SOURCEPK));                                                   
+                                                                                
+      %% USE WFL FUNCTION TO PERFORM THE REMOVE AND TRACK IT                    
+      #WFL.SUM(1);                                                              
+      IF #CPY:=WFL($CMD,#("BLPACKREM",#PCOUNT)) > 0 THEN                        
+                                                                                
+         %% NEGATIVE RETURN CODE FROM WFL FUNCTION = ERROR, POSITIVE = JOBNO    
+         %% IF POSITIVE THEN WFL FUNCTION RUNNING.                              
+         BEGIN                                                                  
+         ON JOBMESSAGE DO                                                       
+            BEGIN                                                               
+                                                                                
+            %% IF A MESSAGE IS DISPLAYED BY WFL FUNCTION, DISPLAY IT ON SCREEN  
+            IF JOBMSGTYPE = WFLMSG AND JOBTEXT INCL "REMOVED" THEN              
+               BEGIN                                                            
+               $STATUS:= (JOBTEXT);                                             
+               DISPLAY ($STATUS);                                               
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",         
+                  $STATUS));                                                    
+               IF JOBTEXT INCL "NOT REMOVED" THEN                               
+                  #RFAILED:=1; %%SET FLAG THAT FILE COULDN'T BE REMOVED         
+               END                                                              
+                                                                                
+            %% IF EOJ RECORD, CHECK IF DSED AND DISPLAY ERROR                   
+            %% OR IF OK, DISPLAY SUCCESS MSG                                    
+            ELSE                                                                
+               IF JOBMSGTYPE = WFLEOJ THEN                                      
+               BEGIN                                                            
+               $REMERR:=WFLEOJREASON(#("BLPACKREM",#PCOUNT));                   
+               CASE $REMERR OF                                                  
+                  BEGIN                                                         
+                  "BADEOJ":  %%REMOVE FAILED                                    
+                     #REMRSLT:=1;                                               
+                  "GOODEOJ": %%REMOVE SUCCESSFUL                                
+                     #REMRSLT:=2;                                               
+                  ELSE:                                                         
+                     DISPLAY (#("BL_REC: DEBUG: ",$REMERR));                    
+                  END;                                                          
+               IF $REMERR INCL "DS" THEN                                        
+                  #REMRSLT:=1; %% IF REMOVE FAILS, FLAG AS SUCH                 
+               END;                                                             
+            END;                                                                
+                                                                                
+            IF #REMRSLT=1 THEN                                                  
+               BEGIN                                                            
+               $STATUS:=#("SOURCEFILE REMOVE FAILED: ",$SOURCETITLE," ON ",     
+                  $SOURCEPK);                                                   
+               DISPLAY ($STATUS);                                               
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",         
+                  $STATUS));                                                    
+               EXIT;                                                            
+               END;                                                             
+                                                                                
+            IF #REMRSLT=2 THEN                                                  
+               BEGIN                                                            
+               IF #RFAILED = 0 THEN                                             
+                  BEGIN                                                         
+                  $STATUS:=#("SOURCEFILE REMOVE SUCCESSFUL: ",$SOURCETITLE,     
+                  " ON ",$SOURCEPK);                                            
+                  DISPLAY ($STATUS);                                            
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",      
+                     $STATUS));                                                 
+                  EXIT;                                                         
+                  END                                                           
+               ELSE %% REMOVE WENT TO GOODEOJ BUT FILE NOT REMOVED              
+                  BEGIN                                                         
+                  $STATUS:=#("SOURCEFILE REMOVE FAILED: ",$SOURCETITLE,         
+                  " ON ",$SOURCEPK);                                            
+                  DISPLAY ($STATUS);                                            
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",      
+                     $STATUS));                                                 
+                  EXIT;                                                         
+                  END;                                                          
+            END                                                                 
+         END                                                                    
+      ELSE                                                                      
+                                                                                
+         %% IF -VE RETURN CODE, WFL FUNCTION FAILED, DISPLAY ERROR              
+         BEGIN                                                                  
+         $ERR:=WFLEOJREASON(#("BLPACKREM",#PCOUNT));                            
+         DISPLAY (#("REMOVE OF FILE #",#PCOUNT," FAILED: ",$ERR));              
+         END                                                                    
+\                                                                               
+DEFINE * ODTS BL_REC_MAIL:                                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% BL_REC_MAIL ODTSEQUENCE TO EMAIL BLPACK RECOVERY LOG                     %%  
+%%                                                                          %%  
+%% CALLED BY BL_REC                                                         %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               JUL '10 GXG %%  
+%% VERSION 02 FIX CUMULATIVE FILE COUNT BUG        JUL '10 GXG    %%  
+%% VERSION 03 IMPROVE ERROR HANDLING AND           SEP '10 GXG    %%  
+%%            CHECK DEST PACK HAS ENOUGH SPACE                              %%  
+%% VERSION 04 ADD EMAIL ADDRESS STORED IN RELEASEID FEB '13      %%  
+%% VERSION 05 Bugfix for > 50 files in 1 run (WFL Slot Limit)               %%  
+%%                                                  SEP '13 GXG    %%  
+%% VERSION 06 Use a different file attribute for the email address.         %%  
+%%                                                22/01/19     %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+IF #GROUPERR = 1 THEN                                                           
+  $TOSTRING := 'TO:##REDACTED##,' & $NOTE                          
+ELSE                                                                            
+  $TOSTRING := 'TO:##REDACTED##,' & $NOTE;                                       
+$AUDDIR:=TAKE($AUDTITLE.SPLIT(" "),20);                                         
+#ML:=MAIL(#($TOSTRING                                                           
+    ';SUBJECT:BLPACK RECOVERY',,                                                
+   DATETOTEXT(TODAY,DEFAULT),,TIMETOTEXT(TIMEOFDAY,HHMM)),                      
+   #('^INCLUDE ',$AUDDIR,'/= ON ',$BACKUP));                                    
+IF #ML < 0 THEN                                                                 
+   BEGIN                                                                        
+   ODT(#('BEGIN JOB BL_REC/MAILERROR',';CLASS=9; STRING S; ',                   
+       'S:=ACCEPT("MAIL OF AUDITLOG FAILED: ',MAILERROR(#ML),'");'));           
+   END                                                                          
+                                                                                

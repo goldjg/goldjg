@@ -1,0 +1,18 @@
+Begin                                                                   
+  Integer I,                                                            
+          J,                                                            
+          W;                                                            
+  Boolean Done;                                                         
+                                                                        
+  W := Myself.TaskValue;                                                
+  If W = 0 then                                                         
+    W := 1;                                                             
+  While not Done do                                                     
+    Begin                                                               
+      For I := 0 step 1 until 999999 do                                 
+        J := I + 1;                                                     
+      %Wait ((W));                                                      
+      If Myself.TaskValue = 99 then                                     
+        Done := True;                                                   
+    End;                                                                
+End of Program..........................................................

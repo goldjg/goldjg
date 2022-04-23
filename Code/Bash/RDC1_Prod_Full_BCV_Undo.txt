@@ -1,0 +1,595 @@
+# %%% Script to remove pairings/associations for Production BCV Set Mappings on Libra690.
+# %%%
+# %%% Version 1. For Pre Failover Production Backup - Nov 2008, 
+# %%%         2. Add new pack volumes.	    	    - Apr 2009, 
+#
+#
+#
+#
+# %%% detach BCVs from R1s
+#
+# %%% Packs 4000 - 4172 from 6436 - 6607
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4000 BCV ld PK6436
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4001 BCV ld PK6437
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4002 BCV ld PK6438
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4003 BCV ld PK6439
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4004 BCV ld PK6440
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4005 BCV ld PK6441
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4006 BCV ld PK6442
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4007 BCV ld PK6443
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4008 BCV ld PK6444
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4009 BCV ld PK6445
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4010 BCV ld PK6446
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4011 BCV ld PK6447
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4012 BCV ld PK6448
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4013 BCV ld PK6449
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4014 BCV ld PK6450
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4015 BCV ld PK6451
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4016 BCV ld PK6452
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4017 BCV ld PK6453
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4018 BCV ld PK6454
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4019 BCV ld PK6455
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4020 BCV ld PK6456
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4021 BCV ld PK6457
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4022 BCV ld PK6458
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4023 BCV ld PK6459
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4024 BCV ld PK6460
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4025 BCV ld PK6461
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4026 BCV ld PK6462
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4027 BCV ld PK6463
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4028 BCV ld PK6464
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4029 BCV ld PK6465
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4030 BCV ld PK6466
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4031 BCV ld PK6467
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4032 BCV ld PK6468
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4033 BCV ld PK6469
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4034 BCV ld PK6470
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4035 BCV ld PK6471
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4036 BCV ld PK6472
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4037 BCV ld PK6473
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4038 BCV ld PK6474
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4039 BCV ld PK6475
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4040 BCV ld PK6476
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4041 BCV ld PK6477
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4042 BCV ld PK6478
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4043 BCV ld PK6479
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4044 BCV ld PK6480
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4045 BCV ld PK6481
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4046 BCV ld PK6482
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4047 BCV ld PK6483
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4048 BCV ld PK6484
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4049 BCV ld PK6485
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4050 BCV ld PK6486
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4051 BCV ld PK6487
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4052 BCV ld PK6488
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4053 BCV ld PK6489
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4054 BCV ld PK6490
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4055 BCV ld PK6491
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4056 BCV ld PK6492
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4057 BCV ld PK6493
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4058 BCV ld PK6494
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4059 BCV ld PK6495
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4060 BCV ld PK6496
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4061 BCV ld PK6497
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4062 BCV ld PK6498
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4063 BCV ld PK6499
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4064 BCV ld PK6500
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4065 BCV ld PK6501
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4066 BCV ld PK6502
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4067 BCV ld PK6503
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4068 BCV ld PK6504
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4069 BCV ld PK6505
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4070 BCV ld PK6506
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4071 BCV ld PK6507
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4072 BCV ld PK6508
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4073 BCV ld PK6509
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4074 BCV ld PK6510
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4075 BCV ld PK6511
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4076 BCV ld PK6512
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4077 BCV ld PK6513
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4078 BCV ld PK6514
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4079 BCV ld PK6515
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4080 BCV ld PK6516
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4081 BCV ld PK6517
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4082 BCV ld PK6518
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4083 BCV ld PK6519
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4084 BCV ld PK6520
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4085 BCV ld PK6521
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4086 BCV ld PK6522
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4087 BCV ld PK6523
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4088 BCV ld PK6524
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4089 BCV ld PK6525
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4090 BCV ld PK6526
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4091 BCV ld PK6527
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4092 BCV ld PK6528
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4093 BCV ld PK6529
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4094 BCV ld PK6530
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4095 BCV ld PK6531
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4096 BCV ld PK6532
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4097 BCV ld PK6533
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4098 BCV ld PK6534
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4099 BCV ld PK6535
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4100 BCV ld PK6536
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4101 BCV ld PK6537
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4102 BCV ld PK6538
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4103 BCV ld PK6539
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4104 BCV ld PK6540
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4105 BCV ld PK6541
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4106 BCV ld PK6542
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4107 BCV ld PK6543
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4108 BCV ld PK6544
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4109 BCV ld PK6545
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4110 BCV ld PK6546
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4111 BCV ld PK6547
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4112 BCV ld PK6548
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4113 BCV ld PK6549
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4114 BCV ld PK6550
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4115 BCV ld PK6551
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4116 BCV ld PK6552
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4117 BCV ld PK6553
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4118 BCV ld PK6554
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4119 BCV ld PK6555
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4120 BCV ld PK6556
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4121 BCV ld PK6557
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4122 BCV ld PK6558
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4123 BCV ld PK6559
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4124 BCV ld PK6560
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4125 BCV ld PK6561
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4126 BCV ld PK6562
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4127 BCV ld PK6563
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4128 BCV ld PK6564
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4129 BCV ld PK6565
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4130 BCV ld PK6566
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4131 BCV ld PK6567
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4132 BCV ld PK6568
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4133 BCV ld PK6569
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4134 BCV ld PK6570
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4135 BCV ld PK6571
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4136 BCV ld PK6572
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4137 BCV ld PK6573
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4138 BCV ld PK6574
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4139 BCV ld PK6575
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4140 BCV ld PK6576
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4141 BCV ld PK6577
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4142 BCV ld PK6578
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4143 BCV ld PK6579
+#
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4144 BCV ld PK6580
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4145 BCV ld PK6581
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4146 BCV ld PK6582
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4147 BCV ld PK6583
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4148 BCV ld PK6584
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4149 BCV ld PK6585
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4150 BCV ld PK6586
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4151 BCV ld PK6587
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4152 BCV ld PK6588
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4153 BCV ld PK6589
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4154 BCV ld PK6590
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4155 BCV ld PK6591
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4156 BCV ld PK6592
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4157 BCV ld PK6593
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4158 BCV ld PK6594
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4159 BCV ld PK6595
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4160 BCV ld PK6596
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4161 BCV ld PK6597
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4162 BCV ld PK6598
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4163 BCV ld PK6599
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4164 BCV ld PK6600
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4165 BCV ld PK6601
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4166 BCV ld PK6602
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4167 BCV ld PK6603
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4168 BCV ld PK6604
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4169 BCV ld PK6605
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4170 BCV ld PK6606
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g RDC1_Prod_Full_BCV detach PK4171 BCV ld PK6607
+#
+#
+#
+#
+#
+# %%% disassociate individual (labelled) BCVs
+#
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6436
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6437
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6438
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6439
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6440
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6441
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6442
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6443
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6444
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6445
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6446
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6447
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6448
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6449
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6450
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6451
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6452
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6453
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6454
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6455
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6456
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6457
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6458
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6459
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6460
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6461
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6462
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6463
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6464
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6465
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6466
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6467
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6468
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6469
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6470
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6471
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6472
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6473
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6474
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6475
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6476
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6477
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6478
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6479
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6480
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6481
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6482
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6483
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6484
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6485
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6486
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6487
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6488
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6489
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6490
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6491
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6492
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6493
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6494
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6495
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6496
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6497
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6498
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6499
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6500
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6501
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6502
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6503
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6504
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6505
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6506
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6507
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6508
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6509
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6510
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6511
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6512
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6513
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6514
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6515
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6516
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6517
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6518
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6519
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6520
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6521
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6522
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6523
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6524
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6525
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6526
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6527
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6528
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6529
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6530
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6531
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6532
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6533
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6534
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6535
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6536
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6537
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6538
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6539
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6540
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6541
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6542
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6543
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6544
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6545
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6546
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6547
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6548
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6549
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6550
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6551
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6552
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6553
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6554
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6555
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6556
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6557
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6558
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6559
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6560
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6561
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6562
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6563
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6564
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6565
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6566
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6567
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6568
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6569
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6570
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6571
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6572
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6573
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6574
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6575
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6576
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6577
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6578
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6579
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6580
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6581
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6582
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6583
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6584
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6585
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6586
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6587
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6588
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6589
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6590
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6591
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6592
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6593
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6594
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6595
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6596
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6597
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6598
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6599
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6600
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6601
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6602
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6603
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6604
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6605
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6606
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g RDC1_Prod_Full_BCV disassociate -force ld PK6607
+#
+#
+# %%% remove individual (labelled) std (R1) devices                                  
+#                                                                             
+#         
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4000
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4001
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4002
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4003
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4004
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4005
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4006
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4007
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4008
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4009
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4010
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4011
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4012
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4013
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4014
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4015
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4016
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4017
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4018
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4019
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4020
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4021
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4022
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4023
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4024
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4025
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4026
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4027
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4028
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4029
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4030
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4031
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4032
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4033
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4034
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4035
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4036
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4037
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4038
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4039
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4040
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4041
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4042
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4043
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4044
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4045
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4046
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4047
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4048
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4049
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4050
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4051
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4052
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4053
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4054
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4055
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4056
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4057
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4058
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4059
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4060
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4061
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4062
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4063
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4064
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4065
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4066
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4067
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4068
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4069
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4070
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4071
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4072
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4073
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4074
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4075
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4076
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4077
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4078
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4079
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4080
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4081
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4082
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4083
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4084
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4085
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4086
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4087
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4088
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4089
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4090
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4091
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4092
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4093
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4094
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4095
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4096
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4097
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4098
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4099
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4100
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4101
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4102
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4103
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4104
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4105
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4106
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4107
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4108
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4109
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4110
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4111
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4112
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4113
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4114
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4115
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4116
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4117
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4118
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4119
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4120
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4121
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4122
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4123
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4124
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4125
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4126
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4127
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4128
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4129
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4130
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4131
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4132
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4133
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4134
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4135
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4136
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4137
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4138
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4139
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4140
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4141
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4142
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4143
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4144
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4145
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4146
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4147
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4148
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4149
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4150
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4151
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4152
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4153
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4154
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4155
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4156
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4157
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4158
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4159
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4160
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4161
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4162
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4163
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4164
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4165
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4166
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4167
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4168
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4169
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4170
+/usr/local/bin/sudo /usr/symcli/bin/symld  -g RDC1_Prod_Full_BCV remove -force PK4171
+#
+#
+#
+# %%% add individual (labelled) std (R1) devices    
+#
+#
+#
+
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symgate -sid 1234 -g RDC1_Prod_Full_BCV disassociate dev 1509
+/usr/local/bin/sudo /usr/symcli/bin/symgate -sid 1234 undefine dev 1509
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symdg delete RDC1_Prod_Full_BCV
+#
+#

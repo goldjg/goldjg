@@ -1,0 +1,1 @@
+cd $("\\" + $ENV:HomeDataServer + "\" + $env:USERNAME + "\CodeSnippets\PowerShell")

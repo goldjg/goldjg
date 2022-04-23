@@ -1,0 +1,9 @@
+BEGIN JOB GXG/DUMMY;                                                            
+INTEGER ANSWER;                                                                 
+ANSWER:=4/2;                                                                    
+DISPLAY STRING(ANSWER,*);                                                       
+ANSWER:=4 DIV 2;                                                                
+DISPLAY STRING(ANSWER,*);                                                       
+ANSWER:=4 MOD 2;                                                                
+DISPLAY STRING(ANSWER,*);                                                       
+END JOB.                                                                        

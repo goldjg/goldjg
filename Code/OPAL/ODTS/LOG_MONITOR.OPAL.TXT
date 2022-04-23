@@ -1,0 +1,95 @@
+DEFINE * SITUATION LOG_MONITOR(LOG=16,4):                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% LOG_MONITOR SITUATION                                                     %% 
+%% ~~~~~~~~~~~~~~~~~~~~~                                                     %% 
+%% Monitors sumlog for retitle of *SYSTEM/SUMLOG                             %% 
+%% (one of the last entries in a sumlog prior to new sumlog being active).   %% 
+%%                                                                           %% 
+%% Will trigger ODTS if time between creation of the log, and the log switch %% 
+%% entry is less than 5 minutes (rapid log rotation in effect).              %% 
+%%                                                                           %% 
+%% Invoked using WHEN LOG_MONITOR DO LOG_MONITOR                             %% 
+%% CALLS: LOG_MONITOR ODTS                                                   %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+"*SYSTEM/SUMLOG" ISIN LOGTEXT                                                   
+And LOGTIME - LOGSTARTTIME Leq 300                                              
+And LOGTIME - LOGSTARTTIME > 0 %avoid false match when log spans more than 1 day
+\                                                                               
+DEFINE * ODTSEQUENCE LOG_MONITOR(LOG):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% LOG_MONITOR ODTSEQUENCE                                                   %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~                                                   %% 
+%% Triggered by LOG_MONITOR SITU when logs rotation every 5 minutes or less. %% 
+%%                                                                           %% 
+%% Will trigger ODTS if time between creation of the log, and the log switch %% 
+%% entry is less than 5 minutes (rapid log rotation in effect).              %% 
+%%                                                                           %% 
+%% Counts all log entries for all mix numbers in last minute, produces list  %% 
+%% of top 5 worst offending mix entries, and their details and emails alert. %% 
+%%                                                                           %% 
+%% Invoked using WHEN LOG_MONITOR DO LOG_MONITOR                             %% 
+%% CALLED BY: LOG_MONITOR SITU                                               %% 
+%% CALLS: LOG_COUNT ODTS in INLINE LOG EVAL                                  %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+Clear;                                                                          
+                                                                                
+%% Produce count of log entries per mixno in last 60 seconds                    
+TT(#('EV(LOG:TRUE)[@BACK 1 MIN] DO LOG_COUNT'));                                
+                                                                                
+%Build Sorted mix list (needs count to be first)                                
+WHILE $MIXID:=$MIXLIST.SPLIT NEQ EMPTY DO  %build sorted list                   
+    $Sorted.Insert(#(#$MixId 20,":",Drop($MixId,1)),Down);                      
+#Cnt:=0;                                                                        
+                                                                                
+%Extract First 5 entries                                                        
+While $Item:=$Sorted.Split Neq Empty And #Cnt.Sum(1) < 6 Do                     
+   Begin                                                                        
+   $ItemCnt:=$Item.Copy(1,":");                                                 
+   $ItemMix:=$Item.Copy(2,":");                                                 
+   $ItemTitle:=$ItemMix.MX(NAME);                                               
+   $MaxMixList.Insert(#(Decimal(Trim($ItemCnt)) 10," " 7,                       
+      Decimal(Trim($ItemMix)) 5," " 7,$ItemTitle),Down,/);                      
+   End;                                                                         
+                                                                                
+%Send notification email                                                        
+%Build list of email recipients                                                 
+$RECIPIENTS:=#('##REDACTED##,',         
+    '##REDACTED##');         
+                                                                                
+                                                                                
+#ML:=MAIL(#('To:',$RECIPIENTS,';Subject:',                                      
+               HOSTNAME,': Excessive Log Rotation (Log Life < 5 Minutes)'),     
+            #('New sumlogs are being created every 5 minutes or less.',/,       
+              /,                                                                
+              'Please investigate the following top 5 mix numbers generating ', 
+              'sumlog entries in the last 60 seconds:',//,                      
+              '# Entries' 12,'MixNo' 7,'TaskName(If still active)',/,           
+              $MaxMixList,//                                                    
+              ));                                                               
+\                                                                               
+TT DEFINE * ODTSEQUENCE LOG_COUNT(LOG):                                         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% LOG_COUNT ODTSEQUENCE                                                     %% 
+%% ~~~~~~~~~~~~~~~~~~~~~                                                     %% 
+%% Called by LOG_MONITOR ODTS to count number of log entries by each mixno   %% 
+%% in the time range specified by the LOG EVAL used in the ODTS.             %% 
+%%                                                                           %% 
+%% Produces list of top 5 worst offending mix entries, and their details     %% 
+%%  and emails alert.                                                        %% 
+%%                                                                           %% 
+%% CALLED BY: LOG_MONITOR ODTS                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$MixCount:=#("M",Mixno);                                                        
+#$MixCount.Sum(1);                                                              
+If Not $MixList.Includes($MixCount) Then %keep list of mixnos                   
+   $MixList.Insert($MixCount);                                                  
+\                                                                               

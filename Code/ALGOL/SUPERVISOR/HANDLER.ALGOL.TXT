@@ -1,0 +1,107 @@
+$$ SET LIST ERRLIST STACK LINEINFO FORMAT NOXREFLIST LISTDOLLAR         
+$$ SET LEVEL 2                                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%% SUPERVISOR/HANDLER                                   %%         
+%% =======================                                   %%         
+%% PROGRAM CALLED BY SUPERVISOR/HANDLER.              %%         
+%% JOB/PROGRAM MUST BE RUN FROM USERCODE WITH PU.            %%         
+%% PROGRAM MUST BE PP'D WITH PU OR TASKING.                  %%         
+%%                                                           %%         
+%% FUNCTION: PASSES COMMANDS FROM JOB INTO SUPERVISOR        %%         
+%%                                                           %%         
+%% INPUT PARAMS FROM CALLING WFL                             %%         
+%% =============================                             %%         
+%% INPUT: COMMAND TO BE PROCESSED BY SUPERVISOR.             %%         
+%% EMAIL: EMAIL ADDRESS(ES) TO SEND SUPERVISOR RESPONSE TO.  %%         
+%% SUBJECT: SUBJECT OF EMAIL TO SEND                         %%         
+%%                                                           %%         
+%% OUTPUTS                                                   %%         
+%% =======                                                   %%         
+%% EMAIL SENT TO ADDRESS(ES) SPECIFIED IN INPUT PARAM        %%         
+%% DETAILS CMD SENT TO SUPERVISOR AND RESPONSE RECEIVED.     %%         
+%% EMAIL SUBJECT AS SPECIFIED IN INPUT PARAM                 %%         
+%%                                                           %%         
+%% CALLS EXTERNALCOMMAND ENTRYPOINT IN SUPERVISOR TO PROCESS %%         
+%% SUPERVISOR CMDS ONLY ("TT" NOT REQUIRED. ODT CMDS NOT     %%         
+%% SUPPORTED.                                                %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                                                           %%         
+%% VERSION 01 ######### INITIAL IMPLEMENTATION   FEB 2010 GXG %%         
+%% VERSION 02 ######### RECOMPILE FOR MCP 17     OCT 2015 %%
+%%                                                           %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                        
+%% CALLSUPERVISOR PROCEDURE.                                            
+%% PARAM NAMES MATCH WFL STRINGS PASSED FROM CALLING WFL.               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+PROCEDURE CALLSUPERVISOR(INPUT,EMAIL,SUBJECT);                          
+REAL ARRAY INPUT,EMAIL,SUBJECT[*];                                      
+                                                                        
+BEGIN                                                                   
+                                                                        
+%% DECLARE SUPERVISOR LIBRARY USING EXTERNALCOMMAND PROCEDURE           
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
+   LIBRARY SUP(LIBACCESS=BYTITLE,                                       
+                  TITLE="*METALOGIC/SUPERVISOR.");                      
+                                                                        
+      INTEGER PROCEDURE EXTERNALCOMMAND(INP,OUT);                       
+      ARRAY INP,OUT[0];                                                 
+   LIBRARY SUP;                                                         
+                                                                        
+%% DECLARE MAILLIB LIBRARY USING QUICKMAIL FUNCTION                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                     
+   LIBRARY MAILLIB (LIBACCESS=BYFUNCTION);                              
+      REAL PROCEDURE QUICKMAIL(MAILHDRS,MAILTEXT,OPT);                  
+      VALUE OPT;                                                        
+      EBCDIC ARRAY MAILHDRS, MAILTEXT [0];                              
+      BOOLEAN OPT;                                                      
+   LIBRARY MAILLIB;                                                     
+                                                                        
+   %% DEFINE REALS/ARRAYS REQUIRED FOR EXTERNALCOMMAND CALL             
+   %% DEFINE OUTPUT ARRAY WITH NO BOUNDS, EXTERNALCOMMAND               
+   %% PROCEDURE WILL RESIZE AS NEEDED.                                  
+   REAL EXTCMD;                                                         
+   ARRAY OUTPUT[0:0];                                                   
+                                                                        
+   %% USE ADDRESS EQUATION TO MAP REAL ARRAYS TO EBCDIC ARRAYS.         
+   EBCDIC ARRAY OUTPUTEX[0]=OUTPUT;                                     
+   EBCDIC ARRAY INPUTEX[0]=INPUT;                                       
+                                                                        
+   %% RESIZE LATER TO ENSURE NO BOUNDS ERRORS.                          
+   EBCDIC ARRAY MAILTEXT[0:0];                                          
+                                                                        
+   %%SETUP EMAIL HEADER ARRAY                                           
+   DEFINE MAX_QMAILHDRS = 35#;                                          
+   EBCDIC ARRAY QMAILHDRS[0:MAX_QMAILHDRS*6];                           
+                                                                        
+   REPLACE MYSELF.FAMILY BY ".";                                        
+                                                                        
+   %%CALL SUPERVISOR LIBRARY TO PROCESS COMMAND                         
+   %%AND GET RESPONSE BACK.                                             
+   EXTCMD:=EXTERNALCOMMAND(INPUT,OUTPUT);                               
+                                                                        
+   %%RESIZE MAILTEXT ARRAY TO BE SIZE OF EXTCMD                         
+   %%PLUS SOME PADDING FOR EMAIL HEADERS, BODY TEXT.                    
+   RESIZE(MAILTEXT,EXTCMD+255,PAGED);                                   
+                                                                        
+   %% SETUP EMAIL HEADERS                                               
+   REPLACE QMAILHDRS BY                                                 
+       "TO:",                                                           
+       EMAIL UNTIL = 48"00",                                            
+       ";SUBJECT:",                                                     
+       SUBJECT UNTIL = 48"00";                                          
+                                                                        
+   %%SETUP EMAIL BODY WITH CMD/RESPONSE PLUS FORMATTING                 
+   REPLACE MAILTEXT BY                                                  
+       "COMMAND SENT TO SUPERVISOR:",                                   
+       48"0D",                                                          
+       INPUTEX UNTIL = 48"00",                                          
+       48"0D",                                                          
+       48"0D",                                                          
+       "RESPONSE FROM SUPERVISOR:",                                     
+       48"0D",                                                          
+       OUTPUTEX UNTIL = 48"00";                                         
+                                                                        
+   %%CALL QUICKMAIL TO SEND THE EMAIL                                   
+   QUICKMAIL(QMAILHDRS,MAILTEXT,FALSE);                                 
+END.                                                                    

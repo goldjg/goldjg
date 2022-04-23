@@ -1,0 +1,70 @@
+TT DEF + ODTS ODT_TEST(MSG):                                                      00001000
+      $ADDR := UPPER(TRIM(TEXT));                                                 00002000
+      $ODTMSG := $ODTMSG & "AA" & #(/) & "==" & #(/);                             00002500
+      $ODTMSG := $ODTMSG & KEYIN("AA") & #(//); ;                                 00003000
+      $ODTMSG := $ODTMSG & "AA NAME=COMS=" & #(/)                                 00003200
+                         & "=============" & #(/);                                00003400
+      $ODTMSG := $ODTMSG & KEYIN("AA NAME=COMS=") & #(//);                        00004000
+      $ODTMSG := $ODTMSG & "C" & #(/) & "=" & #(/);                               00004500
+      $ODTMSG := $ODTMSG & KEYIN("C") & #(//); ;                                  00005000
+      $ODTMSG := $ODTMSG & "CU" & #(/)  & "==" & #(/);                            00005500
+      $ODTMSG := $ODTMSG & KEYIN("CU") & #(//);                                   00006000
+      $ODTMSG := $ODTMSG & "DBS" & #(/)  & "===" & #(/);                          00006050
+      $ODTMSG := $ODTMSG & KEYIN("DBS") & #(//);                                  00006100
+      $ODTMSG := $ODTMSG & "DL" & #(/)  & "==" & #(/);                            00006150
+      $ODTMSG := $ODTMSG & KEYIN("DL") & #(//);                                   00006200
+      $ODTMSG := $ODTMSG & "DN" & #(/)  & "==" & #(/);                            00006250
+      $ODTMSG := $ODTMSG & KEYIN("DN") & #(//);                                   00006300
+      $ODTMSG := $ODTMSG & "DQ" & #(/)  & "==" & #(/);                            00006350
+      $ODTMSG := $ODTMSG & KEYIN("DQ") & #(//);                                   00006400
+      $ODTMSG := $ODTMSG & "DU ON DISK" & #(/)  & "==========" & #(/);            00006450
+      $ODTMSG := $ODTMSG & KEYIN("DU ON DISK") & #(//);                           00006500
+      $ODTMSG := $ODTMSG & "HLUNIT" & #(/)  & "======" & #(/);                    00006550
+      $ODTMSG := $ODTMSG & KEYIN("HLUNIT") & #(//);                               00006600
+      $ODTMSG := $ODTMSG & "HOSTNAME" & #(/)  & "========" & #(/);                00006650
+      $ODTMSG := $ODTMSG & KEYIN("HOSTNAME") & #(//);                             00006700
+      $ODTMSG := $ODTMSG & "HU" & #(/)  & "==" & #(/);                            00006750
+      $ODTMSG := $ODTMSG & KEYIN("HU") & #(//);                                   00006800
+      $ODTMSG := $ODTMSG & "J" & #(/)  & "=" & #(/);                              00006850
+      $ODTMSG := $ODTMSG & KEYIN("J") & #(//);                                    00006900
+      $ODTMSG := $ODTMSG & "LIBS" & #(/)  & "====" & #(/);                        00006950
+      $ODTMSG := $ODTMSG & KEYIN("LIBS") & #(//);                                 00007000
+      $ODTMSG := $ODTMSG & "MCS" & #(/)  & "===" & #(/);                          00007050
+      $ODTMSG := $ODTMSG & KEYIN("MCS") & #(//);                                  00007100
+      $ODTMSG := $ODTMSG & "ML" & #(/)  & "==" & #(/);                            00007150
+      $ODTMSG := $ODTMSG & KEYIN("ML") & #(//);                                   00007200
+      $ODTMSG := $ODTMSG & "MQ 321" & #(/)  & "======" & #(/);                    00007250
+      $ODTMSG := $ODTMSG & KEYIN("MQ 321") & #(//);                               00007300
+      $ODTMSG := $ODTMSG & "MQ - 321" & #(/)  & "========" & #(/);                00007350
+      $ODTMSG := $ODTMSG & KEYIN("MQ - 321") & #(//);                             00007400
+      $ODTMSG := $ODTMSG & "MSG" & #(/)  & "===" & #(/);                          00007450
+      $ODTMSG := $ODTMSG & KEYIN("MSG") & #(//);                                  00007500
+      $ODTMSG := $ODTMSG & "PD *SYSTEM/MCP/=" & #(/)                              00007550
+                         & "================" & #(/);                             00007600
+      $ODTMSG := $ODTMSG & KEYIN("PD *SYSTEM/MCP/=") & #(//);                     00007650
+      $ODTMSG := $ODTMSG & "PER PK" & #(/)  & "======" & #(/);                    00007652
+      $ODTMSG := $ODTMSG & KEYIN("PER PK") & #(//);                               00007654
+      $ODTMSG := $ODTMSG & "PER PK-" & #(/)  & "=======" & #(/);                  00007656
+      $ODTMSG := $ODTMSG & KEYIN("PER PK-") & #(//);                              00007658
+      $ODTMSG := $ODTMSG & "PS" & #(/)  & "==" & #(/);                            00007660
+      $ODTMSG := $ODTMSG & KEYIN("PS") & #(//);                                   00007662
+      $ODTMSG := $ODTMSG & "PS SH" & #(/)  & "=====" & #(/);                      00007664
+      $ODTMSG := $ODTMSG & KEYIN("PS SH") & #(//);                                00007666
+      $ODTMSG := $ODTMSG & "PS GROUP" & #(/)  & "=========" & #(/);               00007668
+      $ODTMSG := $ODTMSG & KEYIN("PS GROUP") & #(//);                             00007670
+      $ODTMSG := $ODTMSG & "QF" & #(/)  & "==" & #(/);                            00007672
+      $ODTMSG := $ODTMSG & KEYIN("QF") & #(//);                                   00007674
+      $ODTMSG := $ODTMSG & "S" & #(/)  & "=" & #(/);                              00007676
+      $ODTMSG := $ODTMSG & KEYIN("S") & #(//);                                    00007678
+      $ODTMSG := $ODTMSG & "SQ" & #(/)  & "==" & #(/);                            00007680
+      $ODTMSG := $ODTMSG & KEYIN("SQ") & #(//);                                   00007682
+      $ODTMSG := $ODTMSG & "TD" & #(/)  & "===" & #(/);                           00007684
+      $ODTMSG := $ODTMSG & KEYIN("TD") & #(//);                                   00007686
+      $ODTMSG := $ODTMSG & "U" & #(/)  & "=" & #(/);                              00007688
+      $ODTMSG := $ODTMSG & KEYIN("U") & #(//);                                    00007690
+      $ODTMSG := $ODTMSG & "W" & #(/)  & "=" & #(/);                              00007692
+      $ODTMSG := $ODTMSG & KEYIN("W") & #(//);                                    00007694
+      $ODTMSG := $ODTMSG & "WM" & #(/)  & "==" & #(/);                            00007696
+      $ODTMSG := $ODTMSG & KEYIN("WM") & #(//);                                   00007698
+      #RSLT := MAIL("TO:" & $ADDR                                                 00007700
+                        & "; SUBJECT : ODT COMMAND TESTS",$ODTMSG);               00008000

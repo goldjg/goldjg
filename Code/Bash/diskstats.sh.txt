@@ -1,0 +1,36 @@
+#!/bin/bash
+############################################################################
+# Diskstats monitoring script                                              #
+# ---------------------------                                              #
+# Scans /proc/diskstats on a 60 second interval and writes the             #
+# reads/writes and read/write times (cumulative) to a file.                #
+#                                                                          #
+# Only tracks the dm devices (Device Mapper logical volumes aka VTS vaults)#
+# and inserts date/time stamp to each output file line.                    #
+# 								           #
+# Output is a CSV file intended to be analysed in MS Excel on the desktop. #
+#                                                                          #
+# VERSION 01    Initial Implementation          GXG ##REDACTED## Feb 2012      #
+############################################################################
+
+# Start loop
+while true; do
+   # Setup output file name named for today (create a new file each day)
+   LOG="diskstats_$(hostname)_$(date +%Y%m%d).csv"   
+   
+   #Check if a logfile already exists for today
+   if [ ! -f $LOG ];
+   then
+      # file doesn't exist so create by writing header record to it.
+      echo "date,time,device,reads,read time(ms),writes,write time(ms)" > $LOG
+   else
+      # exists, so write date, time, and the fields we care about.
+      # /dm-/ ensures we grab only the logical volumes
+      # separate files with commas, grab device name (3rd field),
+      # reads (4th field), read time (7th field), writes(6th field) and
+      # write time (11th field).
+      awk -v ds="`date '+%F,%H:%M'`" '/dm-/ {OFS = ",";print ds,$3,$4,$7,$6,$11}' /proc/diskstats  >> $LOG
+   fi
+   # go to sleep for 60 seconds and start loop again.
+   sleep 60
+done

@@ -1,0 +1,190 @@
+DEFINE * ODTSEQUENCE IO_RELEASE_ME(MSG):                                        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% IO_RELEASE_ME ODTSEQUENCE                                                 %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~                                                 %% 
+%% Places any mixno passed to it onto a whitelist so that IO_MONITOR leaves  %% 
+%% that task alone.                                                          %% 
+%%                                                                           %% 
+%% Invoked using DO IO_RELEASE_ME <mixno> e.g. DO IO_RELEASE_ME 1234         %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$IO_WHITELIST_MAP.GLOBAL.INSERT(#(TRIM(TEXT)));                                 
+ODT(TRIM(TEXT),"OK");                                                           
+TT(#('DO (MX:Display("Task has been whitelisted, no longer monitored."))'       
+   ,Mixno));                                                                    
+\                                                                               
+DEFINE * SITUATION IO_CLEAN_WL(LOGEOJ):                                         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% IO_CLEAN_WL SITUATION                                                     %% 
+%% ~~~~~~~~~~~~~~~~~~~~~                                                     %% 
+%% Monitors EOJs and if mixno was in IO whitelist, call ODTS to remove from  %% 
+%% the list.                                                                 %% 
+%%                                                                           %% 
+%% Invoked using WHEN IO_CLEAN_WL DO IO_CLEAN_WL                             %% 
+%% CALLS: IO_CLEAN_WL ODTS                                                   %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+String(MIXNO,*) ISIN $IO_WHITELIST_MAP.GLOBAL                                   
+\                                                                               
+DEFINE * ODTSEQUENCE IO_CLEAN_WL(LOG):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% IO_CLEAN_WL ODTSEQUENCE                                                   %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~                                                   %% 
+%% For any fileclose passed by SITU:                                         %% 
+%% - Monitor task that done the fileclose for 30 seconds and count           %% 
+%%   filecloses in that time - if more than 150  then stop the task and alert%% 
+%%                                                                           %% 
+%% Invoked using WHEN IO_CLEAN_WL DO IO_CLEAN_WL                             %% 
+%% CALLED BY: IO_CLEAN_WL SITU                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$IO_WHITELIST_MAP.GLOBAL.CUT(STRING(MIXNO,*));                                  
+DISPLAY(#(MIXNO,,"has completed and has been removed from whitelist"));         
+\                                                                               
+DEF * SITU IO_MONITOR(FILECLOSE):                                               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% IO_MONITOR SITUATION                                                      %% 
+%% ~~~~~~~~~~~~~~~~~~~~                                                      %% 
+%% Monitors FILECLOSE events for mix entries matching criteria:              %% 
+%% - File not a database audit file                                          %% 
+%% - Task elapsed time greater than 5 minutes (passed initialisation code)   %% 
+%% - Task running under ##REDACTED## usercode,                                    %% 
+%%   or ##REDACTED## usercodes                                       %% 
+%% - Not a TP, CANDE stack, ##REDACTED## utility, , patternsearch,       %% 
+%%   face, DB extract/load/delete, not system software.            %% 
+%%                                                                           %% 
+%% Invoked using WHEN IO_MONITOR DO IO_MONITOR                               %% 
+%% ************************************************************************* %% 
+%% *** THIS SCRIPT HAS A SIGNIFICANT PERFORMANCE OVERHEAD AND SHOULD NOT *** %% 
+%% *** BE RUNNING CONTINOUSLY!!!                                         *** %% 
+%% ***                                                                   *** %% 
+%% *** AT IMPLEMENTATION, A SERIES OF TT AFTERS WERE SETUP TO START THIS *** %% 
+%% *** EVERY 10 MINUTES AND STOP AGAIN 2 MINUTES LATER SO ONLY SAMPLING  *** %% 
+%% *** 2 MINUTES OUT OF EVERY 10.                                        *** %% 
+%% ************************************************************************* %% 
+%% CALLS: IO_MONITOR ODTS                                                    %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%% Version  2 - - Add REORGANIZATION tasks to exclusion and        %% 
+%%                          fix ##REDACTED## Load/Delete        APR '16 GXG.     %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+Not Title Incl {"##REDACTED##",                                                     
+                "##REDACTED##",                                               
+                "##REDACTED##",                                                    
+                "##REDACTED##"}                                                    
+And (ASSOCIATION Neq 1 And DISPOSITION Neq 5)                                   
+And Via(Mixno:ELAPSEDTIME) > 300                                                
+And Via(Mixno:Name) Incl {"(USER1","(USER2","(USER3","(USER4","(USER5)"}         
+And Not Via(Mixno:Name) Incl {")TP/",                                           
+                          "REORGANIZATION/",                                    
+                          "CANDE/STACK",                                        
+                          "OBJECT/",                                            
+                          "##REDACTED##",                                                
+                          "##REDACTED##",                                            
+                          "(##REDACTED##)",                                         
+                          "##REDACTED##",                                   
+                          "##REDACTED##",                                
+                          "##REDACTED##",                              
+                          "##REDACTED##"}                                         
+And Not Via(Mixno:Name) EQW {"=PRM/P/LOAD/T##DB=",                        
+                             "=PRM/P/DELETE/T##DB="}                      
+And Not Via(Mixno:CodeTitle) Incl {"*SYSTEM/"}                                  
+And Via(Mixno:CompilerName Eql Empty)                                           
+\                                                                               
+DEF * ODTS IO_MONITOR(FILECLOSE):                                               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% IO_MONITOR ODTSEQUENCE                                                    %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~                                                    %% 
+%% For any fileclose passed by SITU:                                         %% 
+%% - Monitor task that done the fileclose for 30 seconds and count           %% 
+%%   filecloses in that time - if more than 150  then stop the task and alert%% 
+%%                                                                           %% 
+%% Invoked using WHEN IO_MONITOR DO IO_MONITOR                               %% 
+%% ************************************************************************* %% 
+%% *** THIS SCRIPT HAS A SIGNIFICANT PERFORMANCE OVERHEAD AND SHOULD NOT *** %% 
+%% *** BE RUNNING CONTINOUSLY!!!                                         *** %% 
+%% ***                                                                   *** %% 
+%% *** AT IMPLEMENTATION, A SERIES OF TT AFTERS WERE SETUP TO START THIS *** %% 
+%% *** EVERY 10 MINUTES AND STOP AGAIN 2 MINUTES LATER SO ONLY SAMPLING  *** %% 
+%% *** 2 MINUTES OUT OF EVERY 10.                                        *** %% 
+%% ************************************************************************* %% 
+%% CALLED BY: IO_MONITOR SITU                                                %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+#TimeLimit:=30; %if 30 seconds since last close reset count                     
+#CloseLimit:=150; %number of consecutive closes allowed                         
+If Mixno Neq #LastMixno Then                                                    
+Begin                                                                           
+   $MyCount:=#("C",Mixno);                                                      
+   $MyTime:=#("T",Mixno);                                                       
+End;                                                                            
+                                                                                
+%Check if task has been placed on whitelist - if so, leave it alone!            
+IF NOT ($SKIPPED:= $IO_WHITELIST_MAP.GLOBAL.COPY(#(MIXNO)) = EMPTY) THEN        
+Begin                                                                           
+   Exit;                                                                        
+End;                                                                            
+                                                                                
+If (#$MyTime Neq 0 And MCPTIME-#$MyTime > #TimeLimit) Then  %reset              
+   #$MyCOunt:=0;                                                                
+If #$MyCOunt.Sum(1) > #CloseLimit Then %limit breached                          
+Begin                                                                           
+   #$MyTime:=#$MyCOunt:=0;                                                      
+                                                                                
+   %stop the task                                                               
+   ODT(Mixnumber,"ST");                                                         
+                                                                                
+   %Tell the user why they have been stopped                                    
+   TT(#('DO (MX:Display("Stopped for exceeding ',#CloseLimit,                   
+           ' File Closes in ',#TimeLimit,' seconds")) ' ,Mixno));               
+                                                                                
+   %get user details                                                            
+   $AC:=Via(MixNo:AccessCode);                                                  
+   $ACZZ:=#($AC,"ZZ");                                                          
+   $ID:=USERDATA($ACZZ,IDENTITY);                                               
+                                                                                
+   %Send notification email                                                     
+   %Build list of email recipients                                              
+   $RECIPIENTS:=#('##REDACTED##,',      
+    '##REDACTED##');         
+                                                                                
+   %If there is an accesscode for the task, and if the accesscode has an        
+   % email address populated in the EMAIL field of the USERDATA entry           
+   % add it to the recipient list                                               
+   IF NOT($AC = EMPTY) THEN                                                     
+   BEGIN                                                                        
+     $EMAIL:=USERDATA($ACZZ,EMAIL);                                             
+     IF NOT($EMAIL = EMPTY) THEN                                                
+     BEGIN                                                                      
+        $RECIPIENTS:=#($RECIPIENTS,',',$EMAIL);                                 
+     END;                                                                       
+   END;                                                                         
+                                                                                
+   #ML:=MAIL(#('To:',$RECIPIENTS,';Subject:',                                   
+               '##REDACTED## : Task ',MixNo,,'stopped for exceeding ',#CloseLimit,       
+               ' File Closes in ',#TimeLimit,' seconds'),                       
+            #('Task can only be resumed (via OK command) by Operators or ',     
+              'technical support staff from ODT, RemoteSPO or Supervisor.',/,   
+              /,                                                                
+              'Alternatively, if task not causing performance or log space ',   
+              'issues - from ##REDACTED## SUPERVISOR window enter:',/,                  
+              'DO IO_RELEASE_ME ',MixNo,/,                                      
+              /,                                                                
+              'TaskName = ',(Via(MixNo:Name)),/,/,                              
+              'Accesscode = ',$AC,/,                                            
+              'Identity = ',$ID));                                              
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   #$MyTime:=MCPTIME;                                                           
+End                                                                             
+\                                                                               

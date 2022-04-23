@@ -1,0 +1,66 @@
+BEGIN JOB OS/PROCESSRUNNER(STRING REQID);                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                   OS/JOB/PROCESSRUNNER                            %%         
+%%                   ====================                            %%         
+%%                                                                   %%         
+%% THIS JOB RUNS OS/P/PROCESSRUNNER, WHICH PASSES A COMMAND TO       %%         
+%% SUPERVISOR.                                                       %%         
+%%                                                                   %%         
+%% JOB TAKES ONE STRING PARAMETER:-                                  %%         
+%% REQID : OPSRUNNER REQUEST TO BE PROCESSED BY SUPERVISOR -REQUIRED %%         
+%%                                                                   %%         
+%% JOB WILL INITIATE OPS_RUNNER OPAL ON SUPERVISOR UNDER ##REDACTED##%%         
+%% PASSING THE REQID AS A PARAMETER TO THE OPAL E.G.                 %%         
+%%    FOR ##REDACTED## DO OPS_RUNNER <REQID>                           %%         
+%%                                                                   %%         
+%% MUST BE RUN FROM UNDER ##REDACTED## USERCODE OR WILL TERMINATE      %%         
+%%                                                                   %%         
+%% WILL TERMINATE IF FILE *PRM/D/OPSRUNNER/<REQID> NOT RESIDENT      %%         
+%% ON DISK.                                                          %%         
+%%                                                                   %%         
+%% VALID START:                                                      %%         
+%% =============                                                     %%         
+%% START OS/JOB/PROCESSRUNNER("CAB12345")                            %%         
+%%                                                                   %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                                                                   %%         
+%% VERSION 01 INITIAL IMPLEMENTATION           OCT 2010 GXG %%         
+%% VERSION 02 ADD MULTIPLE REQUEST PROCESSING  NOV 2010 GXG %%         
+%% VERSION 03 ADD TIMEOUT HANDLING           05/05/17 LW  %%         
+%%                                                                   %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+ $INCLUDE GN/INC/ABORTDISPLAY;                                                  
+ $INCLUDE GN/INC/WFLATTRIBUTES;                                                 
+                                                                                
+TASK PROCESSRUNNER;                                                             
+                                                                                
+STRING INPUT;                                                                   
+                                                                                
+                                                                                
+ON RESTART, GO STARTUP;                                                         
+STARTUP:                                                                        
+                                                                                
+WFLATTS;                                                                        
+                                                                                
+%% ABORT IF NOT RUN UNDER ##REDACTED##
+IF NOT MYSELF(USERCODE) = "##REDACTED##" THEN                                     
+   ABORTIT("OS/JOB/PROCESSRUNNER MUST BE RUN FROM OPSCONTROL");                 
+                                                                                
+%% SETUP INPUT COMMAND FOR PROCESSRUNNER PROG                                   
+INPUT := REQID;                                                                 
+                                                                                
+%% RUN PROCESSRUNNER PROGRAM PASSING IN SUPERVISOR COMMAND                      
+%% FROM INPUT PARAM,VALIDATED EMAIL ADDRESS(ES) & EMAIL SUBJECT                 
+RUN OS/P/PROCESSRUNNER(INPUT)[PROCESSRUNNER];                                   
+    OPTION = (FILES,DSED,ARRAYS,FAULT);                                         
+    FILE TASKFILE (USERBACKUPNAME=FALSE);                                       
+                                                                                
+ IF PROCESSRUNNER (TASKVALUE) = 99 THEN                                         
+    %%Program has detected 60 second timeout rather than "will be done"         
+    RUN *METALOGIC/MAILER("user@domain",                                        
+        "OPSRUNNER - CHECK TIMEOUT " & "FOR " & REQID)                          
+%%DETECT PROGRAM FAILURE AND PRODUCE PROGRAMDUMP/FAILURE NOTICE                 
+ ELSE IF PROCESSRUNNER ISNT COMPLETEDOK THEN                                    
+    ABORTIT("OS/P/PROCESSRUNNER FAILURE - ALERT MAINFRAME SUPPORT");            
+                                                                                
+END JOB                                                                         

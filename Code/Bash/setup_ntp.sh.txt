@@ -1,0 +1,14 @@
+#!/bin/bash
+echo "Renaming current live ntp.conf"
+mv /etc/ntp.conf /etc/ntp.orig
+echo "Copying in one from /home/bill"
+cp /home/bill/ntp.conf /etc/ntp.conf
+echo "Changing ownership of /etc/ntp.conf to root"
+chown root:root /etc/ntp.conf
+echo "Syncing system clock and hardware clock"
+hwclock --systohc
+echo "Enabling ntpd daemon in chkconfig so it can be started on server startup"
+chkconfig ntpd on
+echo "Starting ntpd daemon"
+/etc/init.d/ntpd start
+echo "*** All done - time should be syncing - check via 'date' command"

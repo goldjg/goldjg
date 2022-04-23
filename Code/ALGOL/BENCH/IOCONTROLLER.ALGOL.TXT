@@ -1,0 +1,67 @@
+                                                                        
+ $ SET LISTDOLLAR LIST ERRLIST LINEINFO STACK NOXREFLIST                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  THIS PROGRAM CONTROLS THE IO PROCESSOR PROGRAMS. THE PARAMETER       
+%  HOWLONG DETERMINES HOW LONG THE TAASK RUN FOR (SECONDS).             
+%                                                                       
+%  N.B. USE WITH CARE AS THIS PROGRAM CAN SERIOUSLY DEGRADE THE SYSTEM. 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PROCEDURE IOCONTROLLER(HOWLONG,IORETURN);                               
+INTEGER HOWLONG;                                                        
+REAL IORETURN;                                                          
+BEGIN                                                                   
+   TASK ARRAY IOTASK[0:20];                                             
+   EVENT START,STOP;                                                    
+   EBCDIC ARRAY IOTASK_NAME[0:83],                                      
+                DKUSE[1:4,0:2];                                         
+   REAL ARRAY IORES[1:4];                                               
+   INTEGER I;                                                           
+                                                                        
+   PROCEDURE IOPROCESSOR(START,STOP,DKUSE,DKWHICHFILE,IORES);           
+     % External IOPROCESSOR procedure                                   
+   VALUE DKWHICHFILE;                                                   
+   EVENT STOP,START;                                                    
+   INTEGER DKWHICHFILE;                                                 
+   REAL IORES;                                                          
+   EBCDIC ARRAY DKUSE[*];                                               
+   EXTERNAL;                                                            
+                                                                        
+   DEFINE RUN_TASK(USE,DKWHICHFILE,INDEX) =                             
+   BEGIN                             % Initialse task name              
+      REPLACE IOTASK[INDEX].NAME BY IOTASK_NAME;                        
+      REPLACE DKUSE[INDEX,0] BY USE; % Set up variables                 
+                                     % Set dump options                 
+      IOTASK[INDEX].OPTIONS := (2**VALUE(BDBASE)) + (2**VALUE(FAULT)) + 
+                               (2**VALUE(DSED))   + (2**VALUE(FILES)) + 
+                               (2**VALUE(ARRAYS));                      
+                                     % Fire off process and get result  
+      PROCESS IOPROCESSOR(START,STOP,DKUSE[INDEX,*],                    
+                          DKWHICHFILE,IORES[INDEX])[IOTASK[INDEX]];     
+                                     % Wait until process has started   
+                                     % before ending procedure          
+      WHILE IOTASK[INDEX].STATUS < 0 DO                                 
+         WAITANDRESET(MYSELF.EXCEPTIONEVENT);                           
+   END #;                                                               
+                                                                        
+   REPLACE IOTASK_NAME BY "*OS/P/BENCH/IOPROCESSOR ON DISK.";           
+                                                                        
+   RUN_TASK("IN ",0,1);              % Fire off the four tasks          
+   RUN_TASK("IN ",1,2);                                                 
+   RUN_TASK("OUT",0,3);                                                 
+   RUN_TASK("OUT",1,4);                                                 
+                                                                        
+   IF MYSELF.TASKVALUE = 9 THEN                                         
+      PROGRAMDUMP(ALL);                                                 
+   CAUSE(START);                     % Cause the processes to start     
+   WHEN(HOWLONG);                    % wait for specified time          
+   CAUSE(STOP);                      % Cause processes to stop          
+                                                                        
+                                     % Wait for all the processes to    
+                                     % stop                             
+   FOR I := 1 STEP 1 UNTIL 4 DO                                         
+     WHILE IOTASK[I].STATUS NEQ -1 DO                                   
+       WAITANDRESET(MYSELF.EXCEPTIONEVENT);                             
+                                                                        
+                                     % Return comparison figure         
+   IORETURN:=(IORES[1]+IORES[2]+IORES[3]+IORES[4])/4;                   
+END.                                                                    

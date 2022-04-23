@@ -1,0 +1,7 @@
+BEGIN JOB PCRUNNER(STRING PASS);                                                
+RUN SYSTEM/NXSERVICES/PCDRIVER(                                                 
+"\\##REDACTED##" &                                                      
+"[CREDENTIALS=user/" & PASS & "," &                                           
+"USERDOMAIN=##REDACTED##]" &                                                      
+"RUN [RESULT=0] CMD /c NET USE;");                                              
+END JOB                                                                         

@@ -1,0 +1,20 @@
+#!/bin/bash
+#
+# Version 01 - ##REDACTED##- initial imp as part of DCT   May 08.  JA.
+# Version 02 - ##REDACTED##- add in new pools             May 10. JMM.
+# Version 02 - ##REDACTED##- Automation and Handle _v vs _V in Pool names
+#                                                             Aug 11  GXG
+#
+
+set -e
+
+cd /opt/tivoli/tsm/client/ba/bin
+
+# replace oold query per pool with a query per vault using subdir and filesonly
+# (gets round issues of vaults mistakenly named with lowercase characters and
+# also means no need to change scripts when more pools added)
+sudo ./dsmc query archive "/VAULT10/*" -subdir=yes -filesonly
+sudo ./dsmc query archive "/VAULT11/*" -subdir=yes -filesonly
+sudo ./dsmc query archive "/VAULT12/*" -subdir=yes -filesonly
+sudo ./dsmc query archive "/VAULT13/*" -subdir=yes -filesonly
+sudo ./dsmc query archive "/VAULT14/*" -subdir=yes -filesonly

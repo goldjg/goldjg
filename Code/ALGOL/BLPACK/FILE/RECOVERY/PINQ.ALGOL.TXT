@@ -1,0 +1,559 @@
+$$ SET LIST ERRLIST STACK LINEINFO FORMAT NOXREFLIST LISTDOLLAR LISTINCL
+$$ SET LEVEL 2                                                          
+PROCEDURE RECOVERY(INPUT_PARAMS);                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Program to recover file from the BLPACK system in batch mode using   %
+% using input parameter supplied from #############/########## screens %
+% on #### window                                                       %
+%                                                                      %
+% Modified version of ########################## which recovers files  %
+% as BPR/= (set by #### screen) on usercode default family with the    %
+% station that requested the files set in the PRODUCT file attribute   %
+% of each file.                                                        %
+%                                                                      %
+% To be implemented under #### usercode on ######## on ##### for use   %
+% by #### window.                                                      %
+%                                                                      %
+% Leave original program alone as still required for operational use.  %
+% This version for ###### to recover files from live BLPACK and have   %
+% them copied to #### by BL_REC supervisor script.                     %
+%                                                                      %
+%                                                                      %
+% VERSION 1 - Initial implementation                        JUN 10 GXG %
+% VERSION 2 - ######## ADD EMAIL ADDRESS TO ##REDACTED## 19/02/13 ##  %
+% VERSION 3 - ######## One wfl controlcard, check on user code and     %
+%             make errorfile disk file.                   16/05/13 ##  %
+% VERSION 4 - ######### Amend code to include ##REDACTED## as a valid user    %
+%             location                                    12/06/15 ##  %
+% VERSION 5 - ######### Allow single quotes in email name. 11/08/17 ## 
+% VERSION 6 - ######### Use a different attribute for email 22/01/19 ##
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+ARRAY INPUT_PARAMS[*];                                                  
+BEGIN                                                                   
+                                                                        
+DEFINE                                                                  
+  DOT                               = "."#                              
+ ,MAX_BIT                           = 70#                               
+ ,OPEN_BRACKET                      = "("#                              
+ ,CLOSE_BRACKET                     = ")"#                              
+ ,NULLS                             = 48"00"#                           
+ ,NINES                             = "9"#                              
+ ,BLANKS                            = " "#                              
+ ,DELIM                             = ","#                              
+ ,SOURCE_LEN                        = 120#                              
+ ,DEST_LEN                          = 120#                              
+ ,UCODE_LEN                         = 19#                               
+ ,TEMP_CARDS_LEN                    = 512#                              
+ ,TEMP_USER_LEN                     = 19#                               
+ ,TEMP_FAMILY_LEN                   = 80#                               
+ ,REC_LEN                           = 84#                               
+ ,DATE_LEN                          = 6#                                
+ ,TIME_LEN                          = 4#                                
+ ,EMAIL_LEN                         = 39#                               
+ ,CMD_WFL_LEN                       = 70#                               
+ % scoot = scan along to next comma                                     
+ ,SCOOT = IF PINPUT NEQ DELIM THEN                                      
+             SCAN PINPUT:PINPUT UNTIL = DELIM;                          
+          PINPUT:=PINPUT+1#                                             
+ ,CHARACTERSPERWORD                 = 6#                                
+ ;                                                                      
+                                                                        
+TRUTHSET                                                                
+  EQUALORDOT ("." OR "=")                                               
+ ,NUMS         ("0123456789")                                           
+ ,ALPHANUM     (ALPHA OR NUMS)                                          
+ ,EMAILERRSET  ("[]\/;:<>")                                             
+ ;                                                                      
+EBCDIC STRING                                                           
+   ESCANBUF1                                                            
+  ,ESCANBUF2                                                            
+  ;                                                                     
+POINTER                                                                 
+  PCARDS                                                                
+ ,PREC                                                                  
+ ,PREC2                                                                 
+ ,PINPUT                                                                
+ ,PSOURCE                                                               
+ ,PSOURCE2                                                              
+ ,PDEST                                                                 
+ ,PDEST2                                                                
+ ,PSCAN                                                                 
+ ;                                                                      
+LABEL                                                                   
+  XIT                                                                   
+  ;                                                                     
+INTEGER                                                                 
+  REMAINDER                                                             
+ ,HRS                                                                   
+ ,MINS                                                                  
+ ,EMAILCHARCOUNT                                                        
+                                                                        
+ ;                                                                      
+                                                                        
+EBCDIC ARRAY                                                            
+                                                                        
+  IN_DATE1                      [0:DATE_LEN-1]                          
+ ,IN_TIME1                      [0:TIME_LEN-1]                          
+ ,IN_DATE2                      [0:DATE_LEN-1]                          
+ ,IN_TIME2                      [0:TIME_LEN-1]                          
+ ,TEMP_CARDS                    [0:TEMP_CARDS_LEN]                      
+ ,FILE_RECORD                   [0:REC_LEN-1]                           
+ ,SOURCE_UCODE                  [0:UCODE_LEN-1]                         
+ ,DEST_UCODE                    [0:UCODE_LEN-1]                         
+ ,SOURCE                        [0:SOURCE_LEN-1]                        
+ ,DESTINATION                   [0:DEST_LEN-1]                          
+ ,FIRST_DATE                    [0:DATE_LEN-1]                          
+ ,SECOND_DATE                   [0:DATE_LEN-1]                          
+ ,FIRST_TIME                    [0:TIME_LEN-1]                          
+ ,SECOND_TIME                   [0:TIME_LEN-1]                          
+ ,TEMP_USERCODE                 [0:TEMP_USER_LEN-1]                     
+ ,TEMP_FAMILY                   [0:TEMP_FAMILY_LEN-1]                   
+ ,PARAMETER_ARRAY               [0:1]                                   
+ ,EMAIL                         [0:EMAIL_LEN-1]                         
+ ;                                                                      
+                                                                        
+REAL ARRAY CMDWFL[0:CMD_WFL_LEN];                                       
+ARRAY OLDDIR, NEWDIR [0:10];                                            
+                                                                        
+                                                                        
+BOOLEAN                                                                 
+ DIRECTORY_REC                                                          
+ ;                                                                      
+                                                                        
+ FILE OPTIONS(KIND=DISK,DEPENDENTSPECS);                                
+ FILE REQUESTS(KIND=DISK);                                              
+ FILE ERRORFILE(KIND=DISK);                                             
+                                                                        
+TASK                                                                    
+  RECOVERTASK                                                           
+  ;                                                                     
+                                                                        
+                                                                        
+PROCEDURE RECOVERPROGRAM;                                               
+EXTERNAL;                                                               
+                                                                        
+LIBRARY SITESUPPORT (LIBACCESS = BYFUNCTION);                           
+INTEGER PROCEDURE CHECKDATE (GREGORIAN);                                
+VALUE GREGORIAN;                                                        
+INTEGER GREGORIAN;                                                      
+LIBRARY SITESUPPORT;                                                    
+                                                                        
+                                                                        
+ $ PAGE                                                                 
+PROCEDURE PARAM_ERROR(OXO);                                             
+INTEGER OXO;                                                            
+BEGIN                                                                   
+DISPLAY("** Input parameter error **");                                 
+CASE OXO OF                                                             
+   BEGIN                                                                
+                                                                        
+   1:BEGIN                                                              
+     DISPLAY                                                            
+     ("** File or directory must be recovered under your user code **");
+     END;                                                               
+   2:BEGIN                                                              
+     DISPLAY                                                            
+     ("** First copy date must be entered in MMDDYY format **");        
+     END;                                                               
+   3:BEGIN                                                              
+     DISPLAY                                                            
+     ("** First copy time must be entered in 24-hr HHMM format **");    
+     END;                                                               
+   4:BEGIN                                                              
+     DISPLAY                                                            
+     ("** Second copy date must be entered in MMDDYY format **");       
+     END;                                                               
+   5:BEGIN                                                              
+     DISPLAY                                                            
+     ("** Second copy time must be entered in 24-hr HHMM format **");   
+     END;                                                               
+   6:BEGIN                                                              
+     DISPLAY                                                            
+     ("** Invalid chars in email parameter. **");                       
+     DISPLAY                                                            
+     ("** Cannot be any of  []\/;:<>    **");                           
+     END;                                                               
+   7:BEGIN                                                              
+     DISPLAY                                                            
+     ("** Email parameter must end in alphanumeric character **");      
+     END;                                                               
+   8:BEGIN                                                              
+     DISPLAY                                                            
+     ("** MUST BE ##REDACTED## USERCODE **"         
+       CAT STRING8(MYSELF.STACKNO,4));                                  
+     END;                                                               
+                                                                        
+   ELSE: DISPLAY("** Unknown program error **");                        
+                                                                        
+   END;                                                                 
+MYSELF.TASKVALUE := 5;                                                  
+GO XIT;                                                                 
+END; % PARAM_ERROR                                                      
+                                                                        
+                                                                        
+ $ PAGE                                                                 
+ BOOLEAN PROCEDURE CHECKTIME(IN_TIME);                                  
+                                                                        
+ % Make sure time is in 24 hr format                                    
+                                                                        
+ EBCDIC ARRAY IN_TIME[*];                                               
+ BEGIN                                                                  
+ CHECKTIME:=TRUE;;                                                      
+ HRS  := INTEGER(IN_TIME[0],2);                                         
+ MINS := INTEGER(IN_TIME[2],2);                                         
+ IF HRS < 0 OR HRS > 23 OR MINS < 0 OR MINS > 59 THEN                   
+    CHECKTIME:= FALSE;                                                  
+ END;% CHECK_TIME                                                       
+                                                                        
+                                                                        
+                                                                        
+                                                                        
+                                                                        
+PROCEDURE CHECK_INPUT_PARAMS;                                           
+ BEGIN                                                                  
+ STRING ESCANBUF,                                                       
+        IN_UCODE;                                                       
+ REPLACE SOURCE[0] BY BLANKS FOR SOURCE_LEN;                            
+ REPLACE DESTINATION[0] BY BLANKS FOR DEST_LEN;                         
+ REPLACE FIRST_DATE[0]  BY BLANKS FOR DATE_LEN;                         
+ REPLACE SECOND_DATE[0] BY BLANKS FOR DATE_LEN;                         
+ REPLACE FIRST_TIME[0]  BY NINES FOR TIME_LEN;                          
+ REPLACE SECOND_TIME[0] BY NINES FOR TIME_LEN;                          
+ REPLACE DEST_UCODE[0] BY BLANKS FOR UCODE_LEN;                         
+ REPLACE SOURCE_UCODE[0] BY BLANKS FOR UCODE_LEN;                       
+ REPLACE EMAIL[0] BY BLANKS FOR EMAIL_LEN;                              
+ DIRECTORY_REC := FALSE;                                                
+                                                                        
+ % Put contents of input into EBCDIC array for processing               
+                                                                        
+ REMAINDER:=SIZE(INPUT_PARAMS)*CHARACTERSPERWORD;                       
+ RESIZE(PARAMETER_ARRAY,REMAINDER,DISCARD);                             
+ REPLACE PARAMETER_ARRAY BY POINTER(INPUT_PARAMS) FOR REMAINDER;        
+                                                                        
+                                                                        
+ PINPUT:=PARAMETER_ARRAY[0];                                            
+ IF PINPUT = "D" THEN DIRECTORY_REC := TRUE;                            
+ SCOOT;                                                                 
+ IF PINPUT NEQ "*" THEN                                                 
+    REPLACE SOURCE_UCODE[0] BY OPEN_BRACKET,                            
+       PINPUT:PINPUT FOR UCODE_LEN WHILE NEQ DELIM, CLOSE_BRACKET       
+ ELSE                                                                   
+    REPLACE SOURCE_UCODE[0] BY PINPUT:PINPUT FOR 1;                     
+ SCOOT;                                                                 
+ REPLACE EMAIL[0] BY PINPUT:PINPUT FOR EMAIL_LEN WHILE NEQ DELIM;       
+ SCOOT;                                                                 
+ REPLACE SOURCE[0] BY PINPUT:PINPUT FOR SOURCE_LEN-1 WHILE NEQ DELIM,   
+  DELIM;                                                                
+ SCOOT;                                                                 
+ IF PINPUT NEQ "*" THEN                                                 
+    REPLACE DEST_UCODE[0] BY OPEN_BRACKET,                              
+       PINPUT:PINPUT FOR UCODE_LEN WHILE NEQ DELIM, CLOSE_BRACKET       
+ ELSE                                                                   
+    REPLACE DEST_UCODE[0] BY PINPUT:PINPUT FOR 1;                       
+ SCOOT;                                                                 
+                                                                        
+ % Prefix recovered files with own mix no to identify files from        
+ % this run of program.                                                 
+                                                                        
+ REPLACE DESTINATION[0] BY MYSELF.STACKNO FOR 4 DIGITS,"/"              
+   ,PINPUT:PINPUT FOR DEST_LEN-1 WHILE NEQ DELIM,                       
+  DELIM;                                                                
+ SCOOT;                                                                 
+ REPLACE FIRST_DATE[0] BY PINPUT:PINPUT FOR DATE_LEN WHILE NEQ DELIM;   
+ SCOOT;                                                                 
+ REPLACE FIRST_TIME[0] BY PINPUT:PINPUT FOR TIME_LEN WHILE NEQ DELIM;   
+ SCOOT;                                                                 
+ REPLACE SECOND_DATE[0] BY PINPUT:PINPUT FOR DATE_LEN WHILE NEQ DELIM;  
+ SCOOT;                                                                 
+ REPLACE SECOND_TIME[0] BY PINPUT:PINPUT FOR TIME_LEN WHILE NEQ DELIM;  
+ SCOOT;                                                                 
+                                                                        
+                                                                        
+ REPLACE TEMP_USERCODE[0] BY BLANKS FOR TEMP_USER_LEN;                  
+                                                                        
+ % Ensure you are trying to copy file(s) under usercode from which      
+ % job is run EXCEPT for OPSCONTROL                                     
+                                                                        
+ REPLACE PREC:TEMP_USERCODE[1] BY MYSELF.USERCODE;                      
+                                                                        
+ IF TEMP_USERCODE[1] = DOT THEN                                         
+    BEGIN                                                               
+    REPLACE TEMP_USERCODE[0] BY "*  ";                                  
+    END                                                                 
+ ELSE                                                                   
+    BEGIN                                                               
+    REPLACE TEMP_USERCODE[0] BY OPEN_BRACKET;                           
+    PREC := PREC - 1;                                                   
+    REPLACE PREC BY CLOSE_BRACKET;                                      
+    END;                                                                
+                                                                        
+ IF TEMP_USERCODE NEQ "(OPSCONTROL)" AND                                
+    STRING(DEST_UCODE,UCODE_LEN) NEQ STRING(TEMP_USERCODE,TEMP_USER_LEN)
+    THEN PARAM_ERROR(1);                                                
+                                                                        
+ % Make sure dates are in MMDDYY format and times are in 24-hr format   
+                                                                        
+                                                                        
+ IF CHECKDATE(INTEGER(FIRST_DATE,DATE_LEN)) < 0 THEN                    
+    PARAM_ERROR(2);                                                     
+ IF NOT CHECKTIME(FIRST_TIME) THEN                                      
+    PARAM_ERROR(3);                                                     
+ IF CHECKDATE(INTEGER(SECOND_DATE,DATE_LEN)) < 0 THEN                   
+    PARAM_ERROR(4);                                                     
+ IF NOT CHECKTIME(SECOND_TIME) THEN                                     
+    PARAM_ERROR(5);                                                     
+                                                                        
+ %% Check email parameter...                                            
+                                                                        
+ %% Check for invalid characters                                        
+ SCAN PSCAN:EMAIL[0] FOR EMAIL_LEN-1 WHILE NEQ BLANKS;                  
+   EMAILCHARCOUNT:=OFFSET(PSCAN);                                       
+   ESCANBUF1:=STRING8(EMAIL,EMAILCHARCOUNT);                            
+   ESCANBUF2:=HEAD(ESCANBUF1,NOT EMAILERRSET);                          
+   IF LENGTH(ESCANBUF2) < EMAILCHARCOUNT THEN                           
+      PARAM_ERROR(6);                                                   
+                                                                        
+ %% Check for non-alphanumeric in last character of email param         
+ SCAN PSCAN:EMAIL[0] FOR EMAILCHARCOUNT -1 WHILE NEQ BLANKS;            
+ IF NOT PSCAN IN ALPHANUM THEN                                          
+      PARAM_ERROR(7);                                                   
+                                                                        
+ %% Check that the destination usercode is either a                     
+ %% DEVNNN, UTESTN or TESTNN usercode.                                  
+ IN_UCODE :=                                                            
+   TAKE(DROP(STRING(DESTINATION[0],DEST_LEN-1),9),6);                   
+ ESCANBUF := HEAD(IN_UCODE,NOT NUMS);                                   
+ IF NOT ESCANBUF = "##REDACTED##" THEN                                           
+   IF NOT ESCANBUF = "##REDACTED##" THEN                                       
+      IF NOT ESCANBUF = "##REDACTED##" THEN                                     
+         IF NOT ESCANBUF = "##REDACTED##" THEN                                 
+            PARAM_ERROR(8);                                             
+                                                                        
+END;% CHECK_INPUT_PARAMS                                                
+                                                                        
+ $ PAGE                                                                 
+PROCEDURE BUILD_INPUT_FILES;                                            
+% Builds the options and requests files for input to the FILERECOVERY   
+% process and also the FILECARDS declaration for the process.           
+% Need to specify usercode and family in FILECARDS declaration as       
+% otherwise the FILERECOVERY task will not pick up the input files.     
+                                                                        
+ BEGIN                                                                  
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ REPLACE TEMP_CARDS[0] BY BLANKS FOR TEMP_CARDS_LEN;                    
+ REPLACE TEMP_FAMILY[0] BY BLANKS FOR TEMP_FAMILY_LEN;                  
+ REPLACE TEMP_USERCODE[0] BY BLANKS FOR TEMP_USER_LEN;                  
+ REPLACE PREC:TEMP_USERCODE[1] BY MYSELF.USERCODE;                      
+ IF TEMP_USERCODE[1] = DOT THEN                                         
+    REPLACE TEMP_USERCODE[0] BY "*.    "                                
+ ELSE                                                                   
+    BEGIN                                                               
+    REPLACE TEMP_USERCODE[0] BY OPEN_BRACKET;                           
+    PREC := PREC - 1;                                                   
+    REPLACE PREC BY CLOSE_BRACKET,DOT;                                  
+    END;                                                                
+ REPLACE TEMP_FAMILY BY MYSELF.FAMILY;                                  
+ SCAN PREC:TEMP_FAMILY[0] UNTIL IN EQUALORDOT;                          
+ PREC := PREC + 2;                                                      
+ IF PREC = BLANKS THEN                                                  
+    REPLACE TEMP_FAMILY[0] BY "DISK",                                   
+         BLANKS FOR (TEMP_FAMILY_LEN - 4)                               
+ ELSE                                                                   
+    REPLACE TEMP_FAMILY[0] BY PREC UNTIL = BLANKS,                      
+         BLANKS FOR TEMP_FAMILY_LEN - OFFSET(PREC); % offset not exact  
+                                                    % but will do       
+% Build OPTIONS file and FILECARD declaration                           
+                                                                        
+ REPLACE FILE_RECORD[0] BY "BLPACK/OPTIONS/", MYSELF.STACKNO FOR 4      
+         DIGITS, DOT, NULLS;                                            
+ REPLACE OPTIONS.TITLE BY FILE_RECORD;                                  
+ REPLACE PCARDS:TEMP_CARDS[0] BY                                        
+         "FILE OPTIONS (KIND=DISK,DEPENDENTSPECS,TITLE="                
+        , TEMP_USERCODE[0] UNTIL = DOT                                  
+        , FILE_RECORD[0] UNTIL = DOT                                    
+        ," ON ", TEMP_FAMILY[0] UNTIL = BLANKS                          
+        ,");";                                                          
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ REPLACE FILE_RECORD[0] BY "RECOVERNOW ", MYSELF.STACKNO FOR 4 DIGITS;  
+ WRITE(OPTIONS, REC_LEN, FILE_RECORD);                                  
+ LOCK(OPTIONS);                                                         
+                                                                        
+ % Build REQUESTS file and FILECARD declaration                         
+                                                                        
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ REPLACE FILE_RECORD[0] BY "BLPACK/REQUESTS/", MYSELF.STACKNO FOR 4     
+         DIGITS, DOT, NULLS;                                            
+ REPLACE PCARDS:PCARDS BY                                               
+         "FILE REQUESTS (KIND=DISK,TITLE="                              
+        , TEMP_USERCODE UNTIL= DOT                                      
+        , FILE_RECORD[0] UNTIL = DOT                                    
+        ," ON ", TEMP_FAMILY[0] UNTIL = BLANKS                          
+        ,");";                                                          
+% Force temporary files to current family by adding to                  
+% FILECARDS decalaration                                                
+                                                                        
+ REPLACE PCARDS:PCARDS BY                                               
+         "FILE SCANIN   (PACKNAME="                                     
+        ,TEMP_FAMILY[0] UNTIL = BLANKS                                  
+        ,");"                                                           
+        ,"FILE SCANOUT  (PACKNAME="                                     
+        ,TEMP_FAMILY[0] UNTIL = BLANKS                                  
+        ,");"                                                           
+        , NULLS                                                         
+           ;                                                            
+ % Build requests file using parameters which have previously           
+ % been validated n.b dates and times are when file was                 
+ % COPIED by BLPACK                                                     
+                                                                        
+ REPLACE REQUESTS.TITLE BY FILE_RECORD;                                 
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ IF DIRECTORY_REC THEN                                                  
+    REPLACE FILE_RECORD[0] BY "DIRECTORY"                               
+ ELSE                                                                   
+    REPLACE FILE_RECORD[0] BY "FILE";                                   
+ IF SOURCE_UCODE  = "*" THEN                                            
+    REPLACE PREC:FILE_RECORD[10] BY "*"                                 
+ ELSE                                                                   
+    REPLACE PREC:FILE_RECORD[10] BY SOURCE_UCODE UNTIL = ")",")";       
+                                                                        
+ % Handle the first few characters of the source file or directory name 
+ % following the user code                                              
+ SCAN PSOURCE:SOURCE[0] FOR MAX_BIT - OFFSET(PREC) UNTIL = DELIM;       
+ REPLACE PREC BY PSOURCE2:SOURCE[0] FOR OFFSET(PSOURCE);                
+ WRITE(REQUESTS,REC_LEN,FILE_RECORD);                                   
+                                                                        
+ % Handle the rest in 60 character chunks                               
+ WHILE PSOURCE NEQ DELIM DO                                             
+    BEGIN                                                               
+    REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                       
+    PREC := FILE_RECORD[10];                                            
+    SCAN PSOURCE:PSOURCE FOR MAX_BIT - OFFSET(PREC) UNTIL = DELIM ;     
+    REPLACE PREC BY PSOURCE2:PSOURCE2                                   
+       FOR OFFSET(PSOURCE) - OFFSET(PSOURCE2);                          
+    WRITE(REQUESTS,REC_LEN,FILE_RECORD);                                
+    END;                                                                
+                                                                        
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ REPLACE FILE_RECORD[0] BY "AS";                                        
+ IF DEST_UCODE[0] = "*" THEN                                            
+    REPLACE PREC:FILE_RECORD[10] BY "*"                                 
+ ELSE                                                                   
+    REPLACE PREC:FILE_RECORD[10] BY DEST_UCODE UNTIL = ")",")";         
+                                                                        
+ % Handle the first few characters of the dest   file or directory name 
+ % following the user code                                              
+ SCAN PDEST:DESTINATION[0] FOR MAX_BIT - OFFSET(PREC) UNTIL = DELIM;    
+ REPLACE PREC BY PDEST2:DESTINATION[0] FOR OFFSET(PDEST);               
+ WRITE(REQUESTS,REC_LEN,FILE_RECORD);                                   
+                                                                        
+ % Handle the rest in 60 character chunks                               
+ WHILE PDEST NEQ DELIM DO                                               
+    BEGIN                                                               
+    REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                       
+    PREC := FILE_RECORD[10];                                            
+    SCAN PDEST:PDEST FOR MAX_BIT - OFFSET(PREC) UNTIL = DELIM ;         
+    REPLACE PREC BY PDEST2:PDEST2                                       
+       FOR OFFSET(PDEST) - OFFSET(PDEST2);                              
+    WRITE(REQUESTS,REC_LEN,FILE_RECORD);                                
+    END;                                                                
+                                                                        
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ REPLACE FILE_RECORD[0] BY "OPTIONS";                                   
+ REPLACE FILE_RECORD[17] BY FIRST_DATE FOR DATE_LEN;                    
+ REPLACE FILE_RECORD[24] BY FIRST_TIME FOR TIME_LEN;                    
+ REPLACE FILE_RECORD[29] BY SECOND_DATE FOR DATE_LEN;                   
+ REPLACE FILE_RECORD[36] BY SECOND_TIME FOR TIME_LEN;                   
+                                         % required because of          
+ REPLACE FILE_RECORD[41] BY "N";         % undocumented "feature"       
+ REPLACE FILE_RECORD[43] BY "Y";         % include archived files       
+ WRITE(REQUESTS,REC_LEN,FILE_RECORD);                                   
+ LOCK(REQUESTS);                                                        
+                                                                        
+                                                                        
+ END;% BUILD_INPUT_FILES                                                
+                                                                        
+ $ PAGE                                                                 
+ PROCEDURE GET_THE_FILES;                                               
+                                                                        
+ % Recover the files                                                    
+                                                                        
+ BEGIN                                                                  
+ REPLACE RECOVERTASK.NAME BY                                            
+    "*OBJECT/BLPACK/FILERECOVERY ON ##REDACTED##." ;                         
+ REPLACE RECOVERTASK.FAMILY BY "DISK = ##REDACTED## OTHERWISE DISK.";        
+ REPLACE RECOVERTASK.FILECARDS BY TEMP_CARDS;                           
+ PROCESS RECOVERPROGRAM[RECOVERTASK];                                   
+ DO WAITANDRESET(MYSELF.EXCEPTIONEVENT) UNTIL                           
+    RECOVERTASK.STATUS < 0;                                             
+ CASE RECOVERTASK.TASKVALUE OF                                          
+    BEGIN                                                               
+    1 : BEGIN                                                           
+        DISPLAY("** No exceptions - at least one file recovered **");   
+        END;                                                            
+    2 : BEGIN                                                           
+        DISPLAY("** No files recovered **");                            
+        MYSELF.TASKVALUE := 1;                                          
+        END;                                                            
+    3 : BEGIN                                                           
+    DISPLAY("** No files recovered - bad recovery task parameters **"); 
+    DISPLAY("** Check file or directory names, user codes and/or  **"); 
+    DISPLAY("** date and time parameters                          **"); 
+       MYSELF.TASKVALUE := 2                                            
+         END;                                                           
+    ELSE : BEGIN                                                        
+        DISPLAY("** Recovery task failure or bad result **");           
+        MYSELF.TASKVALUE := 3;                                          
+        END;                                                            
+    END;                                                                
+ % check_status                                                         
+ END;%GET_THE_FILES                                                     
+                                                                        
+ $ PAGE                                                                 
+                                                                        
+ PROCEDURE TIDY_UP;                                                     
+ BEGIN                                                                  
+ % Set PRODUCT file attribute on each of the recovered files to         
+ % sourcestation and NOTE file attribute to the required email          
+ % address.                                                             
+ REPLACE CMDWFL BY "ALTER "                                             
+   ,MYSELF.STACKNO FOR 4 DIGITS                                         
+   ,"/= (PRODUCT="                                                      
+   ,""",MYSELF.SOURCENAME                                               
+   ,"""                                                                 
+   ,",NOTE="                                                            
+   ,""",EMAIL[0] UNTIL = BLANKS                                         
+   ,"""")";                                                             
+ CONTROLCARD(CMDWFL,4 & 1[39:1] & 1[38:1]);                             
+                                                                        
+ % Rename files to switch mixno and BPR. BPR to be first node.          
+                                                                        
+ REPLACE OLDDIR BY MYSELF.STACKNO FOR 4 DIGITS                          
+   ,"/BPR/=.";                                                          
+ REPLACE NEWDIR BY "BPR/" , MYSELF.STACKNO FOR 4 DIGITS ,"/=.";         
+ CHANGEFILE (OLDDIR, NEWDIR);                                           
+                                                                        
+ % Remove card files                                                    
+                                                                        
+ REPLACE FILE_RECORD[0] BY BLANKS FOR REC_LEN;                          
+ REPLACE FILE_RECORD[0] BY "BLPACK/OPTIONS/", MYSELF.STACKNO FOR 4      
+         DIGITS, DOT;                                                   
+ REMOVEFILE(FILE_RECORD[0]);                                            
+ REPLACE FILE_RECORD[0] BY "BLPACK/REQUESTS/", MYSELF.STACKNO FOR 4     
+         DIGITS, DOT;                                                   
+ REMOVEFILE(FILE_RECORD[0]);                                            
+ REPLACE FILE_RECORD[0] BY "BLPACK/FILERECOVERY", MYSELF.STACKNO FOR 4  
+         DIGITS,"/=", DOT;                                              
+ REMOVEFILE(FILE_RECORD[0]);                                            
+ END;%TIDY_UP                                                           
+                                                                        
+                                                                        
+                                                                        
+                                                                        
+ CHECK_INPUT_PARAMS;                                                    
+ BUILD_INPUT_FILES;                                                     
+ GET_THE_FILES;                                                         
+ TIDY_UP;                                                               
+XIT:                                                                    
+                                                                        
+END.                                                                    
+

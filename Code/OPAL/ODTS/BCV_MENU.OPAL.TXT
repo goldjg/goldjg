@@ -1,0 +1,1922 @@
+  Define * ODTS BCV_MENU Version 2:                                             
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_MENU ODTS                                                            %%  
+%% ~~~~~~~~~~~~~                                                            %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% SRCPK1/SRCPK2 on - via menu driven actions. Parent script for    %%  
+%% this process, calling child scripts and other menu-specific OPALS.       %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%% VERSION 02 - Release 2 - Fix Unprotected Start   GXG SEP '17  %%  
+%% VERSION 03 - Release 3 - Clearer messages when Families are not suitable.%%  
+%%              Ensure Families are BCV capable     GXG NOV '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%Main menu Set up an 'BCV' Supervisor window with an open action of             
+%TT DO BCV_MENU or enter TT DO BCV_MENU from a normal Supervisor window.        
+% TT / (#BCV_DEBUG.Global:=1) to set debug                                      
+% TT / (#BCV_DEBUG.Global:=0) to reset debug                                    
+If Myself(restarts) > 0 Then                                                    
+Begin  %screen based opals cannot be restarted                                  
+   #BCV_CHECKPOINT.Perm:=Myself(Checkpoint);                                    
+   Abort("Cannot be restarted");                                                
+End                                                                             
+Else                                                                            
+If #CP:=#BCV_Checkpoint.Perm > 0 Then                                           
+Begin                                                                           
+   $MCMsg:=#("Checkpoint ",#CP,"exists",/,                                      
+      "Enter OK to continue from that point." );                                
+   $COnf_ACT:=Empty;                                                            
+   Call DO "MENU_CONFIRM";                                                      
+   If $COnf_ACT="OK" Then                                                       
+      Checkpoint(#CP)                                                           
+   Else                                                                         
+      Checkpoint(#BCV_Checkpoint.Perm:=0);                                      
+End;                                                                            
+#WaitSecs:=5;  %seconds to wait before retrying check                           
+If $Hi:=$BCV_HI.Perm=Empty Then                                                 
+   $Hi:=#("#[SUB]");    %Highlight char used on all screens                     
+If $ErrHi:=$BCV_ErrHI.Perm=Empty Then                                           
+   $ErrHi:=#("#[Can]");  %Highlight char used for errors on all screens         
+If #Bcv_Debug.Global=1 Then                                                     
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp);                                                                    
+$LastLine:=#("#[Esc]M",Tdaddress(Myself(pagesize),1),"#[Esc]J");                
+$Bcv_Families:="BCVPK1,BCVPK2";  %default families to be migrated.        
+If Myself(Restarts) > 0 Then                                                    
+   Exit;                                                                        
+$L1_Cmds:="Help:BCV_MENU_HLP,"&                                                 
+           "Start,"&                                                            
+           "Revert,"&                                                           
+           "Remap,"&                                                            
+           "Msg,"&                                                              
+           "Log:BCV_LOG,"&                                                      
+           "Quit";                                                              
+Call DO "MENU_CMD_LIST" "l1_Cmds,L1_CmdList";                                   
+$L1_ScreenHead:=#("BCV Home Menu User ",Term(LogOnUser));                       
+If Term(LogOnAccess) Neq Empty Then                                             
+   $L1_ScreenHead.Insert(Term(LogonAccess),"\");                                
+Call DO "MENU_PadHeading" "L1_"; %Fixes Up $L1_ScreenHEad                       
+$L1__OldInput:=#($BCV_Families);                                                
+$l1_Act:="Start";                                                               
+While True Do                                                                   
+Begin                                                                           
+   $L1_Fields:=$L1__OldInput;                                                   
+   SHOW($L1_ScreenHead,/,                                                       
+     " " ,/,                                                                    
+     "ACTION #[US]",$L1_Act 20,"#[RS]",/,                                       
+     $Hi,$L1_CmdList,/," ",/,                                                   
+     $HI,"Help    #[ETB]Give help for this screen.",/,                          
+     $Hi,"Start   #[ETB]Start a Refresh.",/,                                    
+     $Hi,"REVert  #[ETB]Restore from an aborted Refresh.",/,                    
+     $Hi,"REMap   #[ETB]Rebuilds the maps for the specified families.",/,       
+     $Hi,"Msg     #[ETB]Show accumulated messages.",/,                          
+     $Hi,"Log     #[ETB]View BCV Log",/,                                        
+     $Hi,"Quit    #[ETB]Quit and close window.",/,,/,                           
+     $Hi,"Families#[ETB]#[US]",$l1_Fields.Split(60) 60,"#[RS]",/,               
+     "Families field only applies to the START or REVERT commands",/,           
+      $ErrHi,$Err);                                                             
+   #SpecOne:=6;  %First Specify row                                             
+   Call Do "menu_getfield" "L1_ACT 20 T 4,10"; %Calls input                     
+                                                                                
+   $Err:=Empty;                                                                 
+   If $L1_ACT = "SPCFY" Then                                                    
+   Begin                                                                        
+      If #L1_Spec:=#L1__Row - #SpecOne >6 Then                                  
+         #L1_Spec:=#L1_Spec+1;                                                  
+      Case #L1_Spec Of                                                          
+      Begin                                                                     
+      0: $L1_Act:="HELP"                                                        
+      1: $L1_Act:="START"                                                       
+      2: $L1_Act:="REVERT"                                                      
+      3: $L1_Act:="REMAP"                                                       
+      4: $L1_Act:="MSG"                                                         
+      5: $L1_Act:="LOG";                                                        
+      6: $l1_Act:="QUIT"                                                        
+   Else: $Err:=#("Invalid row ",#L1__Row,,"for specify");                       
+      End; %case                                                                
+   End                                                                          
+   Else                                                                         
+      Call Do "menu_getfield" "L1_Families 60 UT";                              
+   If $L1_Act Neq $L1_oldAct Then                                               
+   Begin                                                                        
+      If #BCV_Debug.global > 0 Then                                             
+         Log(Site,"DBG",#("Clearing checkpoint ",Myself(Checkpoint),,           
+             "L1_act=",$L1_act,,"Old=",$L1_OldAct));                            
+      Checkpoint(0);                                                            
+   End;                                                                         
+   $L1_oldAct:=$L1_Act;                                                         
+   If $L1_Families Neq $L1_oldFamilies Then                                     
+   Begin                                                                        
+      If #BCV_Debug.global > 0 Then                                             
+         Log(Site,"DBG",#("Clearing checkpoint ",Myself(Checkpoint),,           
+             "L1_Families=",$L1_Families,,"Old=",$L1_Oldfamilies));             
+      Checkpoint(0);                                                            
+   End;                                                                         
+   $L1_oldFamilies:=$L1_Families;                                               
+   Call Do "Menu_Parse" "L1_Act,L1_Cmds";                                       
+   If $MenuOdts Neq Empty Then                                                  
+   Begin                                                                        
+      Log(Site,"BCV",$MenuODTs&" entered from "&Term(LogOnStation));            
+      If $MenuODTS Neq "ERROR" Then                                             
+      Begin                                                                     
+         Call Do $MenuODts;                                                     
+         If $Err="HOME" Then $Err:=EMpty;                                       
+      End;                                                                      
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      Log(Site,"BCV",$L1_Act&" entered from "&Term(LogOnStation));              
+      CASE $L1_Act OF                                                           
+      Begin                                                                     
+   Else:                                                                        
+         $Err:="Bad case returned:"&$MenuAct;                                   
+   "START":                                                                     
+   "REVERT":                                                                    
+   "REMAP":#Inx:=0;$Err:=Empty;                                                 
+           Log(Site,"BCV","Processing families:"&$L1_Families);                 
+           If $L1_Act Neq "REMAP" Then                                          
+              Log(Site,"BCV",#("Checkpoint:",Myself(Checkpoint)));              
+           While $L1_Fam:=$L1_Families.Copy(#inx.sum(1)) Neq Empty DO           
+             If $got:=Objects(Per=PK:Label=$L1_Fam) = Empty Then                
+             Begin                                                              
+                If ($L1_Act = "START" and Myself(Checkpoint)=0) Or              
+                  $L1_Act="REMAP" Then                                          
+                   $Err.Insert($L1_Fam);                                        
+             End                                                                
+             Else                                                               
+                If $L1_Act = "REVERT" Then                                      
+                   $Err.Insert($L1_Fam&"(PK"&$Got&")");                         
+           If $err Neq Empty Then                                               
+              $Err:=If $l1_act Neq "REVERT" Then "No packs for Families:"       
+                    Else "Packs online:"&$err                                   
+           Else                                                                 
+           If $L1_Act="REMAP" Then                                              
+           Begin                                                                
+              $Err:=Empty;                                                      
+              #inx:=0;                                                          
+              While $Err=Empty And                                              
+                 $L1_Fam:=$L1_Families.Copy(#inx.sum(1)) Neq Empty DO           
+              Begin                                                             
+                 CALL DO "BCV_MAP_PK" $L1_Fam;                                  
+                 If $err = Empty Then                                           
+                    $$L1_Fam.Perm:=$Map                                         
+                 Else                                                           
+                    $$L1_Fam.Perm:=Empty;                                       
+              End;                                                              
+              If $Err=Empty Then                                                
+                 $Err:="Remapped:"&$l1_Families;                                
+              Call DO "BCV_SCROLL" $Err;                                        
+           End                                                                  
+           Else                                                                 
+           Begin                                                                
+              $Tmp:=If Myself(Checkpoint) > 0 Then "retry" else "start";        
+              $Tmp:=If $L1_Act="REVERT" Then                                    
+                       $Tmp&" revert"                                           
+                    Else                                                        
+                       $Tmp&" refresh";                                         
+              $MCMsg:=#($L1_act,,"Confirmation",/,                              
+                    "Enter OK to confirm "&$tmp&" of ",$L1_Families,".");       
+              $COnf_ACT:=Empty;                                                 
+              Call DO "MENU_CONFIRM";                                           
+              If $COnf_ACT="OK" Then                                            
+              Begin                                                             
+                 Call DO "BCV_START" "CMD="&$L1_Act&";"&"Families="&            
+                      $L1_Families;                                             
+                 If $Err="HOME" Then $Err:=Empty;                               
+                 If Myself(Checkpoint)=0 Then                                   
+                    $L1_Act:="MSG"                                              
+              End                                                               
+              Else                                                              
+                 Checkpoint(#BCV_Checkpoint.Perm:=0);                           
+           End;                                                                 
+   "MSG":$PGHD:="BCV Messages";$Hd:=Empty;                                      
+            $SHowList:=$BCV_MSG;                                                
+            Call Do "Menu_Show";                                                
+            If $Err="HOME" Then $Err:=Empty;                                    
+   "QUIT":                                                                      
+         SHOW(" #[FF]");  %leading space to cancel suppress response            
+         $Err:="QUIT";                                                          
+         If #BCV_Debug=1 Then                                                   
+         Log(Site,"Dbg",#("BCV_MENU Jobs Exit $Err:",$Err,,"$SHow_Act",         
+               $Show_Act));                                                     
+      End;                                                                      
+   End;                                                                         
+   If $Err="HOME" Then                                                          
+      $Err:=Empty                                                               
+   Else                                                                         
+   If $Err={"QUIT","ABORT"} Then                                                
+   Begin                                                                        
+      Show(" #[FF]");                                                           
+      ODT("TT WINDOW - ",WHENID(STATION));                                      
+      Exit;                                                                     
+   End;                                                                         
+End;                                                                            
+\                                                                               
+   Define * ODTSEQUENCE BCV_Log Version 2:                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_LOG ODTS                                                             %%  
+%% ~~~~~~~~~~~~                                                             %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% SRCPK1/SRCPK1 on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%provides the top level menu for viewing schedule log                           
+%Called by BCV_MENU                                                             
+If #Bcv_Debug.Global=1 Then                                                     
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp);                                                                    
+                                                                                
+Clear("LG_");                                                                   
+$LogCats:="Bcv,Dbg";                                                            
+If Not "," Isin Myself(action) Then                                             
+   Abort("This ODTS is a subroutine and cannot be started with a TT DO");       
+$ValidDays:="SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY";         
+#TODAY:=TODAY;                                                                  
+#DAYINWEEK:=DAYINWEEK;                                                          
+$LG_Cmds:="Return,Help:BCV_Log_HLP,Show,HOme,Quit";                             
+Call DO "MENU_CMD_LIST" "LG_Cmds,LG_CmdList";                                   
+$LG_Act:="SHOW";                                                                
+$LG__OldInput:=Empty;                                                           
+$LG_ScreenHead:="BCV Log";                                                      
+Call DO "MENU_PadHeading" "LG_"; %Fixes Up $LG_ScreenHEad                       
+While True Do                                                                   
+Begin                                                                           
+   $LG_Fields:=#($LG_Time 60,Drop($LG__OldInput,60)); %refresh time             
+   SHOW($LG_ScreenHEad,/,,/,                                                    
+     "ACTION #[US]",$LG_Act 6,"#[RS]",/,                                        
+          $Hi,$LG_CmdList,/,,/,                                                 
+      $Hi,"Range   #[ETB]#[US]",$LG_Fields.Split(60) 60,"#[RS]",/,              
+      " " 10,$Hi,"Ex Skip 1 day or 1100 7/21/11-1100 7/20/11#[ETB]",/,          
+      $Hi,"Category#[ETB]#[US]",$LG_Fields.Split(60) 60,                        
+         "#[RS]",$Hi,"list#[ETB]",/,                                            
+      " " 10,$Hi,$LogCats,"#[ETB]",/,,/,                                        
+      $Hi,"Find    #[ETB]#[US]",$LG_fields.Split(60) 60,"#[RS]",/,              
+      $Hi,"File    #[ETB]#[US]",$LG_fields.Split(60) 60,"#[RS]",/,              
+      $Hi,"EMail   #[ETB]#[US]",$LG_Fields.SPlit(60) 60,"#[RS]",/,,/,           
+     $ErrHi,$Err,"#[ESC]W");                                                    
+   $ERR:=Empty;                                                                 
+   Call Do "Menu_GetField" "LG_Act 6 T 4,10";                                   
+   Call Do "Menu_GetField" "LG_Time 60 TU";                                     
+   Call Do "Menu_GetField" "LG_LogCat 60 TU";                                   
+   Call Do "Menu_GetField" "LG_LogFind 60 TU";                                  
+   Call Do "Menu_GetField" "LG_LogFile 60 UT";                                  
+   Call Do "Menu_GetField" "LG_Email 60 T";                                     
+   Call Do "MENU_PARSE" "LG_ACT,LG_Cmds";                                       
+   If $LG_LogCat=Empty Then $LG_LogCat:="BCV";                                  
+   If $MenuOdts Neq Empty Then                                                  
+   Begin                                                                        
+      If $MenuODTS Neq "ERROR" Then                                             
+      Begin                                                                     
+         Call Do $MenuODts;                                                     
+         If $Err="HOME" Then Exit;                                              
+      End;                                                                      
+   End                                                                          
+   Else                                                                         
+   Case $LG_Act Of                                                              
+   Begin                                                                        
+Else: $Err:="Bad case returned:"& $LG_Act;                                      
+"REFRESH":;                                                                     
+"HOME":                                                                         
+      $Err:="HOME";                                                             
+"QUIT":                                                                         
+      SHOW(" #[FF]");  %leading space to cancel suppress response               
+      $ERR:="QUIT";                                                             
+      EXIT;                                                                     
+"RETURN":                                                                       
+      Exit;                                                                     
+"SHOW":                                                                         
+      $LG_Evcat:=Empty;                                                         
+      #Cfg_LogF:=If $CFG_LogF="TRUE" Then 1 Else 0;                             
+      If $LG_Tmp:=$LG_LogCat Neq Empty Then                                     
+         While $Err=Empty And $LG_Tmp Neq Empty DO                              
+         Begin                                                                  
+            If Length($LG_TmpCat :=Head($LG_Tmp,"ABCDEFGHIJKLMNOPQRSTUVWXYZ"))  
+               Neq 3 Then                                                       
+               $Err:="Category must be three letters:"&$LG_Tmp                  
+            Else                                                                
+            Begin                                                               
+               $LG_EVCat.Insert($LG_TmpCat);                                    
+               $LG_Tmp:=Trim(TAil(Tail($LG_Tmp,"ABCDEFGHIJKLMNOPQRSTUVWXYZ"),   
+                                        Not "ABCDEFGHIJKLMNOPQRSTUVWXYZ"));     
+            End;                                                                
+         End;                                                                   
+      If $Err=Empty Then                                                        
+      Begin                                                                     
+         $LogIt:="BCV LOG";                                                     
+         #LG_NextLine:=1;                                                       
+         $ShowList:=Empty;                                                      
+         #LG_ShowAll:=If $LG_LOgCat = Empty And $LG_LogFInd=Empty Then 1 Else 0;
+         #LG_LogDay:=0;                                                         
+         #LG_Width:=If $LG_LogFile Neq Empty Then 80                            
+                    ELse If $LG_Email Neq Empty Then 120                        
+                    Else Myself(width);                                         
+         $LG_EvCAt:=If $LG_EVCAT Neq Empty Then "CAT "&$LG_EVCat  Else Empty;   
+         #LG_Next:=0;                                                           
+         If $LG_Time=Empty Then                                                 
+            $LG_Time:="For 24"                                                  
+         Else                                                                   
+         If $LG_Time = "NEXT" Then                                              
+         Begin                                                                  
+            $LG_Time:=$LG_NextEv;                                               
+            #LG_Next:=1;                                                        
+         End;                                                                   
+         Call DO "Menu_GetLogSkip" "LG_Time"&                                   
+            (If #Cfg_LogF=1 Then ";F" Else Empty);                              
+         If #LG_Next=1 Then                                                     
+            $LG_Time:="NEXT";                                                   
+         If $Err=Empty Then                                                     
+         Begin                                                                  
+            $LG_DateLIst:=Empty;                                                
+            Show($lastLine,"Scanning log.");                                    
+            TT("EV BCV_LOGSCAN ["&$LG_EvCAt&" @ "&                              
+               $LG_EV&"] DO BCV_LOGSCAN");                                      
+         End;                                                                   
+         If $Err=Empty Then                                                     
+         Begin                                                                  
+            $PgHd:=$LogIt;                                                      
+            $Hd:=Empty;                                                         
+            If $Showlist=Empty Then                                             
+            Begin                                                               
+               If #LG_ShowAll=0 Then                                            
+                  $ShowList:=#("No matching records found in time range")       
+               Else                                                             
+                  $ShowList:="No records in time range"                         
+            End;                                                                
+            If $LG_LogFile=Empty And $LG_Email=Empty Then                       
+            Begin                                                               
+            Do Begin                                                            
+                $Hd:=If #Cfg_LogF=1 Then                                        
+                        Empty                                                   
+                     Else                                                       
+                        "Most recent first. ";                                  
+               If #LG_showAll=0 Then                                            
+                  $Hd:=&"Spcy on a line to view it in context.";                
+               Call Do "Menu_Show" #("Log report Help",/,                       
+                                   "Navigate the Log report");                  
+               If $err={"HOME","ABORT","QUIT"} Then Exit;                       
+               $Hd:=Empty;                                                      
+               If #LG_myLine:=#Spcfy_Item > 0 And #LG_ShowAll Neq 1 Then        
+               Begin                                                            
+                  #LG_St:=#St;  %save where we were                             
+                  $LG_Target:=$Showlist.Copy(#LG_myLine,/);                     
+                  If #Cfg_Logf=1 Then                                           
+                     #LG_Myline:=#LG_NextLine+2-#LG_MyLine;                     
+                  If Not $LG_Target Eqw "##:##:## =" Then                       
+                     $Err:="Must spcfy on a line with a time"                   
+                  Else                                                          
+                  Begin                                                         
+                     #LG_SelTime:=Decimal(Take($LG_Target,2))*60+               
+                        Decimal(Take(Drop($LG_Target,3),2));                    
+                     %Find Date                                                 
+                     #tmp:=0;                                                   
+                     If #Bcv_Debug.Global=1 Then                                
+                        Log(Site,"DBG",#("DateList ",#LG_Myline,,$LG_dateList));
+                     While $Tmp:=$LG_DateList.Copy(#Tmp.Sum(1)) Neq Empty And   
+                          Decimal($Tmp.SPlit(" ")) < #LG_MyLine Do              
+                        #LG_SelDate:=Decimal($Tmp);                             
+                     If #Bcv_Debug.Global=1 Then                                
+                        Log(Site,"Dbg",#("Sel",TIme(#LG_SelTime*60),,           
+                           DateTotext(#LG_selDate,default)));                   
+                     #LG_Seltime.Sum(-720);                                     
+                     If #LG_SelTime < 0 Then                                    
+                     Begin                                                      
+                        #LG_SelDate:=Newdate(#LG_Seldate,-1);                   
+                        #LG_Seltime.Sum(1440);                                  
+                     End;                                                       
+                     #LG_SelTime:=#LG_SelTime Div 60*100+#LG_seltime mod 60;    
+                     $LG_EV:=#(#LG_Seltime,,                                    
+                        Datetotext(#LG_Seldate,Default),,                       
+                        "-",,#LG_seltime,,Datetotext(Newdate(#LG_Seldate,1),    
+                           Default));                                           
+                     $LG_ShowLIst:=$ShowList;                                   
+                     $LG_LogFInd:=Empty;                                        
+                     Show($lastLine,"Scanning log.");                           
+                     TT("EV BCV_LOGSCAN [@ "&$LG_EV&"] DO BCV_LOGSCAN");        
+                     If #Cfg_LogF=1 Then                                        
+                        #LG_Target:=#LG_NextLine-1-#LG_target;%list is reversed 
+                     #AltSt:=#LG_target;                                        
+                     %#LG_Target from BCV_logscan                               
+                     $Hd:=If #Cfg_LogF=1 Then                                   
+                             Empty                                              
+                           Else                                                 
+                             "Most recent first";                               
+                                                                                
+                     Call Do "Menu_Show";                                       
+                     If $err={"HOME","ABORT","QUIT"} Then Exit;                 
+                     #LG_Go:=1;                                                 
+                     $ShowList:=$LG_ShowList;                                   
+                     #AltSt:=#LG_St;                                            
+                  End;                                                          
+               End                                                              
+               Else                                                             
+                  #LG_Go:=0;                                                    
+            End Until #LG_Go=0 Or $Err="HOME";                                  
+            End                                                                 
+            Else                                                                
+            Begin                                                               
+               $LG_Restrict:=Empty;                                             
+               If $LG_Time Neq Empty Then                                       
+                  $LG_Restrict.Insert("Range     :"&$LG_Time,/);                
+               If $LG_LogCat Neq Empty Then                                     
+                  $LG_Restrict.Insert("Categories:"&$LG_logCAt,/);              
+               If $LG_LogFind Neq Empty Then                                    
+                  $LG_Restrict.Insert("Find      :"&$LG_logFind,/);             
+               If $LG_LogFIle Neq Empty Then                                    
+               Begin                                                            
+                  Call Do "BCV_SetTitle" $LG_LogFIle;  %sets $Lg_Title and $Err 
+                  If $Err =Empty Then                                           
+                  Begin                                                         
+                  $FileOut:="Title="&$Lg_Title&",Filekind=data,"&               
+                           "MAXRECSIZE=80,framesize=8,Blocksize=720,"&          
+                           "Securityuse=In,Securitytype=public";                
+                     If Not $Err:=$$Fileout.Write(#($Logit,,TimeDate(Display),/,
+                       $LG_Restrict,/,$ShowList))HdIs "Error" Then              
+                       $Err:="Output to "&$Lg_Title;                            
+                  End;                                                          
+                                                                                
+               End;                                                             
+               If $LG_Email Neq Empty And                                       
+                  ($Err=Empty Or $Err Hdis "Output ") Then                      
+               Begin                                                            
+                  $LG_Body:=#($PgHd,,TimeDate(Display),/,$LG_Restrict);         
+                  If $LG_LogFile Neq Empty Then                                 
+                  Begin                                                         
+                     $LG_PCTxt:="LOGEXTRACT" &                                  
+                        DateToText(Today,ddmonyyyy)&".TXT";                     
+                     $LG_Body.Insert("]Attach ["&$LG_PCTXT&"] "&$Lg_Title,/);   
+                     $Err:=&" and emailed to "&$LG_Email;                       
+                  End                                                           
+                  Else                                                          
+                  Begin                                                         
+                     $LG_Body.Insert($ShowList,/);                              
+                     $Err:="Report emailed to "&$LG_Email;                      
+                  End;                                                          
+                  If #LG_Tmp:=Mail("TO:"&$LG_Email&";SUBJECT:"&$PgHd&           
+                                   " "&TimeDate(Display) ,                      
+                                      $LG_Body) < 0 Then                        
+                     $Err:="Email failed:"&MailError(#LG_Tmp);                  
+               End;                                                             
+            End;                                                                
+         End;                                                                   
+      End;                                                                      
+   End;                                                                         
+   If $Err={"QUIT","HOME","ABORT"} Then                                         
+      Exit;                                                                     
+End;                                                                            
+\                                                                               
+   Define * ODTSEQUENCE BCV_START(Msg) Version 4:                               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_START ODTS                                                           %%  
+%% ~~~~~~~~~~~~                                                             %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%% Version 02 - Simplify error reporting            GXG NOV '17  %%  
+%%              Better handling of UR and UR- problems                      %%  
+%%              Better handling of waiting entry                            %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%provides the controlling logic for a start operation                           
+%Called by BCV_MENU                                                             
+%Will attempt to Close,UR and Free all of the members of the families           
+%specified in $Bcv_Families                                                     
+Clear("l2_"); $PgHd:=Empty;                                                     
+$L2_Param:=Upper(Trim(Text));                                                   
+$L2_param.Distribute(";",nameeqlvalue,"L2_");                                   
+%Set up  $L2_CMD and $L2_Families;                                              
+If #Bcv_Debug.Global=1 Then                                                     
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp&" "&Text&" (CP "&String(Myself(Checkpoint),*)&")");                  
+$L2_Cmds:="Return,Help:BCV_START_HLP,Continue,HOme,Quit";                       
+Call DO "MENU_CMD_LIST" "l2_Cmds,l2_CmdList";                                   
+$l2_Act:="Show";                                                                
+$l2__OldInput:=Empty;                                                           
+$L2_ScreenHead:="BCV Start";                                                    
+Call DO "MENU_PadHeading" "L2_"; %Fixes Up $L2_ScreenHEad                       
+#BCV_Scrlines:=myself(PageSize)-5;                                              
+#L2_Inx:=0;                                                                     
+While $Fam:=$L2_Families.Copy(#l2_Inx.sum(1)) Neq Empty DO                      
+Begin                                                                           
+   $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,                 
+                 "Checking open files",/,,/);                                   
+   If $Map:=$$Fam.Perm = Empty Then                                             
+   Begin                                                                        
+      CALL DO "BCV_MAP_PK" $Fam;                                                
+      If $err Neq Empty Then                                                    
+         Exit;                                                                  
+      $$Fam.Perm:=$Map;                                                         
+   End;                                                                         
+   If $L2_CMD="START" And Myself(Checkpoint) < 100 Then                         
+   Begin                                                                        
+      #Inx:=0;$list:=Empty;                                                     
+      Do Begin                                                                  
+         Call DO "BCV_OPEN" $FAM;                                               
+         $Err:=Empty;                                                           
+         If $Result Neq Empty Then                                              
+            DO Begin                                                            
+               Log(Site,"Bcv",$Msg:=#("Open files on ",$Fam));                  
+               Call DO "BCV_Scroll" $Msg;                                       
+               Call DO "BCV_Pause" "HD="&$Msg&                                  
+                  "\ERR=Open Files"&                                            
+                  "\BODY=$Result";                                              
+               If $err={"HOME","ABORT","QUIT"} Then Exit;                       
+            End Until $err=Empty;                                               
+      End Until $Result=Empty and $L2_Missed=Empty;                             
+      Checkpoint(100);                                                          
+   End;                                                                         
+   %Build List                                                                  
+   $Vunits:=#("VUnits",#L2_Inx);                                                
+   $Vunitser:=#("VUnitser",#L2_Inx);                                            
+   $$VUnitSer:=$$VUnits:=Empty;                                                 
+   $VBp:=#("Vbp",#L2_Inx);                                                      
+   $VBpSer:=#("VbpSer",#L2_Inx);                                                
+   #Inx:=0;                                                                     
+   While $entry:=$map.Copy(#inx.Sum(1),/) Neq Empty DO                          
+   Begin                                                                        
+      $Entry.Distribute; %sets up $Unit,$Index and $Serial                      
+      If #BCV_DEBUG.Global = 1 Then                                             
+         Log(Site,"Dbg",#($Unit,,$Index,,$Serial));                             
+      $List.insert($unit);                                                      
+      If $Index="1" Then                                                        
+      Begin                                                                     
+         $$VBp:=$Unit;                                                          
+         $$VBPSer:=$Unit.Per(Serialno);                                         
+      End                                                                       
+      Else                                                                      
+      Begin                                                                     
+         $$VUnits.Insert($unit);                                                
+         $$VUnitSer.Insert($Unit.Per(Serialno));                                
+      End                                                                       
+   End;                                                                         
+   If #BCV_Debug.Global=1 Then                                                  
+   Begin                                                                        
+      Log(Site,"Dbg","Build List "&$Fam&" BP:"&$$VBP&" Others:"&$$VUnits);      
+      Log(Site,"Dbg","SerList "&$fam&" BP:"&$$VBPSer&" Others:"&$$VUnitSer);    
+   End;                                                                         
+End;   %$fam loop                                                               
+$MyVar:=#("LOGIT_",Myself(slot));                                               
+$$Myvar.global:=Empty;                                                          
+If $L2_CMD="START" Then                                                         
+Begin                                                                           
+   If Myself(Checkpoint)<299 Then                                               
+   Begin %close families                                                        
+      #L2_Inx:=0;                                                               
+      While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                
+      If Myself(Checkpoint) < 200+#l2_iNX*10+1 Then                             
+      Begin  %Close loop                                                        
+         $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,           
+                       "Checking Close Results",/,,/);                          
+         $Keymsg:=KEYIN("TT WHEN (MSG:MSGCAT= MSRDPC and MSGTYPE=40) DO ($"&    
+                  $MyVar&".Global.insert(#(Text),/)");                          
+         If #BCV_DEBUG.Global = 1 Then log(site,"dbg",$Keymsg);                 
+         $Vunits:=#("VUnits",#L2_Inx);                                          
+         $VBp:=#("Vbp",#L2_Inx);                                                
+         $List:=$$VUnits&","&$$VBp;                                             
+         If #BCV_Debug.global=1 then                                            
+            Log(Site,"DBG",#("Close ",$fam,,$list));                            
+         #inx:=0;                                                               
+         If myself(checkpoint) < 200+#L2_inx*10 Then                            
+         While $unit:=$List.Copy(#inx.Sum(1)) Neq Empty DO                      
+         Begin                                                                  
+            Log(Site,"Bcv","CLOSE PK "&$Unit);                                  
+            Log(Site,"Bcv",Keyin("CLOSE PK "&$Unit));                           
+         End;                                                                   
+         Checkpoint(200+#L2_inx*10);                                            
+         TT(Decat($Keymsg,"+",4)&" DO"); %turn off when                         
+         Do Begin                                                               
+            #Inx:=0;$Result:=Empty;                                             
+            While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                   
+               If Not $Unit.Per(Closed) Then                                    
+                  $L2_Missed.Insert($Unit);                                     
+            #Lim:=0;                                                            
+            While $L2_Missed Neq Empty and #Lim.Sum(1) < 3 DO                   
+            Begin                                                               
+               Call DO "BCV_SCROLL" "Packs not closed yet:"&$L2_Missed;         
+               $Tmp:=$L2_Missed;$L2_Missed:=Empty;                              
+               Wait(#WaitSecs);                                                 
+               While $Unit:=$Tmp.Split Neq Empty DO                             
+               If Not $Unit.Per(Closed) Then                                    
+                  $L2_Missed.Insert($Unit);                                     
+            End;                                                                
+            If $L2_Missed = Empty Then                                          
+               Wait(.1); %Avoid proc loop                                       
+            $Err:=Empty;                                                        
+            If $L2_Missed Neq Empty Then %show errors and wait                  
+            Do Begin                                                            
+               $l2_Hd:=#($FAM,":Close Errors ",Timedate(Display));              
+               #inx:=0;                                                         
+               While $Log:=$$MyVar.Global.Copy(#inx.sum(1)) Neq Empty Do        
+                  If $Log Incl #{$L2_Missed} Then                               
+                  Begin                                                         
+                     Log(Site,"BCV",$Log);                                      
+                     $Result.Insert($log,/);                                    
+                  End;                                                          
+               If $Result=Empty Then                                            
+               Begin                                                            
+                  $Msg:="No Close Errors Logged for "&$Fam;                     
+                  Log(Site,"Bcv",$msg);                                         
+                  $msg:="Fam "&$Fam&" Missed close:"&$L2_Missed;                
+                  Call DO "BCV_PAuse" "HD="&$l2_HD&"\BODY="&$msg&               
+                    "\ERR=Close Errors";                                        
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End                                                              
+               Else                                                             
+               Begin                                                            
+                 Call Do "BCV_PAUSE" "HD=Close errors on "&$Fam&                
+                    "\ERR=Close Errors"&                                        
+                    "\BODY=$Result";                                            
+                 If $err={"HOME","ABORT","QUIT"} Then Exit;                     
+               End;                                                             
+            End Until $err=Empty;                                               
+         End Until $Result=Empty and $L2_Missed=Empty;                          
+         $$MyVar.Global:=Empty;                                                 
+         If $L2_Missed Neq Empty Then                                           
+            $L2_Msg:=#("Packs not closed yet:",$L2_Missed)                      
+         Else                                                                   
+            $L2_Msg:=#("Good close for ",$List);                                
+         Call DO "BCV_Scroll" $L2_Msg;                                          
+         Checkpoint(200+#L2_Inx*10+1);                                          
+      End; %close loop                                                          
+      If Myself(checkpoint) < 299 Then                                          
+      Begin                                                                     
+         $L2_Msg:="Close "&$L2_Families&" finished";                            
+        Log(Site,"Bcv",$L2_msg);                                                
+        Call DO "BCV_SCROLL" $L2_MSg;                                           
+        Checkpoint(299);                                                        
+     End;                                                                       
+   End; %Close Families                                                         
+   %UR                                                                          
+   If myself(checkpoint) < 399 Then                                             
+   Begin %UR                                                                    
+      #L2_inx:=0;                                                               
+      While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                
+      If Myself(Checkpoint) < 300+#l2_Inx*10+1 Then                             
+      Begin  %UR loop                                                           
+         $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,           
+                       "Checking UR Results",/,,/);                             
+         $Vunits:=#("VUnits",#L2_Inx);                                          
+         $VBp:=#("Vbp",#L2_Inx);                                                
+         $List:=$$VUnits&","&$$VBp;                                             
+         If #BCV_Debug.global=1 then                                            
+            Log(Site,"DBG",#("UR ",$fam,,$list));                               
+         DO Begin                                                               
+            #inx:=0;$Result:=Empty;                                             
+            If Myself(checkpoint) < 300+#l2_Inx*10 Then                         
+            While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                   
+            Begin                                                               
+               If $msg:=Keyin($KM:=#("UR PK"&$Unit)) Neq "PK"&$Unit&" RESERVED" 
+                  And $Msg Neq "UNIT RESERVED" Then                             
+                  $Result.Insert("PK"&$Unit&":"&$Msg,/);                        
+               Log(Site,"Bcv",$KM);                                             
+               Log(Site,"Bcv",$Msg);                                            
+            End;                                                                
+            Wait(.1); %Avoid proc loop                                          
+            $Err:=Empty;                                                        
+            DO Begin                                                            
+               #lim:=0;                                                         
+               Do Begin                                                         
+                  $L2_Missed:=Empty;                                            
+                  #inx:=0;                                                      
+                  $L2_Objects:=objects(per=pk-:String(unitno,*)=#{$list} and    
+                    reserved);                                                  
+                  While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO              
+                     If Not $L2_Objects.Includes($tmp) Then                     
+                       $L2_Missed.Insert($Tmp);                                 
+                  If $L2_Missed neq Empty Then                                  
+                  Begin                                                         
+                     Call Do "BCV_Scroll" "Not yet URed:PK "&$L2_Missed;        
+                     Wait(#WaitSecs);                                           
+                  End;                                                          
+               End Until $L2_Missed=Empty or #lim.sum(1) > 3;                   
+               If $Result Neq Empty Or $L2_Missed Neq Empty Then                
+               Begin                                                            
+                  If $Result Neq Empty Then                                     
+                  Begin                                                         
+                     $Hd:=#($FAM,":UR Errors ",Timedate(Display));              
+                     $SHowList:=$REsult;                                        
+                  End                                                           
+                  Else                                                          
+                     $ShowList:="Not URed:"&$L2_Missed;                         
+                  Call Do "BCV_PAUSE" "HD=UR errors on "&$Fam&                  
+                     "\ERR=UR Errors"&                                          
+                     "\BODY=$ShowList";                                         
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End;                                                             
+            End Until $err=Empty;                                               
+         End Until $Result=Empty and $L2_Missed=Empty;                          
+         Checkpoint(300 + #L2_inx*10+1);                                        
+      End; %ur loop                                                             
+      If Myself(Checkpoint) < 399 Then                                          
+      Begin                                                                     
+         $L2_Msg:="UR "&$L2_Families&" finished";                               
+         Log(Site,"Bcv",$L2_msg);                                               
+         Call DO "BCV_SCROLL" $L2_MSg;                                          
+         Checkpoint(399);                                                       
+      End;                                                                      
+   End; %UR                                                                     
+   %Free                                                                        
+   If Myself(Checkpoint) < 499 Then                                             
+   Begin                                                                        
+      Do Begin                                                                  
+         #l2_inx:=0;                                                            
+         While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO             
+         If Myself(Checkpoint) < 400+#l2_Inx*10 +1 Then                         
+         Begin  %Free loop                                                      
+            $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,        
+                       "Checking Free Results",/,,/);                           
+            $Vunits:=#("VUnits",#L2_Inx);                                       
+            $VBp:=#("Vbp",#L2_Inx);                                             
+            $List:=$$VUnits&","&$$VBp;                                          
+            If #BCV_Debug.global=1 then                                         
+               Log(Site,"DBG",#("Free ",$fam,,$list));                          
+            #Inx:=0;$Result:=Empty;$$MyVar.Global:=Empty;                       
+            If Myself(Checkpoint) < 400+#l2_Inx*10 Then                         
+            While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                   
+            Begin                                                               
+               Log(Site,"Bcv","Free PK"&$Unit);                                 
+               If $msg:=Keyin("Free PK"&$Unit) neq                              
+                 "PK"&$unit&" WILL BE FREED" Then                               
+                  $Result.Insert("PK"&$Unit&":"&$Msg,/);                        
+               Log(Site,"Bcv",$msg);                                            
+            End;                                                                
+            WAit(.1);   %Avoide proc loop                                       
+            Checkpoint(400+#l2_inx*10);                                         
+            $Err:=Empty;                                                        
+            DO Begin                                                            
+               #lim:=0;                                                         
+               Do Begin                                                         
+                  $L2_Missed :=objects(per=pk-:String(unitno,*)=#{$list} And    
+                     Label Neq Empty);                                          
+                  If $L2_Missed neq Empty Then                                  
+                  Begin                                                         
+                     Call Do "BCV_Scroll" "Not Yet Freed:PK "&$L2_Missed;       
+                     Wait(#WaitSecs*6);                                         
+                  End;                                                          
+               End Until $L2_Missed=Empty or #lim.sum(1) > 3;                   
+               If $Result Neq Empty Or $L2_Missed Neq Empty Then                
+               Begin                                                            
+                  If $Result Neq Empty Then                                     
+                     $SHowList:=$REsult                                         
+                  Else                                                          
+                     $ShowList:="Not Freed:"&$L2_Missed;                        
+                  Call Do "BCV_PAUSE" "HD=Free errors on "&$Fam&                
+                     "\ERR=Free Errors"&                                        
+                     "\BODY=$Showlist";                                         
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End;                                                             
+            End Until $Err=Empty;                                               
+            Checkpoint(400+#l2_inx*10+1);                                       
+         End; %Free loop                                                        
+      End Until $Result=Empty and $L2_Missed=Empty;                             
+      If Myself(checkpoint) < 499 Then                                          
+      Begin                                                                     
+         $L2_Msg:="Free "&$L2_Families&" finished";                             
+         Log(Site,"Bcv",$L2_msg);                                               
+         Call DO "BCV_SCROLL" $L2_msg;                                          
+         Checkpoint(499);                                                       
+         If $err={"HOME","ABORT","QUIT"} Then Exit;                             
+      End;                                                                      
+   End; %Free                                                                   
+   If Myself(Checkpoint) < 599 Then                                             
+   Begin %wait for sync and spit                                                
+      $L2_Msg:="Waiting for confirmation of BCV sync and split completion";     
+      Call Do "BCV_Pause" "HD="&$L2_Msg&                                        
+                          "\BODY=Enter Continue when ready to proceed";         
+      If $err={"HOME","ABORT","QUIT"} Then Exit;                                
+      Checkpoint(599);                                                          
+   End; %Wait for sync and split;                                               
+End; %$L2_CMD="START"                                                           
+%Acquire                                                                        
+If Myself(Checkpoint) < 699 Then                                                
+Begin %Acquire                                                                  
+   Do Begin                                                                     
+      #l2_inx:=0;                                                               
+      While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                
+      If Myself(Checkpoint) < 600+#l2_Inx*10 +1 Then                            
+      Begin  %Acquire loop                                                      
+         $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,           
+                       "Checking Acquire Results",/,,/);                        
+         $Vunits:=#("VUnits",#L2_Inx);                                          
+         $VBp:=#("Vbp",#L2_Inx);                                                
+         $List:=$$VBp&","&$$VUnits;                                             
+         If #BCV_Debug.global=1 then                                            
+            Log(Site,"DBG",#("Acquire ",$fam,,$list));                          
+         #Inx:=0;$Result:=Empty;$$MyVar.Global:=Empty;                          
+         If Myself(Checkpoint) < 600+#L2_Inx*10 Then                            
+         While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                      
+         Begin                                                                  
+            Log(Site,"Bcv","Acquire PK"&$Unit);                                 
+            If $msg:=Keyin("Acquire PK"&$Unit) neq                              
+               "PK"&$unit&" WILL BE ACQUIRED" Then                              
+               $Result.Insert("PK"&$Unit&":"&$Msg,/);                           
+            Log(Site,"Bcv",$msg);                                               
+         End;                                                                   
+         Wait(.1); %Avoide proc loop                                            
+         Checkpoint(600+#l2_inx*10);                                            
+         $err:=Empty;                                                           
+         DO Begin                                                               
+            #lim:=0;                                                            
+            Do Begin                                                            
+               $L2_Missed:=Empty;                                               
+               #inx:=0;                                                         
+               $L2_Objects :=objects(per=pk-:String(unitno,*)=#{$list}          
+                 and reserved);                                                 
+               While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO                 
+                  If Not $L2_Objects.Includes($tmp) Then                        
+                    $L2_Missed.Insert($Tmp);                                    
+               If $L2_Missed neq Empty Then                                     
+               Begin                                                            
+                  Call Do "BCV_Scroll" "Not yet Acquired:PK "&$L2_Missed;       
+                  Wait(#WaitSecs);                                              
+               End;                                                             
+            End Until $L2_Missed=Empty or #lim.sum(1) > 3;                      
+            If $Result Neq Empty Or $L2_Missed Neq Empty Then                   
+            Begin                                                               
+               If $Result Neq Empty Then                                        
+                  $SHowList:=$REsult                                            
+               Else                                                             
+                  $ShowList:="Did nor acquire PK"&$L2_Missed;                   
+               Call Do "BCV_PAUSE" "HD=Acquire errors on "&$Fam                 
+                  &"\ERR=Acquire Errors"&                                       
+                  "\BODY=$ShowList";                                            
+               If $err={"HOME","ABORT","QUIT"} Then Exit;                       
+            End;                                                                
+         End Until $Err=Empty;                                                  
+         Checkpoint(600+#L2_Inx*10+1);                                          
+      End; %acquire loop                                                        
+   End Until $Result=Empty and $L2_Missed=Empty;                                
+   If Myself(Checkpoint) < 699 Then                                             
+   Begin                                                                        
+      $L2_Msg:="Acquire "&$L2_Families&" finished";                             
+      Log(Site,"Bcv",$L2_msg);                                                  
+      Call DO "BCV_SCROLL" $L2_MSg;                                             
+      Checkpoint(699);                                                          
+   End;                                                                         
+End; %Acquire                                                                   
+%UR-                                                                            
+If Myself(Checkpoint) < 799 Then                                                
+Begin                                                                           
+   #L2_inx:=0;                                                                  
+   While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                   
+   If Myself(Checkpoint) < 700+#L2_inx*10+1 Then                                
+   Begin  %UR- loop                                                             
+      $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,              
+                    "Checking UR- Results",/,,/);                               
+      $Vunits:=#("VUnits",#L2_Inx);                                             
+      $VBp:=#("Vbp",#L2_Inx);                                                   
+      $List:=$$VBp&","&$$VUnits;                                                
+      If #BCV_Debug.global=1 then                                               
+         Log(Site,"DBG",#("UR- ",$fam,,$list));                                 
+      If Myself(Checkpoint) < 700+#l2_Inx*10 Then                               
+      Begin                                                                     
+         DO Begin                                                               
+            #Inx:=0;$Result:=Empty;                                             
+            While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                   
+            Begin                                                               
+               If $msg:=Keyin($KM:=#("UR- PK"&$Unit)) Neq "PK"&                 
+                  $Unit&" AVAILABLE" And $Msg Neq "IS NOT RESERVED" Then        
+                  $Result.Insert("PK"&$Unit&":"&$Msg,/);                        
+               Log(Site,"Bcv",$KM);                                             
+               Log(Site,"Bcv",$Msg);                                            
+               Call Do "BCV_Scroll" $KM;                                        
+               Call Do "BCV_Scroll" $Msg;                                       
+               wait(#waitSecs);                                                 
+            End;                                                                
+            Wait(.1);   %Avoide proc loop                                       
+            If $Result Neq Empty Then                                           
+            Begin                                                               
+               Call Do "BCV_PAUSE" "HD=UR- errors Family:"&$Fam&                
+                       "\ERR=UR- Errors"&                                       
+                       "\BODY=$Result";                                         
+               If $err={"HOME","ABORT","QUIT"} Then Exit;                       
+            End                                                                 
+         End Until $Result=Empty;                                               
+         CheckPoint(700+#l2_inx*10);                                            
+      End;                                                                      
+      If Myself(Checkpoint) < 700+#l2_Inx*10+1 Then                             
+      Begin                                                                     
+         DO Begin                                                               
+            #inx:=0;$Result:=Empty;                                             
+            Do Begin                                                            
+               $L2_Missed:=Empty;                                               
+               #inx:=0;                                                         
+               $L2_Objects :=objects(per=pk-:String(unitno,*)=#{$list}          
+                  and not reserved);                                            
+               While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO                 
+                  If Not $L2_Objects.Includes($tmp) Then                        
+                    $L2_Missed.Insert($Tmp);                                    
+               If $L2_Missed neq Empty Then                                     
+               Begin                                                            
+                  Call Do "BCV_Scroll" "Not yet available:"&$L2_Missed;         
+                  Wait(#WaitSecs);                                              
+                                                                                
+               End;                                                             
+            End Until $L2_Missed=Empty or #lim.sum(1) > 3;                      
+            %Check Import Status                                                
+            DO Begin                                                            
+               #lim:=0;                                                         
+               $Result:=Empty;                                                  
+               If $L2_Cmd="START" Then %Don't check for revert                  
+               Do Begin                                                         
+                  #inx:=0; $Result:=Empty;                                      
+                  While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO              
+                  Begin                                                         
+                     $L2_TargetStatus:="IMPORT STATUS: UNMARKED BCV";           
+                     If #BCV_Debug.Global=1 Then                                
+                        Log(Site,"DBG","PK"&$tmp&" Target Status:"&             
+                           $L2_TargetStatus);                                   
+                     $l2_OL:=Keyin("OL PK"&$Tmp);                               
+                     If $L2_Status:=$L2_OL.Cut("IMPORT STATUS:=",/) = Empty Then
+                        $L2_Status:="No import status";                         
+                     If $L2_Status Neq $L2_TargetStatus Then                    
+                     Begin                                                      
+                        $Result.Insert($msg:="PK "&$Tmp&" "&$L2_Status,/);      
+                        Call DO "BCV_SCROLL" $msg;                              
+                        Log(Site,"BCV",$Msg);                                   
+                     End;                                                       
+                  End;                                                          
+               End Until $Result=Empty or #lim.sum(1) > 3;                      
+               If $Result Neq Empty Then                                        
+               Begin                                                            
+                  If $Result Neq Empty Then                                     
+                  Begin                                                         
+                     $BCV_ERRORS.Global.CUT($FAM&":=","\");                     
+                     $BCV_ERRORS.Global.Insert(#($Hd,/,                         
+                        $Result),"\");                                          
+                     $SHowList:=$REsult;                                        
+                  End                                                           
+                  Else                                                          
+                     $ShowList:="Not UR-ed:"&$L2_Missed;                        
+                  Call Do "BCV_PAUSE" "HD=UR- errors on "&$Fam                  
+                    &"\ERR=Was BCV sync/split missed"&                          
+                     "\BODY=$ShowList";                                         
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End;                                                             
+            End Until $err=Empty;                                               
+         End Until $Result=Empty and $L2_Missed=Empty;                          
+      End;                                                                      
+      Checkpoint(700+#L2_inx*10+1);                                             
+   End; %ur- loop                                                               
+   If Myself(checkpoint) < 799 Then                                             
+   Begin                                                                        
+     $L2_Msg:="UR- "&$L2_Families&" finished";                                  
+     Log(Site,"Bcv",$L2_msg);                                                   
+     Call DO "BCV_SCROLL" $L2_MSg;                                              
+     If $L2_Cmd="REVERT" Then                                                   
+     Begin                                                                      
+        $Err:="Restored:"&$L2_Families;                                         
+        CHECKPOINT(0);                                                          
+        Exit;                                                                   
+     End                                                                        
+     Else                                                                       
+      CheckPoint(799);                                                          
+   End;                                                                         
+End; %UR-                                                                       
+If $L2_CMD="START" Then                                                         
+Begin                                                                           
+   %Mirror mark                                                                 
+   If Myself(checkpoint) < 899 Then                                             
+   Begin  %mirror Mark Block                                                    
+      #L2_inx:=0;                                                               
+      While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                
+      Begin %Mirror mark family loop                                            
+         If Myself(Checkpoint) < 800+#L2_inx*10 Then                            
+         Begin  %mirror mark checkpoint                                         
+            $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,        
+                          "Checking Mirror Mark Results",/,,/);                 
+            $Vunits:=#("VUnits",#L2_Inx);                                       
+            $VBp:=#("Vbp",#L2_Inx);                                             
+            $Vunitser:=#("VUnitser",#L2_Inx);                                   
+            $VBpser:=#("Vbpser",#L2_Inx);                                       
+            $List:=$$VUnits&","&$$VBp&",";                                      
+            $Serlist:=$$VUnitser&","&$$VbpSer;                                  
+            If #BCV_Debug.global=1 then                                         
+               Log(Site,"DBG",#("Mirror ",$fam,,$list));                        
+            DO Begin  %Do Mirror Mark                                           
+               #inx:=0;$Result:=Empty;                                          
+               If Myself(Checkpoint) < 800+#L2_inx*10 Then                      
+               While $Unit:=$list.Copy(#inx.Sum(1)) Neq Empty Do                
+               Begin                                                            
+                  If $msg:=Keyin($KM:=#("MIRROR MARK + PK",$Unit," SERIAL=",    
+                       $Serlist.Copy(#inx))) Neq "PK"&$Unit&                    
+                          " WILL BE MARKED" Then                                
+                     $Result.Insert("PK"&$Unit&":"&$Msg,/);                     
+                  Log(Site,"Bcv",$KM);                                          
+                  Log(Site,"Bcv",$Msg);                                         
+               End;                                                             
+               Wait(.1); %Avoid proc loop                                       
+               If $Result Neq Empty Then                                        
+               Begin                                                            
+                  Call Do "BCV_PAUSE" "HD=Mirror Mark errors Family:"&$Fam&     
+                          "\ERR=Mirror Mark Errors"&                            
+                          "\BODY=$Result";                                      
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End                                                              
+            End Until $Err=Empty;  %Do Mirror Mark                              
+            Checkpoint(800+#l2inx*10);  %Mirror Mark                            
+         End; %mirror mark checkpoint                                           
+         If MySelf(Checkpoint) < 800+#L2_inx*10 +1 Then                         
+         DO Begin %Label error loop                                             
+            #Lim:=0;                                                            
+            Do Begin                                                            
+               $L2_Missed:=Empty;                                               
+               #inx:=0;                                                         
+               $L2_Objects :=objects(per=pk-:String(unitno,*)=#{$list}          
+                  and LabelError);                                              
+               While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO                 
+                  If Not $L2_Objects.Includes($tmp) Then                        
+                    $L2_Missed.Insert($Tmp);                                    
+               If $L2_Missed neq Empty Then                                     
+               Begin                                                            
+                  Call Do "BCV_Scroll" "Not yet marked:PK "&$L2_Missed;         
+                  Wait(#WaitSecs);                                              
+               End;                                                             
+            End Until $L2_Missed=Empty or #lim.sum(1) > 3;                      
+            If $L2_Missed Neq Empty Then                                        
+            Begin                                                               
+               Call Do "BCV_PAUSE" "HD=Mirror Mark Missing Units Family:"&      
+                  $Fam&                                                         
+                       "\ERR=Mirror Mark Missing"&                              
+                       "\BODY=$L2_Missed";                                      
+              If $err={"HOME","ABORT","QUIT"} Then Exit;                        
+            End                                                                 
+         End Until $Err=Empty; %Label error loop                                
+         Checkpoint(800+#L2_inx*10 +2);                                         
+         If Myself(Checkpoint) < 800+#L2_inx*10 +3 Then                         
+         Do Begin  %Status Check                                                
+            #lim:=0;                                                            
+            Do Begin                                                            
+               #inx:=0; $Result:=Empty;                                         
+               While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO                 
+               Begin                                                            
+                  $l2_OL:=Keyin("OL PK"&$Tmp);                                  
+                  If $L2_Status:=$L2_OL.Cut("IMPORT STATUS:=",/) = Empty Then   
+                     $L2_Status:="No import status";                            
+                  $L2_TargetStatus:="IMPORT STATUS: MARKED BCV (PENDING ["&     
+                     $SerList.Copy(#inx)&"])";                                  
+                  If #BCV_Debug.Global=1 Then                                   
+                     Log(Site,"DBG","PK"&$tmp&" Target Status:"&                
+                        $L2_TargetStatus);                                      
+                  If $L2_Status Neq $L2_TargetStatus Then                       
+                  Begin                                                         
+                     $Result.Insert($msg:="PK "&$Tmp&" "&$L2_Status,/);         
+                     Call DO "BCV_SCROLL" $msg;                                 
+                     Log(Site,"BCV",$Msg);                                      
+                 End;                                                           
+               End;                                                             
+            End Until $Result=Empty or #lim.sum(1) > 3;                         
+            If $Result Neq Empty Then                                           
+            Begin                                                               
+               Call Do "BCV_PAUSE" "HD=Mirror Mark Status Family:"&$Fam&        
+                       "\ERR=Mirror Mark Status Errors"&                        
+                       "\BODY=$Result";                                         
+               If $err={"HOME","ABORT","QUIT"} Then Exit;                       
+            End                                                                 
+         End Until $Err=Empty;  %Do Status Check                                
+         Checkpoint(800+#L2_inx*10 +3);                                         
+      End; %Mirror mark family loop                                             
+   End; %mirror mark block                                                      
+      $L2_Msg:="Mirror Mark "&$L2_Families&" finished";                         
+      Log(Site,"Bcv",$L2_msg);                                                  
+      Call DO "BCV_SCROLL" $L2_MSg;                                             
+      Checkpoint(899);                                                          
+   %Mirror import                                                               
+   If Myself(Checkpoint) < 999 Then                                             
+   Begin %Mirror import  block                                                  
+      #L2_inx:=0;                                                               
+      While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                
+      Begin %Mirror Import FAm Loop                                             
+         If Myself(Checkpoint) < 900+#L2_inx*10 +1 Then                         
+         Begin  %Mirror import loop                                             
+            $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,        
+                          "Checking Mirror Import Results",/,,/);               
+            $Vunits:=#("VUnits",#L2_Inx);                                       
+            $VBp:=#("Vbp",#L2_Inx);                                             
+            $List:=$$VBp;                                                       
+            If #BCV_Debug.global=1 then                                         
+               Log(Site,"DBG",#("Mirror Import",,$fam,,$list));                 
+            DO Begin                                                            
+               #inx:=0;$Result:=Empty;                                          
+               If Myself(Checkpoint) < 900+#L2_inx*10 Then                      
+               While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                
+               Begin                                                            
+                  $L2_TmpFam:=$Unit.per(Label);                                 
+                  If Not $L2_importFams.Includes($L2_TmpFam) Then               
+                     $L2_importFams.Insert($L2_TmpFam);                         
+                  If $msg:=Keyin($KM:=#("MIRROR IMPORT PK",$Unit," NAME=",      
+                     $L2_TmpFam)) Neq "PK"&$unit&" WILL BE IMPORTED" Then       
+                     $Result.Insert("PK"&$Unit&":"&$Msg,/);                     
+                  Log(Site,"Bcv",$KM);                                          
+                  Log(Site,"Bcv",$Msg);                                         
+               End;                                                             
+               Wait(.1);  %Avoid proc loop                                      
+               If $Result Neq Empty Then                                        
+               Begin                                                            
+                  Call Do "BCV_PAUSE" "HD=Mirror Import errors on "&$Fam&       
+                        "\ERR=Mirror Import Errors"&                            
+                        "\BODY=$Result";                                        
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End;                                                             
+            End Until $Err=Empty;                                               
+         End; %Mirror Import Loop                                               
+         Checkpoint(900+#L2_inx*10 +1);                                         
+         If Myself(Checkpoint) <  900+#L2_inx*10 +2 Then                        
+         Begin  %Mirror Import PK check                                         
+            DO Begin                                                            
+               #Lim:=0;                                                         
+               Do Begin                                                         
+                  $L2_Objects :=objects(per=pk-:String(unitno,*)=#{$list}       
+                     and LabelError);                                           
+                  $L2_Missed:=Empty;                                            
+                  #inx:=0;                                                      
+                  While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO              
+                     If $L2_Objects.Includes($tmp) Then                         
+                       $L2_Missed.Insert($Tmp);                                 
+                  If $L2_Missed neq Empty Then                                  
+                  Begin                                                         
+                     Call Do "BCV_Scroll" "Not yet Imported:PK "&$L2_Missed;    
+                     Wait(#WaitSecs);                                           
+                  End;                                                          
+               End Until $L2_Missed=Empty or #lim.sum(1) > 3;                   
+               If $L2_Missed Neq Empty Then                                     
+               Begin                                                            
+                  Call Do "BCV_PAUSE" "HD=Mirror Import checks on "&$Fam&       
+                     "\ERR=Mirror Import Errors"&                               
+                     "\BODY=$L2_Missed";                                        
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End;                                                             
+            End Until $Err=Empty;                                               
+            Checkpoint(900+#L2_inx*10+2);                                       
+         End; %Mirror import PK check                                           
+         If Myself(Checkpoint) <  900+#L2_inx*10 +3 Then                        
+         Begin  %Mirror Import OL check                                         
+            DO Begin                                                            
+               #lim:=0;                                                         
+               Do Begin                                                         
+                  #inx:=0; $Result:=Empty;                                      
+                  While $tmp:=$list.COpy(#inx.sum(1)) Neq Empty DO              
+                  Begin                                                         
+                     $l2_OL:=Keyin("OL PK"&$Tmp);                               
+                     If $L2_Status:=$L2_OL.Cut("IMPORT STATUS:=",/) = Empty Then
+                        $L2_Status:="No import status";                         
+                     $L2_TargetStatus:="IMPORT STATUS: IMPORTED BCV";           
+                     If #BCV_Debug.Global=1 Then                                
+                        Log(Site,"DBG","PK"&$tmp&" Target Status:"&             
+                          $L2_TargetStatus);                                    
+                     If $L2_Status Neq $L2_TargetStatus Then                    
+                     Begin                                                      
+                        $Result.Insert($msg:="PK "&$Tmp&" "&$L2_Status,/);      
+                        Call DO "BCV_SCROLL" $msg;                              
+                        Log(Site,"BCV",$Msg);                                   
+                    End;                                                        
+                  End;                                                          
+               End Until $Result=Empty or #lim.sum(1) > 3;                      
+               If $Result eql Empty Then                                        
+                  $SHowList:=$REsult                                            
+               Else                                                             
+                  $ShowList:="Not Imported:"&$L2_Missed;                        
+               If $Result Neq Empty Then                                        
+               Begin                                                            
+               Call Do "BCV_PAUSE" "HD=Mirror Import status errors on "&$Fam&   
+                     "\ERR=Mirror Import Errors"&                               
+                     "\BODY=$ShowList";                                         
+               If $err={"HOME","ABORT","QUIT"} Then Exit;                       
+               End;                                                             
+            End Until $Result=Empty;                                            
+         Checkpoint(900+#L2_inx*10 +3);                                         
+         End; %Mirror Import OL check                                           
+      End; %mirror import loop                                                  
+      $L2_Msg:="Mirror import "&$L2_Families&" finished";                       
+      Log(Site,"Bcv",$L2_msg);                                                  
+      Call DO "BCV_SCROLL" $L2_MSg;                                             
+      %Clear waiting entries                                                    
+      #L2_inx:=0;                                                               
+      $L2_waitmsg:="FAMILIES WERE IN USE BY ANOTHER HOST";                      
+      If #BCV_Debug.Global=1 Then                                               
+        Log(Site,"DBG","Waiting MSG:"&$L2_WaitMsg);                             
+      ODT("TT VIA 0 ONCE (Mx=W:Display Incl $L2_WaitMsg) " &                    
+         'DO (ODT(Mixnumber," OK"))');                                          
+      Checkpoint(999)                                                           
+   End; %Mirror import                                                          
+   If Myself(CheckPoint) < 1099 Then                                            
+   Begin %wait for DMS                                                          
+      $L2_Msg:="Waiting for DMS Recovery completion";                           
+      Call Do "BCV_Pause" "HD="&$L2_Msg&                                        
+                          "\BODY=Enter Continue when ready to proceed";         
+      If $err={"HOME","ABORT","QUIT"} Then Exit;                                
+      CheckPoint(1099);                                                         
+   End; %Wait for DMS                                                           
+   %Relabel                                                                     
+   If Myself(CheckPoint) < 1199 Then                                            
+   Begin %Relabel                                                               
+      #L2_inx:=0;                                                               
+      While $fam:=$L2_Families.Copy(#L2_inx.Sum(1)) Neq Empty DO                
+      If Myself(Checkpoint) < 1100+#L2_inx*10 +1 Then                           
+      Begin  %LB loop                                                           
+         $BCV_First5:=#($L2_ScreenHead,/,"Processing family ",$fam,/,           
+                       "Checking LB Results",/,,/);                             
+         $Vunits:=#("VUnits",#L2_Inx);                                          
+         $VBp:=#("Vbp",#L2_Inx);                                                
+         $List:=$$VUnits&","&$$VBp;                                             
+         If #BCV_Debug.global=1 then                                            
+            Log(Site,"DBG",#("LB ",$fam,,$list));                               
+         DO Begin                                                               
+            #inx:=0;$Result:=Empty;                                             
+            If Myself(Checkpoint) < 1100+#L2_inx*10 Then                        
+            While $Unit:=$list.Copy(#inx.SUm(1)) Neq Empty Do                   
+            Begin                                                               
+               If $msg:=Keyin($KM:=#("LB PK",$Unit," NAME=",$FAm," OLDNAME=",   
+                    $Unit.Per(LABEL))) Neq "PK"&$unit&" WILL BE LABELLED" Then  
+                  $Result.Insert("PK"&$Unit&":"&$Msg,/);                        
+               Log(Site,"Bcv",$KM);                                             
+               Log(Site,"Bcv",$Msg);                                            
+            End;                                                                
+            Wait(.1);  %avoid proc loop                                         
+            Checkpoint(1100+#L2_inx*10);                                        
+            DO Begin                                                            
+               #lim:=0;                                                         
+               Do Begin                                                         
+                  $L2_Missed:=Empty;                                            
+                  #inx:=0;                                                      
+                  $L2_Objects :=objects(per=pk:String(unitno,*)=#{$list}        
+                     and LABEL = $Fam);                                         
+                  While $tmp:=$list.Copy(#inx.sum(1)) Neq Empty DO              
+                     If Not $L2_Objects.Includes($tmp) Then                     
+                       $L2_Missed.Insert($Tmp);                                 
+                  If $L2_Missed neq Empty Then                                  
+                  Begin                                                         
+                     Call Do "BCV_Scroll" "Not yet Labeled:PK "&$L2_Missed;     
+                     Wait(#WaitSecs);                                           
+                  End;                                                          
+               End Until $L2_Missed=Empty or #lim.sum(1) > 5;                   
+               If $Result Neq Empty Or $L2_Missed Neq Empty Then                
+               Begin                                                            
+                  If $Result Neq Empty Then                                     
+                  Begin                                                         
+                     $BCV_ERRORS.Global.CUT($FAM&":=","\");                     
+                     $BCV_ERRORS.Global.Insert(#($Hd,/,                         
+                        $Result),"\");                                          
+                     $Hd:=#($FAM,":LB Errors ",Timedate(Display));              
+                     $SHowList:=$REsult;                                        
+                  End                                                           
+                  Else                                                          
+                     $ShowList:="Not LB:"&$L2_Missed;                           
+                  Call Do "BCV_PAUSE" "HD=LB errors on "&$Fam&                  
+                     "\ERR=LB Errors"&                                          
+                     "\BODY=$ShowList";                                         
+                  If $err={"HOME","ABORT","QUIT"} Then Exit;                    
+               End                                                              
+               Else                                                             
+                  Wait(.1);  %Avoide proc loop                                  
+            End Until $err=Empty;                                               
+         End Until $Result=Empty and $L2_Missed=Empty;                          
+         Checkpoint(1100+#L2_inx*10 +1);                                        
+      End; %LB loop                                                             
+      $L2_Msg:="LB "&$L2_Families&" finished";                                  
+      Log(Site,"Bcv",$L2_msg);                                                  
+      Call DO "BCV_SCROLL" $L2_MSg;                                             
+      $Err:="Successful Refresh for "&$L2_Families;                             
+      Log(Site,"Bcv",$err);                                                     
+      Call DO "BCV_SCROLL" $err;                                                
+      If #BCV_Debug.global > 0 Then                                             
+         Log(Site,"DBG",#("Clearing checkpoint ",Myself(Checkpoint)));          
+      Checkpoint(0);                                                            
+   End;                                                                         
+End; %L2_CMD=Start                                                              
+                                                                                
+\                                                                               
+   Define * ODTSEQUENCE BCV_OPEN(MSG):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_OPEN ODTS                                                            %%  
+%% ~~~~~~~~~~~~~                                                            %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+If #Bcv_Debug.Global=1 Then                                                     
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp&" "&Text);                                                           
+If $Fam:=Upper(trim(text)) = Empty Then                                         
+  $Err:="No familyname specified";                                              
+$open:=Objects(Per=PK:Label=$Fam and #$fam.Accum(opencount)>0);                 
+$Result:=Empty;                                                                 
+If $open = Empty Then                                                           
+Begin                                                                           
+   If Not "," IsIn Myself(action) Then $Result:="No files open";                
+End                                                                             
+Else                                                                            
+WHile $U:=$open.split Neq Empty Do                                              
+Begin                                                                           
+   $Result.Insert(#("PK ",$u," Open count:",$U.per(Opencount)),/);              
+   TT(#("EV (SHOWOPEN:TRUE) DO BCV_OPEN_FILES ",$FAM," #",                      
+        $U.PER(Familyindex)));                                                  
+End;                                                                            
+If Not "," IsIn MySelf(ACTION) Then Show($Result);                              
+$BCV_ERRORS.Global.CUT($FAM&":=","\");                                          
+$BCV_ERRORS.Global.Insert(#($FAM,":",#$Fam,,"Open Files ",Timedate(Display),/,  
+   $Result),"\");                                                               
+                                                                                
+\                                                                               
+   Define * ODTSEQUENCE BCV_OPEN_FILES(SHOWOPEN):                               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_OPEN_FILES ODTS                                                      %%  
+%% ~~~~~~~~~~~~~~~~~~~                                                      %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+$Result.Insert(Title,/);                                                        
+If $MxL:=USERMIXLIST Neq Empty Then                                             
+Begin                                                                           
+   $Result.Insert("  Used by",/);                                               
+   While $Mx:=$Mxl.SPlit Neq Empty DO                                           
+      $Result.Insert(#("  ",$Mx 5,$Mx.MX(Name)),/);                             
+End;                                                                            
+\                                                                               
+   Define * ODTSEQUENCE BCV_MAP_PK(MSG) Version 2:                              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_MAP_PK ODTS                                                          %%  
+%% ~~~~~~~~~~~~~~~                                                          %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%% VERSION 02 - Check packs are BCV capable         GXG NOV '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+   If #Bcv_Debug.Global=1 Then                                                  
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp&" "&Text);                                                           
+$err:=Empty;                                                                    
+If $Param:=Upper(Trim(Text))= Empty Then                                        
+   $Err:="Packname must be supplied"                                            
+Else                                                                            
+Begin                                                                           
+   #bad_bcv:=0;                                                                 
+   TT(#('EV (PER=PK:LABEL="',$param,'") DO BCV_MAP_PK_BLD SORT(-FAMILYINDEX)'));
+   If #Bad_bcv =1 and not #bcv_ignore.global=1 Then  %allow testing at metalogic
+      $Err:= "at least one pack has bad import status, see log for details"     
+   Else                                                                         
+   If $map=Empty Then                                                           
+      $Err:="No pack "&$param&" found.";                                        
+End;                                                                            
+If  not "," isin Myself(action) Then  %not call do                              
+   If $err=Empty Then                                                           
+      Show($Map)                                                                
+   Else                                                                         
+      Show("Error:",$Err);                                                      
+If $Err=Empty Then                                                              
+   log(site,"Bcv",$fam&" Remapped")                                             
+Else                                                                            
+   log(site,"Bcv",$fam&" Remap failed");                                        
+\                                                                               
+   Define * ODTSEQUENCE BCV_MAP_PK_BLD(PER) Version 2:                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_MAP_PK_BLD ODTS                                                      %%  
+%% ~~~~~~~~~~~~~~~~~~~                                                      %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%% VERSION 02 - Check packs are BCV capable         GXG NOV '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+$map.Insert($tmp:=                                                              
+   #("UNIT=",Unitno,",INDEX=",familyindex,",SERIAL=",Serialno),/);              
+If Mirrorimportstate neq 3 Then                                                 
+Begin                                                                           
+   #bad_bcv:=1;                                                                 
+   Log(site,"BCV",#("PK ",Unitno,,"Bad import status:",Mirrorimportstate));     
+End;                                                                            
+If #BCV_DEBUG.Global = 1 Then Log(Site,"DBG",#($fam,":",$Tmp));                 
+\                                                                               
+   Define * ODTS BCV_PAUSE(msg) Version 2:                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_PAUSE ODTS                                                           %%  
+%% ~~~~~~~~~~~~~~                                                           %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%% Version 02 - Better display of errors            GXG NOV '17  %%  
+%%              Only show Recheck when relevant                             %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%Called by BCV_Start                                                            
+   Clear("L3_");                                                                
+#L3_Mylines:=14;  %number of lines if nothing to show;                          
+$L3_Param:=Trim(text);  %heading for MENU_SHOW                                  
+$L3_param.Distribute("\",nameeqlvalue,"L3_");                                   
+%Sets up $L3_HD and optional $L3_Body and $L3_Err                               
+%Count lines in $L3_Body;                                                       
+If $L3_Body HdIs "$" Then                                                       
+Begin                                                                           
+   $L3_body:=Drop($L3_Body,1);                                                  
+   $L3_Body:=$$L3_Body;                                                         
+End;                                                                            
+While $L3_Body.Copy(#L3_BodyLines.Sum(1),/) Neq Empty and $L3_Body Neq Empty DO;
+#L3_BodyLines.Sum(-1);                                                          
+If #L3_BodyLines > Myself(PageSize)-#L3_MyLines Then                            
+   $L3_Body:=#(" ",/,"Enter MSG to see detail of errors");                      
+Log(Site,"Bcv","Paused:"&$L3_Hd);                                               
+Call DO "BCV_Scroll" "Paused:"&$L3_Hd;                                          
+If #Bcv_Debug.Global=1 Then                                                     
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp&" "&$L3_param);                                                      
+If Not "," Isin Myself(action) Then                                             
+   Abort("This ODTS is a subroutine and cannot be started with a TT DO");       
+$L3_Cmds:="Help:BCV_Pause_HLP,Msg,Log:BCV_LOG,Recheck,Continue,HOme,Abort";     
+Call DO "MENU_CMD_LIST" "l3_Cmds,l3_CmdList";                                   
+$l3_Act:=Empty;                                                                 
+$l3__OldInput:=Empty;                                                           
+$L3_ScreenHead:="BCV Pause";                                                    
+Call DO "MENU_PadHeading" "L3_"; %Fixes Up $L3_ScreenHead                       
+$BCV_ERRORS.Global.CUT($FAM&":=","\");                                          
+$BCV_ERRORS.Global.Insert(#($L3_HD,,                                            
+   Timedate(Display),/,$Result),"\");                                           
+While True Do                                                                   
+Begin                                                                           
+   $L3_Fields:=$L3__OldInput;                                                   
+   $Err:=$l3_err;                                                               
+   SHOW($L3_ScreenHead,/,$hi,$L3_hd,#[ETB],/,                                   
+     "ACTION #[US]",$L3_Act 20,"#[RS]",/,                                       
+     $Hi,$L3_CmdList,/," ",/,                                                   
+     $HI,"Help    #[ETB]Give help for this screen.",/,                          
+     $Hi,"Msg     #[ETB]Show most recent errors.",/,                            
+     $Hi,"Log     #[ETB]View BCV Log",/,                                        
+     $Hi,"Recheck #[ETB]Check again",/,                                         
+     $Hi,"Continue#[ETB]Continue process",/,                                    
+     $Hi,"HOme    #[ETB]Return to Home screen",/,                               
+     $Hi,"Abort   #[ETB]Quit and close window.",/,,/,$L3_Body,/,                
+     $ErrHi,$Err);                                                              
+   #SpecOne:=6;  %First Specify row                                             
+   Call Do "menu_getfield" "L3_ACT 20 T 4,10"; %Calls input                     
+   $Err:=Empty;                                                                 
+   If $L3_ACT = "SPCFY" Then                                                    
+   Begin                                                                        
+      If #L3_Spec:=#L3__Row - #SpecOne >6 And #SecUser=0 Then                   
+         #L3_Spec:=#L3_Spec+1;                                                  
+      Case #L3_Spec Of                                                          
+      Begin                                                                     
+      0: $L3_Act:="HELP"                                                        
+      1: $L3_Act:="MSG"                                                         
+      2: $L3_Act:="LOG"                                                         
+      3: $L3_Act:="RECHECK"                                                     
+      4: $L3_Act:="CONTINUE"                                                    
+      5: $L3_Act:="HOME"                                                        
+      6: $L3_Act:="ABORT"                                                       
+   Else: $Err:=#("Invalid row ",#L3__Row,,"for specify");                       
+      End; %case                                                                
+   End;                                                                         
+   Call Do "Menu_Parse" "L3_Act,L3_Cmds";                                       
+   If $MenuOdts Neq Empty Then                                                  
+   Begin                                                                        
+      If $MenuODTS Neq "ERROR" Then                                             
+      Begin                                                                     
+         Call Do $MenuODts;                                                     
+         If $Cfg_CLear="TRUE" Then                                              
+            $L3_Act:=Empty;                                                     
+      End;                                                                      
+   End                                                                          
+   Else                                                                         
+   DO Begin                                                                     
+   #Redo:=0;                                                                    
+   CASE $L3_Act OF                                                              
+   Begin                                                                        
+   Else:                                                                        
+         $Err:="Bad case returned:"&$MenuAct;                                   
+   "HOME":$Err:="HOME";Exit;                                                    
+   "ABORT":                                                                     
+      Log(Site,"Bcv","Aborted");                                                
+      $Err:="ABORT";                                                            
+      EXIT;                                                                     
+   "CONTINUE":                                                                  
+         $Err:=Empty;                                                           
+         If $L3_Err Neq Empty Then                                              
+         Begin                                                                  
+            $MCMsg:=#($L3_Err,/,                                                
+                      "Enter OK to confirm continuing with reported errors.");  
+            $COnf_ACT:=Empty;                                                   
+            Call DO "MENU_CONFIRM";                                             
+            If $COnf_ACT Neq "OK" Then                                          
+               $Err:="Will not continue"                                        
+            Else                                                                
+            Begin                                                               
+               Log(Site,"Bcv","Continue entered, ignoring errors");             
+               $L2_Missed:=$Err:=$Result:=Empty;                                
+            End;                                                                
+         End;                                                                   
+         If $Err =Empty Then                                                    
+         Begin                                                                  
+            SHOW(" #[FF]");  %leading space to cancel suppress response         
+            If #BCV_Debug=1 Then                                                
+            Log(Site,"Dbg",#("BCV_START_PAUSE Exit $Err:",$Err,,"$SHow_Act",    
+                $Show_Act));                                                    
+            Log(Site,"BCV","Continuing");                                       
+            Call DO "BCV_Scroll" "Continuing";                                  
+            EXIT;                                                               
+         End;                                                                   
+   "RECHECK":If $L3_err=Empty Then                                              
+                $Err:="No errors to recheck"                                    
+             Else                                                               
+             Begin                                                              
+                If #BCV_Debug=1 Then                                            
+                   Log(Site,"Dbg",#("BCV_START_PAUSE Exit $Err:",$Err,,         
+                   "$L3_act",$L3_Act));                                         
+                Log(Site,"Bcv","Rechecking");                                   
+                Call Do "BCV_SCROLL" "Rechecking";                              
+                $Err:="Recheck";                                                
+                EXIT;                                                           
+             End;                                                               
+   "MSG":                                                                       
+         $PGHd:="BCV Messages";$Hd:=Empty;                                      
+         $SHowList:=$BCV_MSG;                                                   
+         $Menu_Extra:="RECHECK,CONTINUE";                                       
+         Call Do "Menu_Show" $L3_HD;                                            
+         If ($L3_act:=$Err)={"RECHECK","CONTINUE"} Then                         
+            #Redo:=1;                                                           
+   End;                                                                         
+   End Until #Redo=0;                                                           
+   If $err={"HOME","ABORT","QUIT"} Then Exit;                                   
+End;                                                                            
+\                                                                               
+DEF + ODTS BCV_SCROLL(MSG):                                                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_SCROLL ODTS                                                          %%  
+%% ~~~~~~~~~~~~~~~                                                          %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION            GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+                                                                                
+$BCV_Scroll.Insert(Trim(text),Front,/);                                         
+$BCV_Scroll.Cut(#BCV_Scrlines,/);                                               
+$BCV_MSG.Insert(#(Take(dayname(dayinweek),3),,Time(Timeofday),,Trim(text)),     
+   Front,/);                                                                    
+Show($BCV_First5,/,$BCV_Scroll);                                                
+\                                                                               
+    Define * ODTSEQUENCE BCV_Menu_HLP Version 1:                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_Menu_HLP ODTS                                                        %%  
+%% ~~~~~~~~~~~~~~~~~                                                        %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+$Hd:="";                                                                        
+$PgHd:="BCV Menu Help";                                                         
+$ShowList:= #(                                                                  
+"This window allows safe access to BCV Refresh.",/,                             
+"The actions allowed are listed under the Action field.  The letters in",/,     
+"upper case are the minimum abbreviations for the action.",/,                   
+"On the main menu screen, you may spcfy on the line describing a command",/,    
+"to execute that command.",/,                                                   
+"Details:",/,                                                                   
+"Help",/,                                                                       
+"   Shows this screen",/,                                                       
+"Start",/,                                                                      
+"   Starts the Refresh for the specified families.",/,                          
+"REVert",/,                                                                     
+"   Reverses a previously aborted Refresh."                                     
+"Msg",/,                                                                        
+"   Shows the messages accumulated so far. ",/,                                 
+"Log",/,                                                                        
+"   Allows the BCV log to be searched",/,                                       
+"Quit",/,                                                                       
+"   Clears the screen and closes the window.",/,,/,                             
+"Fields (Only used for Start and Revert commands)",/,                           
+"Families",/,                                                                   
+"   A list of families to be processed.");                                      
+Call DO "Menu_Show" "Help";                                                     
+\                                                                               
+   Define * ODTSEQUENCE BCV_LOG_HLP Version 1:                                  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_LOG_HLP ODTS                                                         %%  
+%% ~~~~~~~~~~~~~~~~                                                         %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+$HD:="";                                                                        
+$PgHd:="BCV Log Help";                                                          
+$ShowList:=  #(                                                                 
+"The Log screen allows viewing of the BCV Log.  ",/,                            
+"Log entries may be filtered by Category and/or a find target.",/,              
+"The actions allowed are listed under the Action field.  The letters in",/,     
+"upper case are the minimum abbreviations for the action.",/,                   
+"Entries are sorted most recent first.  ",/,,/,                                 
+"Details:",/,                                                                   
+"Help",/,                                                                       
+"   Shows this screen.",/,                                                      
+"HOme ",/,                                                                      
+"   Returns you to the parent menu screen.",/,                                  
+"Return",/,                                                                     
+"   Returns you to the previous menu screen.",/,                                
+"Show ",/,                                                                      
+"   List all log entries matching the filters.",/,                              
+"Quit",/,                                                                       
+"   Quits and closes the window.",/,,/,                                         
+"Fields",/,                                                                     
+"Range",/                                                                       
+"   Optional field to limit the range of the log search.",/,                    
+"   If left Empty the the current time for 24 hours is used.",/,                
+"   If NEXT is entered the log request continues from the previous Request.",/, 
+"   A time/date range or a Skip/For specification may be used.",/,              
+"   Skip and/or For are followed by a number and then units of Minutes,Hours",/,
+"   or Days. Skip and For are always counted from the current time.",/,         
+"   A range could be <time>-<time> or <time and date> to <time and date> or ",/,
+"   any other plausible combination. - or to can be used in a range.",/,        
+"   Time may use a : between hours and minutes but it is not required.",/,      
+"The log is presented with most recent entries first, so To Time is",/,         
+"before From Time.",/,                                                          
+"      Skip 1          1 hour ago back to 25 hours ago",/,                      
+"      For 1           current time back to 1 hour ago",/,                      
+"      Skip 2 for 1    2 hours ago back to 3 hour ago",/,                       
+"      1100-0900       If The Current time is 1100 or later then",/,            
+"                          1100 today back to 0900 today",/,                    
+"                      Otherwise",/,                                            
+"                          1100 yesterday back to 0900 yesterday",/,            
+"      1100 To 1200    Searches 1100 today back to 1200 yesterday",/,           
+"      to 13:00        If the current time is after 1300 then",/,               
+"                         current time back to 1300",/,                         
+"                      otherwise current time to 1300 yesterday.",/,            
+"      13:00           If the current time is after 1300 then",/,               
+"                         1300 today for 24 hours",/,                           
+"                      otherwise 1300 yesterday for 24 hours",/,                
+"      1400 ",If SO(USDATES) Then "8/1/11" Else "1/8/11"," to 1400 ",           
+If SO(USDATES) Then "7/29/11" Else "29/7/11",/,                                 
+"                     Searches  1400 on Aug 1 back to 1400 on Jul 29",/,        
+"Category",/,                                                                   
+"   Mnemonic list to match the category shown after the time in the ",/,        
+"   Schedule. log. If left Empty then all categories will match.",/,            
+" Current categories",/,                                                        
+"   BCV Used for BCV log messages.",/,                                          
+"   DBG Used for debug entries.",/,                                             
+"Find",/,                                                                       
+"   If specified then only records containing this string will be reported."    
+"File",/,                                                                       
+"   If specified the output will be directed to the specified file.",/,         
+"Email",/,                                                                      
+"   If specified the output will be sent to the specified email address.",/,    
+"   If the File field is specified the file will be attached otherwise the",/,  
+"   report will be included in the body of the email.",/,,/,                    
+"If a Find or any categories are specified then spcfy on a line of the ",/,     
+"presented list will show the whole log but with the selected line in the",/,   
+"middle of the page.");                                                         
+Call Do "Menu_Show" "Help";                                                     
+\                                                                               
+     Define * ODTSEQUENCE BCV_Pause_HLP Version 1:                              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_Pause_HLP ODTS                                                       %%  
+%% ~~~~~~~~~~~~~~~~~~                                                       %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+$Hd:="";                                                                        
+$PgHd:="BCV Menu Help";                                                         
+$ShowList:= #(                                                                  
+"This window appears when operator input is required.",/,                       
+"The actions allowed are listed under the Action field.  The letters in",/,     
+"upper case are the minimum abbreviations for the action.",/,                   
+"On the main menu screen, you may spcfy on the line describing a command",/,    
+"to execute that command.",/,                                                   
+"Details:",/,                                                                   
+"Help",/,                                                                       
+"   Shows this screen",/,                                                       
+"Msg",/,                                                                        
+"   Shows the messages accumulated so far. ",/,                                 
+"Log",/,                                                                        
+"   Allows the BCV log to be searched",/,                                       
+"Recheck",/,                                                                    
+"   Retry the most recent check",                                               
+"Continue",/,                                                                   
+"   Continue running the script.",/,                                            
+"Home",/,                                                                       
+"   Return to the home screen",/,                                               
+"Abort",/,                                                                      
+"   Clears the screen and closes the window.",/,,/);                            
+Call DO "Menu_Show" "Pause Help";                                               
+\                                                                               
+DEF + ODTS BCV_SETTitle (MSg)version 2:                                         
+%Expects title and suffix list in parameter $Sets $Lg_Title,$L2Title1...2 etc   
+%One title if no suffix or one title for each suffix.                           
+$L2_SufList:=Upper(Trim(Text));                                                 
+If #Bcv_Debug.Global=1 Then                                                     
+   Log(Site,"DBG",(If "," IsIn $Tmp:=Myself(action) Then "CALL DO " Else "DO ")&
+      $tmp& " "&Text);                                                          
+$L2_File:=$L2_SufList.Split;                                                    
+$L2_FileUSer:=Empty;                                                            
+If Not $L2_File HdIs {"*","("} Then                                             
+   $L2_FileUser:="("&Term(LogOnUSer)&")"                                        
+Else                                                                            
+Begin                                                                           
+   If $L2_File HdIs "*" Then                                                    
+   Begin                                                                        
+      $L2_FileUser:="*";                                                        
+      $L2_File:=Drop($L2_File,1);                                               
+   End                                                                          
+   Else                                                                         
+      $L2_FileUser:=$L2_File.Split(")")&")";                                    
+End;                                                                            
+If Not " ON " IsIn $L2_File Then                                                
+Begin                                                                           
+   $L2_Fam:=Userdata(Term(LogOnUser),Family);                                   
+   If $L2_FAm HdIS "DISK =" Then                                                
+      $L2_FAm:=Head(Decat($L2_fam," = ",1),Not " ")                             
+   Else                                                                         
+      $L2_FAm:="DISK";                                                          
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   $L2_FAm:=Decat($L2_FIle," ON ",1);                                           
+   $L2_File:=Decat($L2_FIle," ON ",4);                                          
+End;                                                                            
+                                                                                
+%check priv                                                                     
+If $L2_FileUser Neq "("&Term(LogOnUSer)&")"                                     
+    And Not (Term(LogOnUser) = USE(USER ODTSECURITY) Or                         
+        Userdata(Term(LogOnUser),PU)) Then                                      
+   $Err:="User "&Term(LogOnUser)& " may not create files in directory "&        
+     $L2_FileUser                                                               
+Else                                                                            
+Begin                                                                           
+   If $L2_SufList=Empty Then                                                    
+   Begin                                                                        
+      $Lg_Title:=$l2_FileUSer&$L2_File&" ON " & $L2_Fam;                        
+      If #Bcv_Debug.Global=1 Then                                               
+         Log(Site,"DBG",Myself(action) &" Lg_Title:"&$Lg_Title);                
+      If PD($Lg_Title) Then                                                     
+      Begin                                                                     
+         $MCMsg:=#("File "&$Lg_Title&" already exists",/,                       
+            "Enter OK to confirm it should be replaced. ");                     
+         $COnf_ACT:=Empty;                                                      
+         Call DO "MENU_CONFIRM";                                                
+         If $COnf_ACT="OK" Then                                                 
+         Begin                                                                  
+            Wfl("REMOVE "&$Lg_Title);                                           
+            On Jobmessage DO;                                                   
+         End                                                                    
+         Else                                                                   
+            $Err:=$Lg_Title&" already exists";                                  
+      End                                                                       
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      #L2_SufCnt:=0;                                                            
+      If Fileids($L2_FILE)=1 Then                                               
+      Begin                                                                     
+         $L2_Pre:=Empty;                                                        
+         $L2_Post:=$L2_File;                                                    
+      End                                                                       
+      Else                                                                      
+      Begin                                                                     
+         $L2_Post:=TakeFileIDs($L2_File,-1);                                    
+         $L2_Pre:=DropFileIds($L2_File,-1)&"/";                                 
+      End;                                                                      
+      While $L2_Tmp:=$L2_SufLIst.Split Neq EMpty DO                             
+      Begin                                                                     
+         If #L2_SufCnt.Sum(1)=1 Then                                            
+            $L2_Var:="Lg_Title"                                                 
+         Else                                                                   
+            $L2_VAr:=#("Lg_Title",#L2_SufCnt-1);                                
+         $$L2_VAr:=$L2_FileUser&$L2_Pre&'"'&$L2_Post&"."&$L2_Tmp&'"'&           
+            " ON "&$L2_Fam;                                                     
+         If PD($$L2_var) Then                                                   
+         Begin                                                                  
+            $MCMsg:=#("File "&$$L2_var&" already exists",/,                     
+               "Enter OK to confirm it should be replaced. ");                  
+            $COnf_ACT:=Empty;                                                   
+            Call DO "MENU_CONFIRM";                                             
+            If $COnf_ACT="OK" Then                                              
+            Begin                                                               
+               Wfl("REMOVE "&$$L2_Var);                                         
+               On JobMessage DO;                                                
+            End                                                                 
+            Else                                                                
+               $Err:=$$L2_var&" already exists";                                
+         End;                                                                   
+      end;                                                                      
+   End;                                                                         
+End;                                                                            
+\                                                                               
+   Define * SITU BCV_LOGSCAN(METALOG=SITE) Version 2:                           
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_LOGSCAN SITU                                                         %%  
+%% ~~~~~~~~~~~~~~~~                                                         %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+   $lG_LogFInd = Empty Or $LG_LogFind IsIn Upper(LogText)                       
+\                                                                               
+   Define * ODTS BCV_LOGSCAN(Metalog) Version 1:                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%% BCV_LOGSCAN ODTS                                                         %%  
+%% ~~~~~~~~~~~~~~~~                                                         %%  
+%% Part of a suite of Metalogic-developed scripts to automate the process   %%  
+%% used to refresh data in the environment on with data from   %%  
+%% /on - via menu driven actions.                      %%  
+%%                                                                          %%  
+%% VERSION 01 - INITIAL IMPLEMENTATION              GXG AUG '17  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+If ExtraEntry Then                                                              
+Begin                                                                           
+   If #Cfg_LogF=1 Then                                                          
+      $ShowList.Insert(#(" " 4,"----",,DAteToText(#L2_ShDay,Default),,          
+         "----"),Front,/);                                                      
+      Show($lastline); %clear last line                                         
+   Exit;                                                                        
+End;                                                                            
+IF #l2_WIDTH=0 Then                                                             
+   #L2_width:=Myself(width);                                                    
+If Myself(entries)=1 Then                                                       
+Begin                                                                           
+   $ShowList:=Empty;                                                            
+   #L2_logday:=#l2_nextLine:=0;                                                 
+   If $L2_Target Neq Empty Then                                                 
+      #L2_TargetTime:=Decimal(Take($L2_Target,2))*3600 +                        
+                      Decimal(Take(Drop($L2_Target,3),2))*60+                   
+                      Decimal(Take(Drop($L2_Target,6),2))                       
+   Else                                                                         
+      #L2_Targettime:=0;                                                        
+   #L2_lastEntry:=Mcptime;                                                      
+End;                                                                            
+If McpTime-#l2_LastEntry > 2 Then                                               
+Begin                                                                           
+   SHow($LastLine,Myself(Entries),,"log entries found so far");                 
+   #L2_lastEntry:=Mcptime;                                                      
+End;                                                                            
+If #l2_SHday Neq LogDay Then                                                    
+Begin                                                                           
+   If #Cfg_LogF=0 Then                                                          
+      $ShowList.Insert(#(" " 4,"----",,DAteToText(#L2_ShDay:=LogDay,Default),,  
+         "----"),/)                                                             
+   Else                                                                         
+   If Myself(entries) Neq 1 Then                                                
+      $ShowList.Insert(#(" " 4,"----",,DAteToText(#L2_ShDay,Default),,          
+         "----"),Front,/);                                                      
+   #L2_ShDay:=LogDay;                                                           
+   #L2_NextLine.Sum(1);                                                         
+   If $L2_Target=Empty Then                                                     
+      $L2_DateList.Insert(#(#L2_NextLine,,LogDay));                             
+End;                                                                            
+#L2_NextLine.Sum(1);                                                            
+$L2_TmpEntry:=LogText;                                                          
+#L2_EntryLines:=1;                                                              
+If #L2_Targettime Neq 0 And #L2_Targettime = Logtime And                        
+   $L2_TmpEntry HdIs $L2_Target Then                                            
+Begin                                                                           
+   $L2_TmpEntry:=Take($L2_TmpEntry,8)&$Hi&Drop($L2_Tmpentry,9);                 
+   #L2_Target:=#L2_NextLine;                                                    
+End;                                                                            
+If Length($L2_TmpEntry) > #L2_Width Then                                        
+Begin                                                                           
+   $L2_MyEntry:=$L2_TmpEntry.Split(#L2_Width);                                  
+   While $L2_TmpEntry Neq Empty Do                                              
+   Begin                                                                        
+      #L2_NextLine.Sum(1);                                                      
+      #L2_EntryLines.Sum(1);                                                    
+      $L2_MyEntry.Insert(#(" " 9,$L2_TmpEntry.Split(#L2_Width-9)),/);           
+   End;                                                                         
+End                                                                             
+Else                                                                            
+   $L2_MyEntry:=$L2_TmpEntry;                                                   
+                                                                                
+If #Cfg_LogF=1 Then                                                             
+   $ShowList.Insert($L2_MyEntry,Front,/)                                        
+Else                                                                            
+   $ShowList.Insert($L2_MyEntry,/)                                              
+\                                                                               

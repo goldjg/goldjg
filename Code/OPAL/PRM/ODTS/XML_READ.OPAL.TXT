@@ -1,0 +1,25 @@
+TT DEFINE * ODTSEQUENCE XML_READ_ELEMENT(CUSTOM):                               
+   If (EVENTTYPE = "STARTELEMENT") AND (LOCALNAME=LIBPARAMETER) then            
+   Begin                                                                        
+     #Active:=1;                                                                
+     Exit;                                                                      
+   End;                                                                         
+   If (#Active ~= 1) then                                                       
+     Exit;                                                                      
+   If (EVENTTYPE = "ENDELEMENT") then                                           
+   Begin                                                                        
+     #Active:=0;                                                                
+     Exit;                                                                      
+   End;                                                                         
+   $AttValue:=TEXT;                                                             
+\                                                                               
+TT DEFINE * ODTS XML_GET_ELEMENT(MSG):                                          
+   %$Att:=MSGPARAM;                                                             
+   $Title:='(##REDACTED##)"RIF.XML" ON DISK';                                  
+   $TT:=TT("DO XML_READ_ELEMENT[XML(" & $Att & ") IN SL XMLCONTEXT] " & $Title);
+   Display("Result=",$TT,", ","$Att=",$AttValue);                               
+\                                                                               
+TT DEFINE * ODTS TEST_XML:                                                      
+   $Att:="Station";                                                             
+   CALL DO "XML_GET_ELEMENT";                                                   
+   Display($TT);                                                                

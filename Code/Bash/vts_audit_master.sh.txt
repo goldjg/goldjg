@@ -1,0 +1,74 @@
+#!bin/bash
+
+#master script for VTS audits
+#Fires off vts_audit.sh on ##REDACTED## and ##REDACTED##
+#Copies audit files from ##REDACTED## to ##REDACTED##
+#Compares Files to flag potential issues
+# FTPs file to ##REDACTED## for transfer to LAN
+
+#Version 01 - ##REDACTED## - Initial Imp				Jul 11	GXG
+#Version 02 - ##REDACTED## - Repoint FTP server to ##REDACTED## Apr 13  GXG
+#Version 03 - ##REDACTED## - Amend for new servers                  Jul 13  GXG
+#Version 03 - ##REDACTED## - ##REDACTED## migrates to ##REDACTED##		Jan 14  LW
+# set error handling
+set -e
+
+#Setup Variables
+DS=$(date +%Y%m%d)
+HN=`echo $(hostname) | awk -F'.' '{print $1}'`
+
+# Set home directory for script
+cd /home/bill
+
+echo "Starting Local Audit...";echo
+#start vts_audit script on local server
+sh vts_audit.sh
+
+echo "Local Audit Com##REDACTED##plete, Starting Remote Audit...";echo
+#start vts_audit script on remote server
+ssh ##REDACTED##@##REDACTED##sh /home/bill/vts_audit.sh
+
+echo "Remote Audit Complete, Copying Remote Audit to Local Server";echo
+#copy audit file from remote server
+scp ##REDACTED##@##REDACTED##:"LGEXEPVTSA-Audit_$DS.txt" /home/bill;echo
+
+echo "Copy Complete, Comparing Audits...";echo
+# use diff command to compare the audit files from local and remote
+# and pipe the output to grip, to strip out lines beginning with ---
+# then pipe to sed to replace lines that don't begin with < or >
+# with --- to group differences for same tape or group of tapes together
+# then output to a file
+diff "##REDACTED##-Audit_$DS.txt" "##REDACTED##-Audit_$DS.txt" | grep -v ^--- | sed 's/^[^<>]\+/---/' > "VTS_Full_Audit_$DS.txt"
+
+echo "Audit Process Complete, review VTS_Full_Audit_$DS.txt";echo
+
+echo "Zipping and transferring Audit report to Intel Batch Server";echo
+
+zip "VTS_Full_Audit_$DS.zip" "VTS_Full_Audit_$DS.txt";echo
+
+#set up variables for ftp
+HOST=##REDACTED##
+#lookup the ip address of the hostname using dig command because
+# ftp itself takes 15 seconds or so to do the lookup?!?!
+# pass dig output to grep, pass only lines with IN to awk and print the 5th
+# field of both line, then grep that output to show only the line beginning
+# with a number (phew!)
+IP=$(dig $HOST|grep "IN"|awk '{print $5}'|grep ^[0-9])
+USER=##REDACTED##
+PASS=##REDACTED##
+
+# issue FTP ftp command with the -inv switches.  -i turns off interactive prompting. -n Restrains FTP from attempting the auto-login feature. -v enables verbose and progress.
+ftp -inv $IP << EOF
+user $USER $PASS
+bin
+cd /VTS_IN
+put VTS_Full_Audit_$DS.zip
+quit
+EOF
+
+### Find out if ftp backup failed or not ###
+if [ "$?" = 0 ]; then
+ echo "VTS_Full_Audit_$DS.txt backup successful, transferred and local copy removed." >> vtsaudit.log
+else
+ echo "VTS_Full_Audit_$DS.txt backup failed, not transferred due to FTP Error $?  - file not removed." >> vtsaudit.log
+fi

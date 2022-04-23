@@ -1,0 +1,139 @@
+#!/bin/bash
+
+#
+# Version 01 - ##REDACTED## - initial implementation              Sep 08  
+# Version 02 - ##REDACTED## - Automation and Handle _v vs _V in Pool names
+#                                                             Aug 11  GXG
+# Version 03 - ##REDACTED## - Repoint FTP to ##REDACTED## Apr 13  GXG
+# Version 04 - ##REDACTED## - Repoint FTP to ##REDACTED## Jan 15  
+# Version 05 - ##REDACTED## - Part 2 - Repoing second tramnsfer to ##REDACTED##
+#			   from ##REDACTED##		      Mar 15 			
+#
+
+echo "Saving off files from previous run"
+cp bllibtapes.txt bllibtapes.txt.old
+cp tsmtapes.txt tsmtapes.txt.old
+cp missing_tsm.txt missing_tsm.txt.old
+cp extra_tsm.txt extra_tsm.txt.old
+rm bllibtapes.txt
+rm tsmtapes.txt
+
+#Set up variables for ftp
+HOST=##REDACTED##
+#lookup the ip address of the hostname using dig command because
+# ftp itself takes 15 seconds or so to do the lookup?!?!
+# pass dig output to grep, pass only lines with IN to awk and print the 5th
+# field of both line, then grep that output to show only the line beginning
+# with a number (phew!)
+IP=$(dig $HOST|grep "IN"|awk '{print $5}'|grep ^[0-9])
+USER=##REDACTED##
+PASS=##REDACTED##
+
+# issue FTP ftp command with the -inv switches. 
+# -i turns off interactive prompting. 
+# -n Restrains FTP from attempting the auto-login feature. 
+# -v enables verbose and progress.
+ftp -inv $IP &> /tmp/tsmftp.log << EOF
+user $USER $PASS
+asc
+cd /VTS_FROMMF
+get bllibreport.txt bllibreport.txt
+dele bllibreport.txt
+quit
+EOF
+
+### Find out if ftp backup failed or not ###
+
+if fgrep -c "226 Transfer complete" /tmp/tsmftp.log > 0; then
+ echo "bllibreport.txt successfully retrieved from Batch server"
+fi
+if fgrep -c "550 bllibreport.txt" /tmp/tsmftp.log > 0; then
+ echo "bllibreport.txt not resident on Batch server, quitting"
+ exit
+fi
+if fgrep -c "DELE" /tmp/tsmftp.log > 0; then
+ echo "bllibreport.txt successfully removed from Batch server"
+else
+ echo "bllibreport.txt not removed from Batch server"
+fi
+
+echo "Processing BLLIB file"
+# pipe contents of file through awk (Delimited by double quotes and 
+# pipe 2nd field of each line (serial number) through grep,
+# passing only lines beginning with numbers into bllibtapes.txt file
+cat bllibreport.txt | awk -F \" '{print $2}' | grep ^[0-9] > bllibtapes.txt
+
+echo "Running script to get list of tapes in TSM"
+sh gg_whatsintsm.sh > tapesintsm.txt
+
+echo "Processing list of tapes in TSM"
+# pipe contents of TSM output through awk with a delimiter of "/" and
+#  pipe 6th field (seriial number) to awk (default delimiter of space) and
+# pipe only the first field through to grep which will pipe only lines 
+# beginning with the number 5 through the sort command (ascending order then
+# uniq command to remove duplicates, then into file tsmtapes.txt
+cat tapesintsm.txt | awk -F "/" '{print $6}' | awk '{print $1}' | grep ^5 | sort | uniq > tsmtapes.txt
+
+echo "Comparing bllib and tsm files"
+# compare files, pipe through grep twice to remove non-numeric lines then 
+# match only lines beginning with < and pipe 2nd field of those lines
+# (the serial number only) into output file
+diff bllibtapes.txt tsmtapes.txt | grep -v ^--- | grep "<" | awk '{print $2}' > missing_tsm.txt
+
+# compare files, pipe through grep twice to remove non-numeric lines then
+# match only lines beginning with > and pipe 2nd field of those lines
+# (the serial number only) into output file
+diff bllibtapes.txt tsmtapes.txt | grep -v ^--- | grep ">" | awk '{print $2}' > extra_tsm.txt
+
+#count number of lines in each file and place in variables
+MISSING=`wc -l missing_tsm.txt|awk '{print $1}'`
+EXTRA=`wc -l extra_tsm.txt|awk '{print $1}'`
+
+echo "Tidying up files"
+rm tapesintsm.txt
+rm bllibreport.txt
+
+echo "Zipping up audit files and transferring to Batch server"
+
+#setup filename variable
+ZIPFN="$(hostname)_tsmaudit_$(date +%Y%m%d).zip"
+
+# create the archive using find to generate file list for zip command
+zip $ZIPFN -q /home/bill/missing_tsm.txt /home/bill/extra_tsm.txt
+
+#set up variables for ftp
+HOST=##REDACTED##
+#lookup the ip address of the hostname using dig command because
+# ftp itself takes 15 seconds or so to do the lookup?!?!
+# pass dig output to grep, pass only lines with IN to awk and print the 5th
+#of both lines, then grep that output to show only the line beginning
+# with a number (phew!)
+IP=$(dig $HOST|grep "IN"|awk '{print $5}'|grep ^[0-9])
+USER=##REDACTED##
+PASS=##REDACTED##
+
+# issue FTP ftp command with the -inv switches.
+#-i turns off interactive prompting.
+#-n Restrains FTP from attempting the auto-login feature.
+#-v enables verbose and progress.
+ftp -inv $IP &> /tmp/tsmftp2.log << EOF
+user $USER $PASS
+bin
+cd /VTS_IN
+put $ZIPFN
+quit
+EOF
+
+### Find out if ftp backup failed or not ###
+
+if fgrep -c "226 Transfer complete" /tmp/tsmftp2.log > 0; then
+ echo "$ZIPFN transferred successfully to Batch server"
+else
+ echo "$ZIPFN not transferred to Batch server, review /tmp/tsmftp2/log"
+fi
+
+echo "COMPLETE"
+
+echo "$MISSING tapes in BLLIB but missing from TSM - review missing_tsm.txt"
+echo "$EXTRA tapes in TSM but not in BLLIB - review extra_tsm.txt"
+

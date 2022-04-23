@@ -1,0 +1,257 @@
+<job id="DC1_Dev_No_Establish">
+<script language="VBScript">
+
+ option explicit
+ const VERIFY_ARG 		= "verify"
+ const VERIFY_VER_ARG 		= "verifyversion"
+ const POST_FAILBACK_ARG 	= "postfailback"
+ const SWAP_ARG 		= "swap"
+ const POSTSWAP_ARG 		= "postswap"
+
+ ''CHANGE THESE VALUES TO WHATEVER IS AT THE CUSTOMER:
+ const STORGRP 			= "/opt/emc/RDC1TO3_config_Dev__VMAX.map"
+ const PRODGRP 			= "/opt/emc/RDC1TO3_config_Dev__VMAX.map"
+ const DEVGRP 			= "/opt/emc/RDC1TO3_config_DR_Dev__VMAX.map"
+ const EMC_PATH 		= "/usr/symcli/bin/symrdf"
+ const MCP_FAM 			= "DISK"
+ const PLINK_PATH         	= """C:\Program Files (x86)\PuTTY\PLINK"" -ssh "
+ const PLINK_CMD          	= " -l svc__bca -i ""C:\PKI\##REDACTED##.PPK"" " 
+ const SSH_SERVER_IP         	= "##REDACTED##"
+
+ dim mixNumber
+ dim strout
+
+ mixNumber = 0
+ Log wscript.arguments(0), "Enter!"
+
+ Select case Lcase(wscript.arguments(0))
+ case VERIFY_ARG
+   Log "Case" , "Verify"
+   mixNumber = GetMixNumber(wscript.arguments, 0)
+   WriteWFLOut(Verify())
+ case VERIFY_VER_ARG
+   Log "Case" , "VerifyVersion"
+   mixNumber = GetMixNumber(wscript.arguments, 0)
+   WriteWFLOut(VerifyVersion())
+ case SWAP_ARG
+   mixNumber = GetMixNumber(wscript.arguments, 0)
+   strout = Swap()
+   WriteWFLOut (strout)
+ case POSTSWAP_ARG
+   mixNumber = GetMixNumber(wscript.arguments, 0)
+   strout = PostSwap()
+   WriteWFLOut (strout)
+ case Else
+    MixNumber = GetMixNumber(wscript.arguments, 0)
+    WriteWFLOut "Error- Invalid command " & wscript.arguments(0)
+ end select
+
+public function GetMixNumber(Arguments, NumArguments)
+  'if the count in the arguments in the array is the same as the number
+  'of arguments in the command, then they didn't specify the mix number
+
+  if Arguments.Count - 1 = NumArguments then
+   GetMixNumber = 2
+  else
+   'the mix number was specified.  Return the last argument.
+   GetMixNumber = Arguments(Arguments.Count -1)
+  end if
+ end function
+
+ public function VerifyVersion()
+
+        Log "In Function" , "VerifyVersion"
+        VerifyVersion= "OK VERSION CUSTOM 55.1 PSNEEDED"
+        exit function
+ end function
+
+
+ public function Verify()
+        dim result
+        dim wshShell
+        dim cmd
+	dim sshcmd
+        dim fs
+        result = 0
+        Set fs = CreateObject("Scripting.FileSystemObject")
+        Set wshShell = WScript.CreateObject("WScript.Shell")
+
+        Log "In Function" , "Verify"
+        sshcmd = EMC_PATH & " -f " & PRODGRP & " -sid ### -rdfg # verify -synchronized"
+        cmd = PLINK_PATH & SSH_SERVER_IP & PLINK_CMD & sshcmd
+
+	'MsgBox cmd
+
+	'are we verifying anything ?  
+
+        ' first time thru since a swap? then send PostSwap Needed
+        if fs.FileExists("C:\BC\Dev\swap.txt") then
+            fs.MoveFile "C:\BC\Dev\swap.txt", "C:\BC\Dev\postswap.txt"
+        
+            Verify = "OK PSNEEDED"
+            exit function
+        end if
+
+        ' if we have not run postswap then still send PostSwap Needed
+        if fs.FileExists("C:\BC\Dev\postswap.txt") then
+            Verify = "OK PSNEEDED"
+            exit function
+        end if  
+	
+	'MsgBox "running command now"	
+	result = WshShell.Run( cmd ,  , true)
+	Log result , "result"
+
+	'MsgBox "we ran the command"
+	select case result
+	    case 0 Verify="OK"
+	    case 1 Verify="SYMCLI device call failed"
+	    case 4 Verify="Some devices not Synchronized"
+	    case 5 Verify="No devices Synchronized"
+	    case else Verify="Check device state"
+	end select
+
+        exit function
+ end function
+
+
+ public function Swap()
+        dim result
+        dim wshShell
+        dim cmd
+	dim sshcmd
+        dim fs
+        Set fs = CreateObject("Scripting.FileSystemObject")
+
+        Log "In Function" , "Swap"
+        result = 0
+        result = SRDFSwap(PRODGRP)
+        if not result = 0 then
+                Swap = "ERROR - prodgrp not failed over.  Result: " & result
+                exit function
+        end if
+	
+        Log "Success" , "Swap"		
+        fs.CreateTextFile "C:\BC\Dev\swap.txt", true
+        Swap = "OK"
+
+ end function
+
+ public function Postswap()
+        dim fs
+	dim result
+        Set fs = CreateObject("Scripting.FileSystemObject")
+ 
+        Log "In Function" , "PostSwap"
+
+        if not fs.FileExists("C:\BC\Dev\postswap.txt") then
+                PostSwap = "OK"
+                exit function
+        end if
+
+        result = 0
+	result = SRDFSwap(DEVGRP)
+        if not result = 0 then
+                PostSwap = "ERROR - dev not failed over. Result: " & result
+                exit function
+        end if	
+
+        ' we asked for a postswap call and we've got it. delete postswap so we don't ask again
+        fs.DeleteFile "C:\BC\Dev\postswap.txt"
+        Log "Success" , "PostSwap"
+        PostSwap="OK POSTSWAPPED"
+ end function
+
+
+ public function SRDFSwap(GroupName)
+        dim cmd
+        dim result
+	dim sshcmd
+        dim wshShell
+        Set wshShell = WScript.CreateObject("WScript.Shell")
+
+        Log "EMC_PATH SWAP" , "SRDFSwap"
+        
+	'this is the command that we pass through putty to execute on the
+	'ssh server
+	'sshcmd = EMC_PATH & " -f " & GroupName & " -sid ### -rdfg # failover -establish -noprompt"
+	
+	'############################
+	'###### SPLIT THE DISKS #####
+	'############################
+	sshcmd = EMC_PATH & " -f " & GroupName & " -sid ### -rdfg # split -noprompt"
+
+	'this is the putty command:
+	cmd = PLINK_PATH & SSH_SERVER_IP & PLINK_CMD & sshcmd
+	Log cmd, ""
+
+    	result = WshShell.Run( cmd ,  , true)
+
+	'##############################
+	'##### SWAP PERSONALITIES #####
+	'##############################
+	sshcmd = EMC_PATH & " -f " & GroupName & " -sid ### -rdfg # swap -noprompt"
+
+	'this is the putty command:
+	cmd = PLINK_PATH & SSH_SERVER_IP & PLINK_CMD & sshcmd
+	Log cmd, ""
+
+    	result = WshShell.Run( cmd ,  , true)
+
+
+	'#################################
+	'##### ESTABLISH REPLICATION #####
+	'#################################
+	'sshcmd = EMC_PATH & " -f " & GroupName & " -sid ### -rdfg # establish -noprompt"
+
+	'this is the putty command:
+	'cmd = PLINK_PATH & SSH_SERVER_IP & PLINK_CMD & sshcmd
+	'Log cmd, ""
+
+    	'result = WshShell.Run( cmd ,  , true)
+
+    	SRDFSwap = result
+ end function
+
+
+
+public sub WriteWFLOut(StatusString)
+   dim maxStatusLen
+   dim fs
+   dim wflfile
+   
+   maxStatusLen = 45
+   if len(StatusString) > maxStatusLen then
+       StatusString = Mid(StatusString, 1, maxStatusLen)
+   end if 
+   
+   Log StatusString, "writewfl"
+                                    
+   Set fs = CreateObject("Scripting.FileSystemObject")             
+   Set wflfile= fs.CreateTextFile("C:\BC\Dev\OUTWFL", True)            
+   wflfile.writeline("BEGIN JOB SET/ASSISTANT/VAR " & _            
+   "(STRING MYFAM);")                                             
+   wflfile.writeline(" RUN *SYSTEM/BCMGR ON #MYFAM " & _           
+   "(""MODIFY " & MixNumber & """ &")                            
+   wflfile.writeline(" "" PCSTATUS = """"" & StatusString & _      
+   """"" DONTCONFIRM"");")                                         
+   wflfile.writeline(" REMOVE *SET/ASSISTANT/VAR ON #MYFAM;")      
+   wflfile.writeline("END JOB.")
+  
+ end sub 
+
+ public sub Log(FailString, HostName)
+  dim fs
+  dim logfile
+
+  Set fs = CreateObject("Scripting.FileSystemObject")
+  Set logfile= fs.OpenTextFile("C:\BC\Dev\Log.txt", 8, True)
+
+  logfile.write(FailString & vbcrlf & _
+   "       initiated by " & Hostname & " : " & Now & vbcrlf)
+
+  logfile.close()
+ end sub
+ 
+</script>
+</job>

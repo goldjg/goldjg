@@ -1,0 +1,36 @@
+﻿<Window x:Class="MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="U-Launch (Unisys Enterprise Management Tools Launcher)" 
+        Height="768" Width="1024" Background="SlateGray" 
+        BorderBrush="Black" BorderThickness="0" Foreground="White" 
+        WindowStyle="SingleBorderWindow" WindowStartupLocation="CenterScreen" ResizeMode="NoResize" AllowsTransparency="False">
+
+    <StackPanel Height="738" Orientation="Horizontal">
+        <GroupBox Width="220" Height="Auto" HorizontalAlignment="Left" Header="Tools By Category" Margin="5,0,0,5">
+            <Grid Name="ExpanderGrid" Background="SlateGray" Width="200" HorizontalAlignment="Left">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Expander Margin="5,5,0,0" Grid.Row="0" Background="GhostWhite" Header="Management Server Tools" Foreground="Black" 
+                  HorizontalAlignment="Left" IsExpanded="False" Name="expander1" VerticalAlignment="Top" Width="195">
+                    <StackPanel>
+                        <Button>BCA Windows Manager</Button>
+                        <Button>BCA Windows Monitor</Button>
+                        <Button>RealTime Monitor</Button>
+                    </StackPanel>
+                </Expander>
+                <Expander Margin="5,0,0,0" Grid.Row="1" Background="GhostWhite" Header="Scripts" Foreground="Black" HorizontalAlignment="Left" 
+                  IsExpanded="False" Name="expander2" VerticalAlignment="Top" Width="195" AllowDrop="False">
+                    <StackPanel>
+                        <Button>Active Directory Lookup</Button>
+                        <Button>User Audit</Button>
+                        <Button>Monthly Patch Review Scripts</Button>
+                    </StackPanel>
+                </Expander>
+            </Grid>
+        </GroupBox>
+        <GroupBox Width="780" Height="Auto" HorizontalAlignment="Left" Header="Tool View" Margin="5,0,0,5" />
+    </StackPanel>
+</Window>

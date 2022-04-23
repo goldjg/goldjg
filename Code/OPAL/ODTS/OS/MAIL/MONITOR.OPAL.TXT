@@ -1,0 +1,216 @@
+   DEFINE * ODTSEQUENCE OS_MAIL_MON:                                            
+%% Runs OS_MAILMON to check MAILLIB HEALTH. See doc for OS_MAILMON.             
+%%                                                                              
+                                                                                
+%% Declare and reset OLDQCOUNT and OLDRCOUNT on first run,                      
+%% variables shared with OS_MAILMON                                             
+%%                                                                              
+#OLDQCOUNT:=0;                                                                  
+#OLDRCOUNT:=0;                                                                  
+                                                                                
+%% Run OS_MAILMON every 60 seconds                                              
+%%                                                                              
+WHILE TRUE DO                                                                   
+BEGIN                                                                           
+   IF HostName NEQ ""                                                           
+   THEN                                                                         
+   BEGIN                                                                        
+      CALL DO "OS_MAILMON";                                                     
+   END;                                                                         
+   WAIT(60 SECONDS);                                                            
+END;                                                                            
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_MAILMON:                                             
+%%                                                                              
+%% DEFINED IN OS/ODTS/OS/MAIL/MONITOR                                           
+%%                                                                              
+%% Used to monitor health of mainframe email output from MAILLIB.               
+%%                                                                              
+%% Checks QUEUEDMSGS and REJECTEDMSGS attributes that have been added to        
+%% MAILLIB.                                                                     
+%%                                                                              
+%% When files queued or rejected, send email alert to Ops and check if          
+%% the mail sends successfully.                                                 
+%%                                                                              
+%% If mail sent ok, generate waiting entry to advise of queued/rejected mails   
+%% and to check Ops mailbox.                                                    
+%%                                                                              
+%% If mail failed, generate waiting entry to advice that MAILLIB has an error   
+%% and quote the error message.                                                 
+%%                                                                              
+%% When generating waiting entries, AX existing entries of that type to keep    
+%% ODT screen tidy.                                                             
+%%                                                                              
+%% Email alerts include a listing of all MAILLIB log entries of either:-        
+%%  - LOG category = QUE                                                        
+%%  - LOG category = ERR and contains text ":REJECTED"                          
+%%                                                                              
+%% VERSION 01  Initial Implementation     November 2008 GXG            
+%% VERSION 02  Update to use PD context instead of FLEX WFL,                    
+%%             detect SMTP family at runtime,                                   
+%%             track file count between runs (don't send repeat alerts),        
+%%             remove need to run under ##REDACTED##
+%%                                        December 2008 GXG            
+%% VERSION 03  Check for empty directory before count and exit if empty         
+%%             (Workaround for Supervisor WFL/SLOT Handling Bug)                
+%%                                        February 2009 GXG            
+%% VERSION 04  Rewrite to take advantage of MAILLIB attributes and              
+%%             improve monitoring/alerting. April 2010 GXG             
+%% VERSION 05  Use MAIL-prefixed SYSTEM context mail attributes for             
+%%             Supervisor 58.x compatibility    June 2015 GXG         
+#QCOUNT:=0;                                                                     
+#RCOUNT:=0;                                                                     
+                                                                                
+#QCOUNT:=MAILQUEUEDMSGS;                                                        
+#RCOUNT:=MAILREJECTEDMSGS;                                                      
+                                                                                
+%%                                                                              
+%% generate an alert if there are new queued emails                             
+                                                                                
+If #QCOUNT >= 1 then                                                            
+begin                                                                           
+   %% emails are queueing                                                       
+                                                                                
+   If #QCOUNT = #OLDQCOUNT Then                                                 
+                                                                                
+   %% Count hasn't changed since last check, drop out of the ODTS               
+   Begin                                                                        
+      Exit;                                                                     
+   End;                                                                         
+                                                                                
+%% Threshold breached, new QCOUNT value, carry on with alerts                   
+                                                                                
+%% Setup alert strings                                                          
+$qm1 := "Mails queued by MAILLIB, possible problem";                            
+$qo1 := "Emails being queued, check ICC MAILBOX alert";                         
+$qo2 := "MAILLIB unable to send emails - ";                                     
+$qa1 := "ALERT";                                                                
+$qa2 := "ERROR";                                                                
+$qmailtest := "####";                                                    
+$qmailprod := "####";                             
+$qlog := KEYIN("TT MAIL LOG QUE");                                              
+   %%                                                                           
+   %% send an email to alert that there are queued mail files                   
+   %%                                                                           
+   IF HostName = "####"                                                        
+   OR HostName = "####"                                                         
+   THEN                                                                         
+   $qmail := $qmailprod                                                         
+   ELSE $qmail := $qmailtest;                                                   
+%%                                                                              
+   #Q_RES:=MAIL("To:" & $qmail & ";From:MAILMON@" & HostName & ";" &            
+               "Subject:" & $qm1,                                               
+               #("Email Queue Status",/,"==================",/,                 
+               "Current count: ",#QCOUNT,/,"Previous count: ",#OLDQCOUNT,/,     
+               /,"** " & $qm1 & " **",/,/,$qlog,/,/,                            
+               "End of report"));                                               
+%% Update OLDQCOUNT with current count, so that it's available on next run.     
+%%                                                                              
+#OLDQCOUNT:=#QCOUNT;                                                            
+                                                                                
+%% Check if mail sent successfully, if not amend waiting entry text             
+%%                                                                              
+If #Q_RES <0 Then $qmsg := $qo2 & MailError(#Q_RES)                             
+Else $qmsg := $qo1;                                                             
+If #Q_RES <0 Then $qtype := $qa2                                                
+Else $qtype := $qa1;                                                            
+                                                                                
+$QWAIT:=#("OS/MAIL/MONITOR/QUEUE/",$qtype);                                     
+                                                                                
+%% AX any existing waiting entry of the type about to be produced               
+%%                                                                              
+IF COUNT(MX=W:NAME=$QWAIT                                                       
+            AND #QMIXNO:=MIXNUMBER>0) > 0 THEN                                  
+            ODT(#QMIXNO,"AX");                                                  
+            WAIT(2);                                                            
+IF COUNT(MX=W:NAME=$QWAIT) <= 0 THEN                                            
+   Begin                                                                        
+   %%                                                                           
+   %% produce a waiting entry to either alert on queued files or mail errors    
+   %%                                                                           
+      ODT(#('BEGIN JOB ',$QWAIT,';CLASS=9; STRING S; ',                         
+                      'S:=ACCEPT("',$qmsg,'");'));                              
+   End;                                                                         
+End;                                                                            
+                                                                                
+%%                                                                              
+%% generate an alert if the number of rejected emails is greater than 0         
+%%                                                                              
+                                                                                
+If #RCOUNT < #OLDRCOUNT Then                                                    
+   %% Count has decreased or MAILLIB has been restarted, drop out of odts       
+   Begin                                                                        
+      #OLDRCOUNT:=#RCOUNT;                                                      
+      Exit;                                                                     
+   End;                                                                         
+                                                                                
+                                                                                
+If #RCOUNT >= 1 then                                                            
+begin                                                                           
+   %% emails rejected                                                           
+   %%                                                                           
+   If #RCOUNT = #OLDRCOUNT Then                                                 
+   %% Count hasn't changed since last check, drop out of the ODTS               
+   Begin                                                                        
+      Exit;                                                                     
+   End;                                                                         
+                                                                                
+%% Increased RCOUNT value, carry on with alerts                                 
+%%                                                                              
+                                                                                
+%% Setup alert strings                                                          
+%%                                                                              
+$rm1 := "Email(s) rejected, check log output";                                  
+$ro1 := "Emails being rejected, check ICC Mailbox alert";                       
+$ro2 := "MAILLIB unable to send emails - ";                                     
+$ra1 := "ALERT";                                                                
+$ra2 := "ERROR";                                                                
+                                                                                
+$rmailtest := "####";                                                    
+$rmailprod := "####";                             
+$rlog := KEYIN("TT MAIL LOG ERR FIND :REJECTED");                               
+   %%                                                                           
+   %% send an email to alert that there are rejected mails                      
+   %%                                                                           
+   IF HostName = "####"                                                        
+   OR HostName = "####"                                                         
+   THEN                                                                         
+   $rmail := $rmailprod                                                         
+   ELSE $rmail := $rmailtest;                                                   
+%%                                                                              
+   #R_RES:=MAIL("To:" & $rmail & ";From:MAILMON@" & HostName & ";" &            
+                "Subject:" & $rm1,                                              
+                 #("Rejected Email Status",/,"=====================",/,         
+                 "Current count: ",#RCOUNT,/,"Previous count: ",#OLDRCOUNT,/,   
+                 /,"** " & $rm1 & " **",/,/,$rlog,/,/,                          
+                 "End of report"));                                             
+%% Update OLDRCOUNT with current count, so that it's available on next run.     
+%%                                                                              
+#OLDRCOUNT:=#RCOUNT;                                                            
+                                                                                
+%% Check if mail sent successfully, if not amend waiting entry text             
+%%                                                                              
+If #R_RES <0 Then $rmsg := $ro2 & MailError(#R_RES)                             
+Else $rmsg := $ro1;                                                             
+If #R_RES <0 Then $rtype := $ra2                                                
+Else $rtype := $ra1;                                                            
+                                                                                
+$RWAIT:=#("OS/MAIL/MONITOR/REJECT/",$rtype);                                    
+                                                                                
+%% AX any existing waiting entry of the type about to be produced               
+%%                                                                              
+IF COUNT(MX=W:NAME=$RWAIT                                                       
+            AND #RMIXNO:=MIXNUMBER>0) > 0 THEN                                  
+            ODT(#RMIXNO,"AX");                                                  
+            WAIT(2);                                                            
+IF COUNT(MX=W:NAME=$RWAIT) <= 0 THEN                                            
+   Begin                                                                        
+   %%                                                                           
+   %% produce a waiting entry to either alert on queued files or mail errors    
+   %%                                                                           
+      ODT(#('BEGIN JOB ',$RWAIT,';CLASS=9; STRING S; ',                         
+                      'S:=ACCEPT("',$rmsg,'");'));                              
+   End;                                                                         
+End;                                                                            
+                                                                                
+\                                                                               

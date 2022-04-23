@@ -1,0 +1,44 @@
+                                                                        
+ $ SET LISTDOLLAR LIST ERRLIST LINEINFO STACK NOXREFLIST                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  THIS PROGRAM GRABS MEMORY - NUMBER OF WORDS DETERMINED BY THE        
+%  PARAMETER HOWMUCH. IT THEN WAITS FOR HOWLONG SECONDS BEFORE ENDING.  
+%                                                                       
+%  N.B. USE WITH CARE AS THIS PROGRAM CAN DEGRADE THE SYSTEM.           
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PROCEDURE MEMORY(HOWLONG);                                              
+INTEGER HOWLONG;                                                        
+BEGIN                                                                   
+   DEFINE TYPE = V1.[4:5] #,                                            
+          SUBTYPE = V1.[12:8] #,                                        
+          AVAILMEM = SYSTEM_STAT[9] #;                                  
+                                                                        
+   ARRAY MEMORY[1:1000,1:1000];       % Array used to grab memory       
+   ARRAY SYSTEM_STAT[0:100];          % SYSTEMSTATUS info array         
+   REAL V1,V2;                        % SYSTEMSTATUS variables          
+   INTEGER CURRENTROW;                % Array index                     
+   STRING OUT_STRING;                 % String for ACCEPT (If failure)  
+   INTERRUPT HI;                      % Display message on interrupt    
+     DISPLAY("====> HAVE USED " CAT STRING((CURRENTROW-1)*              
+             (AVAILMEM MOD 1000),*) CAT " WORDS");                      
+                                                                        
+   ATTACH HI TO MYSELF.EXCEPTIONEVENT;% Attach the interrupt            
+   TYPE:=2;                           % Set up SYSTEMSTATUS varables    
+   SUBTYPE:=0;                        % to select available memory      
+   IF SYSTEMSTATUS(SYSTEM_STAT,V1,V2) THEN                              
+   BEGIN                              % If SYSTESTATUS error then abort 
+     OUT_STRING:="SYSTEMSTATUS ERROR. ABORTING GRAB MEMORY TEST";       
+     ACCEPT(OUT_STRING);                                                
+     MYSELF.STATUS:=-1;                                                 
+   END;                                                                 
+                                      % Resize the array to use all     
+                                      % the available memory (Almost)   
+   RESIZE(MEMORY[1,*],(AVAILMEM MOD 1000),DISCARD);                     
+                                      % Touch each row to grab memory   
+   FOR CURRENTROW := 1 STEP 1 UNTIL 1000 DO                             
+     REPLACE MEMORY[CURRENTROW,1] BY "BENCH " FOR                       
+                                              (AVAILMEM MOD 1000) WORDS;
+   DISPLAY("====> GRAB MEMORY FINISHED");                               
+   WAIT((HOWLONG));                   % Wait, then cause interrupt      
+   CAUSEANDRESET(MYSELF.EXCEPTIONEVENT);                                
+END.                                                                    

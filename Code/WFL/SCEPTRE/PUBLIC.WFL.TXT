@@ -1,0 +1,14 @@
+BEGIN JOB GXG/##REDACTED##/PUBLIC;                                                   
+CLASS=0;                                                                        
+FAMILY DISK = ##REDACTED## OTHERWISE DISK;                                          
+SUBROUTINE PUB(STRING FTITLE);                                                  
+BEGIN                                                                           
+        SECURITY (TEAME)#FTITLE PUBLIC IO;                                      
+END;                                                                            
+                                                                                
+PUB ( "PRM/PROJECT/SUITE/S/LIBRARY/PHASE1" );                                  
+PUB ( "PRM/PROJECT/SUITE/S/LIBRARY/PHASE2" );                                  
+PUB ( "PRM/PROJECT/SUITE/S/LIBRARY/PHASE4" );                                  
+                                      
+                                                                                
+END JOB.                                                                        

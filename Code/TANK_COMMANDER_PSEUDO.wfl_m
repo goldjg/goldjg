@@ -1,0 +1,269 @@
+   DEFINE * SITUATION OS_TANK_COMMANDER(LOG=19,9):                                00001000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           00002000
+% OS_TANK_COMMANDER SITUATION                                         %           00003000
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %           00004000
+%                                                                     %           00005000
+% SITUATION THAT DETECTS COMS DIAGNOSTIC LOG ENTRIES (LOG 19,9) FOR   %           00006000
+% STATIONS HITTING MAX TANKED MESSAGES PER STATION LIMIT IN COMS.     %           00007000
+%                                                                     %           00008000
+% VERSION 01   INITIAL IMPLEMENTATION        ######### GXG JUL 2015   %           00009000
+% VERSION 02   Fix COMS accesscode scanning  ######### GXG SEP 2015   %           00009001
+%              and add IDENTITY into email                            %           00009002
+% VERSION 03   Production Implementation     ######### GXG NOV 2015   %           00009003
+% VERSION 04   Add Pseudo Station Support    ######### GXG DEC 2015   %           00009500
+%                                                                     %           00010000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           00011000
+                                                                                  00012000
+%% Check for messages in correct format                                           00013000
+  LOGFIELD(4,11,12) = 0 AND           %SUBTYPE LOG_DIAG_COMS_OTHER                00014000
+  LOGFIELD(5,39,32) = 3565266752      % "Max " as integer value - 4 D481A740      00015000
+\                                                                                 00016000
+   DEFINE * ODTSEQUENCE OS_TANK_COMMANDER(LOG):                                   00017000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00018000
+% OS_TANK_COMMANDER ODTSEQUENCE                                         %         00019000
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         00020000
+%                                                                       %         00021000
+% ODTSEQUENCE THAT ALERTS WHEN A USER STATION HITS THE COMS MAX TANKED  %         00022000
+% MESSAGES PER STATION LIMIT AND CLEARS USER STATION IN CCF CUCPCM.     %         00023000
+%                                                                       %         00024000
+% VERSION 01   INITIAL IMPLEMENTATION        ######### GXG JUL 2015     %         00025000
+% VERSION 02   Fix COMS accesscode scanning  ######### GXG SEP 2015     %         00025001
+%              and add IDENTITY into email                              %         00025002
+% VERSION 03   Production Implementation     ######### GXG NOV 2015     %         00025003
+% VERSION 04   Add Pseudo Station Support    ######### GXG DEC 2015     %         00025500
+%                                                                       %         00026000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00027000
+                                                                                  00027500
+%Grab the station from the COMS log entry                                         00031000
+$STN:=DECAT(LOGTEXT,"= ",1);                                                      00032000
+                                                                                  00032100
+%Query station info in COMS and grab the output                                   00034000
+$COMSINF:=COMS("STATUS "&$STN);                                                   00035000
+                                                                                  00035050
+%Check station type and call appropriate ODTS to handle                           00035100
+IF "Pseudo Station" ISIN $COMSINF THEN                                            00035150
+   BEGIN                                                                          00035200
+      CALL DO "OS_TANK_PSEUDO" $STN;                                              00035250
+      CALL DO "OS_TANK_REMOTE" $STN;                                              00035300
+   END;                                                                           00035350
+                                                                                  00035400
+IF "LAN Station" ISIN $COMSINF THEN                                               00035450
+   CALL DO "OS_TANK_LAN" $STN;                                                    00035500
+DUMP;                                                                             00113000
+\                                                                                 00114000
+   DEFINE * ODTSEQUENCE OS_TANK_LAN(MSG):                                         00115000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00116000
+% OS_TANK_COMMANDER ODTSEQUENCE                                         %         00117000
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         00118000
+%                                                                       %         00119000
+% ODTSEQUENCE THAT ALERTS WHEN A USER STATION HITS THE COMS MAX TANKED  %         00120000
+% MESSAGES PER STATION LIMIT AND CLEARS USER STATION IN CCF CUCPCM.     %         00121000
+%                                                                       %         00122000
+% VERSION 01   INITIAL IMPLEMENTATION        ######### GXG JUL 2015     %         00123000
+% VERSION 02   Fix COMS accesscode scanning  ######### GXG SEP 2015     %         00124000
+%              and add IDENTITY into email                              %         00125000
+% VERSION 03   Production Implementation     ######### GXG NOV 2015     %         00126000
+% VERSION 04   Add Pseudo Station Support    ######### GXG DEC 2015     %         00127000
+%                                                                       %         00128000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00129000
+$SOURCE:=IF WHENID(STATION) HDIS "SLOT" THEN "BNA" ELSE "LOCAL";                  00129100
+$LSTN:=UPPER(TRIM(TEXT));                                                         00129200
+                                                                                  00129300
+IF $SOURCE="BNA" THEN                                                             00129400
+   BEGIN                                                                          00129500
+      $LSTN:=DECAT(DECAT(DECAT($LSTN,"/",4),"/",4),"/",1);                        00129600
+      %Query station info in COMS and grab the output                             00129620
+      $COMSINF:=COMS("STATUS "&$STN);                                             00129640
+   END;                                                                           00129700
+                                                                                  00130000
+%Query the station info in CCF and grab the output                                00130200
+$CCFSTATUSCMD:=#("NA CCF CUCIPCM SHOW STATION ",$LSTN);                           00130400
+$CCFINF:=KEYIN($CCFSTATUSCMD);                                                    00130600
+                                                                                  00131000
+%Parse the CCF info line by line, grabbing the PCUser and Hostname                00131010
+WHILE $CCFLINE:=$CCFINF.SPLIT(/) NEQ EMPTY DO                                     00131020
+   BEGIN                                                                          00131030
+      IF $CCFLINE INCL "PCUser =" THEN                                            00131040
+         BEGIN                                                                    00131050
+            $PCUSER:=DECAT($CCFLINE,"= ",1);                                      00131060
+         END;                                                                     00131070
+      IF $CCFLINE INCL "HostName =" THEN                                          00131080
+         BEGIN                                                                    00131090
+            $HOST:=DECAT($CCFLINE,"= ",1)                                         00131100
+         END;                                                                     00131110
+   END;                                                                           00131120
+                                                                                  00131130
+%Parse the COMS info line by line, grabbing Window, User, Accesscode and IP       00131140
+WHILE $COMSLINE:=$COMSINF.SPLIT(/) NEQ EMPTY DO                                   00131150
+   BEGIN                                                                          00131160
+      IF $COMSLINE INCL "Current window =" THEN                                   00131170
+         BEGIN                                                                    00131180
+            $WINDOW:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                        00131190
+         END;                                                                     00131200
+      IF $COMSLINE INCL "COMS/MARC User" THEN                                     00131210
+         BEGIN                                                                    00131220
+            $MFUSER:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                        00131230
+         END;                                                                     00131240
+      IF $COMSLINE INCL "Access code =" THEN                                      00131250
+         BEGIN                                                                    00131260
+            $ACCESS:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                        00131270
+         END;                                                                     00131280
+      IF $COMSLINE INCL "Client =" THEN                                           00131290
+         BEGIN                                                                    00131300
+            $IPADD:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                         00131310
+         END;                                                                     00131320
+   END;                                                                           00131330
+                                                                                  00131340
+%Query active mix entries for station                                             00131350
+IF NOT ($WINDOW EQL "MARC/1") THEN %not on marc so add window name to station     00131360
+      BEGIN                                                                       00131370
+         $NEWLSTN:=#($LSTN,'/',$WINDOW);                                          00131380
+         $CULPRIT:=OBJECTS(MX=ACTIVE:SOURCESTATION = $NEWLSTN);                   00131390
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                          00131400
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                      00131410
+      END                                                                         00131420
+   ELSE   %on marc so leave station as it is                                      00131430
+      BEGIN                                                                       00131440
+         $CULPRITMIX:=OBJECTS(MX=ACTIVE:SOURCESTATION = $LSTN);                   00131450
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                          00131460
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                      00131470
+      END;                                                                        00131480
+                                                                                  00131490
+%Clear station in CCF, which disconnects user and DSes their program(s)           00131500
+$CLEARCMD:=#("NA CCF CUCIPCM CLEAR STATION ",$LSTN);                              00131510
+ODT($CLEARCMD);                                                                   00131520
+                                                                                  00131530
+%Lookup accesscode in the userdatafile and pull back their IDENTITY info          00131540
+$ACCESSCODE:=#($ACCESS,"ZZ");                                                     00131550
+$WHO:=USERDATA($ACCESSCODE,IDENTITY);                                             00131560
+                                                                                  00131600
+%Send email alert                                                                 00131700
+CALL DO "OS_TANK_ALERT" $LSTN;                                                    00131800
+DUMP;                                                                             00131900
+\                                                                                 00132000
+   DEFINE * ODTSEQUENCE OS_TANK_PSEUDO(MSG):                                      00135000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00136000
+% OS_TANK_COMMANDER ODTSEQUENCE                                         %         00137000
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         00138000
+%                                                                       %         00139000
+% ODTSEQUENCE THAT ALERTS WHEN A USER STATION HITS THE COMS MAX TANKED  %         00140000
+% MESSAGES PER STATION LIMIT AND CLEARS USER STATION IN CCF CUCPCM.     %         00141000
+%                                                                       %         00142000
+% VERSION 01   INITIAL IMPLEMENTATION        ######### GXG JUL 2015     %         00143000
+% VERSION 02   Fix COMS accesscode scanning  ######### GXG SEP 2015     %         00144000
+%              and add IDENTITY into email                              %         00145000
+% VERSION 03   Production Implementation     ######### GXG NOV 2015     %         00146000
+% VERSION 04   Add Pseudo Station Support    ######### GXG DEC 2015     %         00147000
+%                                                                       %         00148000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00149000
+$PSTN:=UPPER(TRIM(TEXT));                                                         00149020
+%Parse the COMS info line by line, grabbing Window, User, Accesscode and IP       00149040
+WHILE $COMSLINE:=$COMSINF.SPLIT(/) NEQ EMPTY DO                                   00149060
+   BEGIN                                                                          00149080
+      IF $COMSLINE INCL "Current window =" THEN                                   00149100
+         BEGIN                                                                    00149120
+            $WINDOW:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                        00149140
+         END;                                                                     00149160
+      IF $COMSLINE INCL "COMS/MARC User" THEN                                     00149180
+         BEGIN                                                                    00149200
+            $MFUSER:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                        00149220
+         END;                                                                     00149240
+      IF $COMSLINE INCL "Access code =" THEN                                      00149260
+         BEGIN                                                                    00149280
+            $ACCESS:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                        00149300
+         END;                                                                     00149320
+      IF $COMSLINE INCL "Client =" THEN                                           00149340
+         BEGIN                                                                    00149360
+            $IPADD:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                         00149380
+         END;                                                                     00149400
+   END;                                                                           00149420
+                                                                                  00149440
+%Query active mix entries for station                                             00149460
+IF NOT ($WINDOW EQL "MARC/1") THEN %not on marc so add window name to station     00149480
+      BEGIN                                                                       00149500
+         $NEWPSTN:=#($PSTN,'/',$WINDOW);                                          00149520
+         $CULPRIT:=OBJECTS(MX=ACTIVE:SOURCESTATION = $NEWPSTN);                   00149540
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                          00149560
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                      00149580
+      END                                                                         00149600
+   ELSE   %on marc so leave station as it is                                      00149620
+      BEGIN                                                                       00149640
+         $CULPRITMIX:=OBJECTS(MX=ACTIVE:SOURCESTATION = $PSTN);                   00149660
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                          00149680
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                      00149700
+      END;                                                                        00149720
+                                                                                  00149740
+%Clear station in CCF, which disconnects user and DSes their program(s)           00149760
+$COMSCMD:=COMS("CLEAR STATION "&$PSTN);                                           00149780
+                                                                                  00149800
+%Lookup accesscode in the userdatafile and pull back their IDENTITY info          00149820
+$ACCESSCODE:=#($ACCESS,"ZZ");                                                     00149840
+$WHO:=USERDATA($ACCESSCODE,IDENTITY);                                             00149860
+                                                                                  00149880
+%Send email alert                                                                 00149900
+CALL DO "OS_TANK_ALERT" $PSTN;                                                    00149920
+\                                                                                 00150000
+   DEFINE * ODTSEQUENCE OS_TANK_REMOTE(MSG):                                      00151000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00152000
+% OS_TANK_COMMANDER ODTSEQUENCE                                         %         00153000
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         00154000
+%                                                                       %         00155000
+% ODTSEQUENCE THAT ALERTS WHEN A USER STATION HITS THE COMS MAX TANKED  %         00156000
+% MESSAGES PER STATION LIMIT AND CLEARS USER STATION IN CCF CUCPCM.     %         00157000
+%                                                                       %         00158000
+% VERSION 01   INITIAL IMPLEMENTATION        ######### GXG JUL 2015     %         00159000
+% VERSION 02   Fix COMS accesscode scanning  ######### GXG SEP 2015     %         00160000
+%              and add IDENTITY into email                              %         00161000
+% VERSION 03   Production Implementation     ######### GXG NOV 2015     %         00162000
+% VERSION 04   Add Pseudo Station Support    ######### GXG DEC 2015     %         00163000
+%                                                                       %         00164000
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00165000
+$RSTN:=UPPER(TRIM(TEXT));                                                         00165500
+$SRCHOST:=DECAT($RSTN,"/",4);                                                     00165600
+ODT(#("AT ",$SRCHOST," TT DO OS_TANK_LAN ",$RSTN));                               00166000
+                                                                                  00169000
+\                                                                                 00171000
+   DEFINE * ODTSEQUENCE OS_TANK_ALERT(MSG):                                       00171020
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00171040
+% OS_TANK_COMMANDER ODTSEQUENCE                                         %         00171060
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         00171080
+%                                                                       %         00171100
+% ODTSEQUENCE THAT ALERTS WHEN A USER STATION HITS THE COMS MAX TANKED  %         00171120
+% MESSAGES PER STATION LIMIT AND CLEARS USER STATION IN CCF CUCPCM.     %         00171140
+%                                                                       %         00171160
+% VERSION 01   INITIAL IMPLEMENTATION        ######### GXG JUL 2015     %         00171180
+% VERSION 02   Fix COMS accesscode scanning  ######### GXG SEP 2015     %         00171200
+%              and add IDENTITY into email                              %         00171220
+% VERSION 03   Production Implementation     ######### GXG NOV 2015     %         00171240
+% VERSION 04   Add Pseudo Station Support    ######### GXG DEC 2015     %         00171260
+%                                                                       %         00171280
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         00171300
+IF NOT (TEXT = EMPTY) THEN                                                        00171305
+   $ASTN:=UPPER(TRIM(TEXT));                                                      00171310
+                                                                                  00171312
+%Set up the email address for the alerts                                          00171314
+%$EMAIL:=#("##REDACTED##,##REDACTED##,##REDACTED##",                              00171316
+%            ",##REDACTED##");                                                    00171318
+$EMAIL:="##REDACTED##";                                                           00171320
+                                                                                  00171322
+%Send alert email                                                                 00171324
+#ML:=MAIL(#('To:',$EMAIL,';',                                                     00171340
+   'Subject:TANKING STATION CLEARED ON ',HOSTNAME),                               00171360
+   #('Tanked messages for station ',$ASTN,,                                       00171380
+      'exceeded COMS limit and station was cleared.',/,/,                         00171400
+      'The station was connected from host ',$HOST,,                              00171420
+      'with IP Address ',$IPADD,,'and PC usercode ',$PCUSER,'.',/,/,              00171440
+      'Mainframe usercode : ',$MFUSER,/,                                          00171460
+      'Mainframe accesscode : ',$ACCESS,/,                                        00171480
+      'User Identity : ',$WHO,/,/,                                                00171500
+      'Program(s) being run by this station prior to being cleared:',/,           00171520
+      #CULPRITMIX,,$CULPRITNAME));                                                00171540
+                                                                                  00171560
+%If there was an error sending the email, inform via waiting entry                00171580
+IF #ML < 0 THEN                                                                   00171600
+   BEGIN                                                                          00171620
+      ODT(#('BEGIN JOB TANK_COMMAND/MAILERROR',';CLASS=9; STRING S; ',            00171640
+          'S:=ACCEPT("MAIL OF TANK ERROR FAILED: ',MAILERROR(#ML),'");',          00171660
+          'S:=ACCEPT("CLEARED STATION: ',$ASTN,'");'));                           00171680
+   END                                                                            00171700
+                                                                                  00172000

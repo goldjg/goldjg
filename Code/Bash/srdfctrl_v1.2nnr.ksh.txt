@@ -1,0 +1,857 @@
+#!/usr/bin/ksh
+# SRDF Failover-Failback Script 
+# March 2007 - EMC
+#
+# This user interactive scirpt will control failover and failback
+# functionality of SRDF pair.  A config file will be used to control
+# This functionality
+##
+# Version 1.1
+#
+
+#Define Variables
+TODAY=`/bin/date +%m-%d-%y`
+SRCDIR=/home/emc #Location of this script
+MAPDIR=${SRCDIR}/maps  #Temp location of flat map files we generate from config file
+LOGDIR=${SRCDIR}/logs  #Location of log files
+MAXRDF=60 #Max RDF Iterations for waiting for Establish - in 60 second intervals
+SYMPATH=/usr/symcli/bin
+
+CONSOLEDEBUG=1  #See output of command run if set to 1, 0 for no output on console
+SUDO="/usr/local/bin/sudo" #put in the word sudo here if you want to run symcli commands as sudo
+
+#Functions
+######################################################################
+# Function to write date, time, hostname and arguments to log file
+# "MARK $0" at the start of each function to show script progress in log
+######################################################################
+
+function mark {
+        if [ $CONSOLEDEBUG -gt 0 ] ; then
+           echo "$(date '+%b %e %X') $(hostname): $*"
+        fi
+        echo "$(date '+%b %e %X') $(hostname): $*" >> $LOGFL 2>&1
+}
+
+########################
+# FUNCTION: set_rdf_mode
+#Function to attempt to set mode acp_disk on devices
+########################
+function set_rdf_mode
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+ MODE=$4
+   mark "Setting mode $MODE if not already set"
+   mark "->symrdf -f ${FILE} -sid ${SID} set mode ${MODE} -nop -rdfg ${RDFG}"
+   $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} set mode ${MODE} -nop -rdfg ${RDFG} >> ${LOGFL} 2>&1
+   RC=$?
+   if [ $RC -ne 0 ] ; then
+        mark "${MODE} could not be set, maybe already in that mode!"
+        return 1
+   else
+        mark "Setting ${MODE} mode succeded..."
+        return 0
+   fi
+}
+
+####################
+#FUNCTION: test_rdf_state
+#Test RDF Pair for any type of valid state
+# Valid Options for QUER are:
+# synchronized,suspended
+####################
+function test_rdf_state
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+ QUER=$4
+        mark "Querying RDF pair on sid ${SID} to test for ${QUER}"
+        mark "->symrdf -f ${FILE} -sid ${SID} verify -${QUER} -rdfg ${RDFG}"
+        $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} verify -${QUER} -rdfg ${RDFG} >> ${LOGFL} 2>&1
+        RC=$?
+        if [ $RC -ne 0 ] ; then
+                mark "RDF Pair is NOT in ${QUER} state, cannot continue RC: $RC"
+                return 1
+        else
+                mark "RDF pair is in ${QUER} state, continuing..."
+                return 0
+        fi
+}
+
+######################
+#FUNCTION rdf_action
+#perform an establish
+# Valid Actions are:
+# establish, suspend, split, failover, failback, swap
+######################
+function rdf_action
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+ ACTN=$4
+        mark "Performing $ACTN for devices on $SID"
+        mark "->symrdf -f ${FILE} -sid ${SID} ${ACTN} -nop -rdfg ${RDFG}"
+        $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} ${ACTN} -nop -rdfg ${RDFG} >> ${LOGFL} 2>&1
+        RC=$?
+        if [ $RC -ne 0 ] ; then
+                mark "${ACTN} Failed for devices, RC: $RC"
+                return 1
+        else
+                mark "${ACTN} successfully called..."
+                return 0
+        fi
+}
+
+###############################
+#FUNCTION: rdf_track_countdown
+#loop through query till track count is lower than 1
+###############################
+function rdf_track_countdown
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+        mark "Querying RDF devices to be close to sync"
+        mark "->symrdf -f ${FILE} -sid ${SID} query -rdfg ${RDFG}"
+        $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} query -rdfg ${RDFG} >> $LOGFL
+        sleep 30
+        INVTRACKS=2000
+        COUNT=1
+        while [ ${INVTRACKS} -gt 1 ]
+        do
+                CMD="$SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} query -rdfg ${RDFG} "
+                INVTRACKS=$(${CMD} | grep "Track(s)" | awk '{ print $4 }')
+                mark "Still establishing... $INVTRACKS to go.."
+
+                if [ $COUNT -gt $MAXRDF ] ; then
+                        mark "ERROR: Exceeded timeframe to extablish over ${MAXRDF}"
+                        return 0
+                fi
+                COUNT=$(($COUNT + 1))
+                sleep 30
+        done
+        return 0
+}
+
+############
+# END FUNCTIONS
+############
+
+#Set up Directory Structure
+if [ ! -d $LOGDIR ]; then
+   echo "Creating log directory"
+   mkdir $LOGDIR
+   RC=$?
+   if [ $RC -ne 0 ] ; then
+                echo "ERROR: Could not create log file directory"
+                return 2
+   fi
+fi
+
+if [ ! -d $MAPDIR ]; then
+   echo "Creating temp map file directory"
+   mkdir $MAPDIR
+   RC=$?
+   if [ $RC -ne 0 ] ; then
+                echo "ERROR: Could not create temp map file directory"
+                return 2
+   fi
+fi
+
+#Set up logging and mapping files
+if [ $# -lt 1 ]; then
+        RC=1
+        echo "Exit Code $RC : Incorrect options"
+        echo " EMC - SRDF/S Failover-Failback control script v1.0"
+        echo "USAGE:"
+        echo " `basename $0` FLAT_FILE_CONFIG.txt -ACTION"
+        echo "Example:"
+        echo " `basename $0` pairing1.txt -failover"
+
+        exit $RC
+else
+    if [ -f $1 ] ; then
+                echo "Config file $1 was found.. continuing."
+                FLNAME=$(echo $1|awk -F. '{print $1}')
+                LOGFL=${LOGDIR}/${FLNAME}.${TODAY}.log #define log file off of config file
+                MAPFL=${MAPDIR}/R1DEVS_${FLNAME}.map
+
+        else
+            echo "Config file $1 was NOT found, cannot proceed!"
+                exit 2
+        fi
+fi
+
+################
+#Handle old files if they exist
+################
+if [ -f ${MAPFL} ] ; then
+        mark "Old temp Flat file exist, moving to ${MAPFL}.old"
+        mv ${MAPFL} ${MAPFL}.old
+fi
+
+if [ "$2" != "" ] ; then
+    case $2 in
+        -failover)
+                mark "Failover action found"
+                ACTION="failover"
+        ;;
+        failover)
+                mark "Failover action found"
+                ACTION="failover"
+        ;;
+        -failback)
+                mark "Failback action found"
+                ACTION="failback"
+        ;;
+        failback)
+                mark "Failback action found"
+                ACTION="failback"
+        ;;
+        *)
+          mark "Invalid action used with option: $2"
+          exit 1
+        ;;
+        esac
+else
+        mark "NO ACTION WAS GIVEN.. CAN NOT CONTINUE.."
+        exit 1
+fi
+
+#####################
+#Test and Create new temp flat files
+#####################
+cat $1 |grep -v "#" |while read R1D R2D
+do
+#Strip out any newlines in the first column
+
+R2D=`echo $R2D|sed 's/^M//g'`
+
+#//g'`echo $R2D|sed 's/
+# The line above should read as following in vi - 'echo $R1D|sed 's/^M//g'`
+# NOTE THE ^M above NEEDS TO BE CREATED WITH CTRL-V CTRL-M in VI and not just a newline space..
+    case $R1D in
+        R1SID)
+            R1SID=$R2D
+        ;;
+        RDFG)
+            RDFG=$R2D
+        ;;
+        *)
+           # We assume if we are here than the line has a device matrix line ( 6 colums of devices separated by tab)
+                if [ "$R1D" != "" -a "$R2D" != "" ] ; then
+                        echo "${R1D}    ${R2D}"   >> $MAPFL
+                else
+                        mark "ERROR! Data in config file $1 not valid"
+                        exit 4
+                fi
+                ;;
+    esac
+done
+
+######################
+#test environment for solutions enabler
+#######################
+if [ -d ${SYMPATH} ] ; then
+  mark "Found Soutions Enabler, continuing.."
+else
+  mark "Soulutions enabler was not found."
+  exit 3
+fi
+
+#############
+# Begin Main Process
+#############
+if [ "$ACTION" = "failover" ] ; then
+
+##################################
+# 1. Verify that all RDF pairs are SYNCRONIZED
+##################################
+        mark "1. Verify that all RDF pairs are SYNCRONIZED"
+        test_rdf_state "$MAPFL" $R1SID $RDFG "synchronized"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 5: RDF in: `basename $MAPFL` is not fully synchrnonized."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 5
+        fi
+##################################
+# 1a. Verify that all RDF pairs are SYNCRONIZED
+##################################
+        mark "Prompt user to unmount Target disks"
+        clear
+        echo ""
+        echo ""
+        echo "Unmount R1 disks or power down servers attached to disks"
+        echo ""
+        while [ "$READLN" != "Y" ]
+        do
+                echo "Press Y to continue."
+                read READLN
+        done
+        mark "User notified to unmount R1 devices or shut down server"
+
+#####################
+# 2. Perform the Failover
+#####################
+        mark "2. Perform the failover on RDF rdf devices"
+        rdf_action "${MAPFL}" ${R1SID} ${RDFG} "failover"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 6: Could not perform failover."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 6
+        fi
+
+##################################
+# 3. Verify that all RDF pairs are failed over
+##################################
+        mark "3. Verify that all RDF pairs are FAILEDOVER"
+        test_rdf_state "$MAPFL" $R1SID $RDFG "failedover"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 7: RDF in: `basename $MAPFL` is not failed over."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 7
+        fi
+
+#####################
+# 4. Set Mode ACP DISK
+#####################
+        mark "4. Attempt to set mode acp_disk on devices"
+        set_rdf_mode "${MAPFL}" ${R1SID} ${RDFG} "acp_disk"
+        if [ $? -ne 0 ] ; then
+                mark "WARNING: acp_disk mode was not successfully set."
+                mark "File: ${MAPFL}"
+                mark "Sid: ${R1SID}"
+                mark "RDFG: ${RDFG}"
+        fi
+
+ mark "Failover process is now complete.  R2 disks are RW"
+
+else # Action is failback
+
+
+##################################
+# 5. Verify that all RDF pairs are failed over
+##################################
+        mark "5. Verify that all RDF pairs are FAILEDOVER"
+        test_rdf_state "$MAPFL" $R1SID $RDFG "failedover"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 8: RDF in: `basename $MAPFL` is not failed over."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 8
+        fi
+##################################
+# 5a. Verify that all RDF pairs are SYNCRONIZED
+##################################
+        mark "Prompt user to unmount DR disks"
+        clear
+        echo ""
+        echo ""
+        echo "Unmount R2 disks or power down servers attached to disks"
+        echo ""
+        while [ "$READLN" != "Y" ]
+        do
+                echo "Press Y to continue."
+                read READLN
+        done
+        mark "User notified to unmount target devices or shut down server"
+
+#####################
+# 6. Set Mode ACP DISK
+#####################
+        mark "6. Attempt to set mode acp_disk on devices"
+        set_rdf_mode "${MAPFL}" ${R1SID} ${RDFG} "acp_disk"
+        if [ $? -ne 0 ] ; then
+                mark "WARNING: acp_disk mode was not successfully set (may already be set)."
+                mark "File: ${MAPFL}"
+                mark "Sid: ${R1SID}"
+                mark "RDFG: ${RDFG}"
+        fi
+
+#####################
+# 7. Perform the Failback
+#####################
+        mark "7. Perform the failback on RDF rdf devices"
+        rdf_action "${MAPFL}" ${R1SID} ${RDFG} "failback"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 7: Could not perform failback."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 9
+        fi
+###############################
+# 8. Loop through query till track count is lower than 5000
+###############################
+        mark "8. Loop through query till track count is lower than 5000 on RDC RDF"
+        rdf_track_countdown "${MAPFL}" ${R1SID} ${RDFG}
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 10: Tracks did not get low enough in alloted time."
+                mark "File: ${RDC1TORDC2FL}"
+                mark "Sid: ${RDC1SID}"
+                mark "RDFG: ${RDFGRDC}"
+                exit 10
+        fi
+
+#####################
+# 9. Set Mode SYNC
+#####################
+        mark "9. Attempt to set mode SYNC on devices"
+        set_rdf_mode "${MAPFL}" ${R1SID} ${RDFG} "sync"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 11: acp_disk mode was not successfully set."
+                mark "File: ${MAPFL}"
+                mark "Sid: ${R1SID}"
+                mark "RDFG: ${RDFG}"
+                exit 11
+        fi
+
+ mark "Failback process is now complete.  R1 disks are RW"
+
+fi # END main test for action
+
+
+
+exit 0
+
+$
+#!/usr/bin/ksh
+# SRDF Failover-Failback Script - Jackson
+# March 2007 - EMC
+#
+# This user interactive scirpt will control failover and failback
+# functionality of SRDF pair.  A config file will be used to control
+# This functionality
+##
+# Version 1.1
+#
+#  Revision history
+#  APR-07      V1.0      KMF       INITIAL RELEASE
+#  MAY-07      V1.1      KMF    Updated to Put Notification for unmount of disks
+#  NOV-07      V1.2      NR     Updated to Put Notification for unmount of disks
+
+
+#Define Variables
+TODAY=`/bin/date +%m-%d-%y`
+SRCDIR=/home/emc #Location of this script
+MAPDIR=${SRCDIR}/maps  #Temp location of flat map files we generate from config file
+LOGDIR=${SRCDIR}/logs  #Location of log files
+MAXRDF=60 #Max RDF Iterations for waiting for Establish - in 60 second intervals
+SYMPATH=/usr/symcli/bin
+
+CONSOLEDEBUG=1  #See output of command run if set to 1, 0 for no output on console
+SUDO="/usr/local/bin/sudo" #put in the word sudo here if you want to run symcli commands as sudo
+
+#Functions
+######################################################################
+# Function to write date, time, hostname and arguments to log file
+# "MARK $0" at the start of each function to show script progress in log
+######################################################################
+
+function mark {
+        if [ $CONSOLEDEBUG -gt 0 ] ; then
+           echo "$(date '+%b %e %X') $(hostname): $*"
+        fi
+        echo "$(date '+%b %e %X') $(hostname): $*" >> $LOGFL 2>&1
+}
+
+########################
+# FUNCTION: set_rdf_mode
+#Function to attempt to set mode acp_disk on devices
+########################
+function set_rdf_mode
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+ MODE=$4
+   mark "Setting mode $MODE if not already set"
+   mark "->symrdf -f ${FILE} -sid ${SID} set mode ${MODE} -nop -rdfg ${RDFG}"
+   $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} set mode ${MODE} -nop -rdfg ${RDFG} >> ${LOGFL} 2>&1
+   RC=$?
+   if [ $RC -ne 0 ] ; then
+        mark "${MODE} could not be set, maybe already in that mode!"
+        return 1
+   else
+        mark "Setting ${MODE} mode succeded..."
+        return 0
+   fi
+}
+
+####################
+#FUNCTION: test_rdf_state
+#Test RDF Pair for any type of valid state
+# Valid Options for QUER are:
+# synchronized,suspended
+####################
+function test_rdf_state
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+ QUER=$4
+        mark "Querying RDF pair on sid ${SID} to test for ${QUER}"
+        mark "->symrdf -f ${FILE} -sid ${SID} verify -${QUER} -rdfg ${RDFG}"
+        $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} verify -${QUER} -rdfg ${RDFG} >> ${LOGFL} 2>&1
+        RC=$?
+        if [ $RC -ne 0 ] ; then
+                mark "RDF Pair is NOT in ${QUER} state, cannot continue RC: $RC"
+                return 1
+        else
+                mark "RDF pair is in ${QUER} state, continuing..."
+                return 0
+        fi
+}
+
+######################
+#FUNCTION rdf_action
+#perform an establish
+# Valid Actions are:
+# establish, suspend, split, failover, failback, swap
+######################
+function rdf_action
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+ ACTN=$4
+        mark "Performing $ACTN for devices on $SID"
+        mark "->symrdf -f ${FILE} -sid ${SID} ${ACTN} -nop -rdfg ${RDFG}"
+        $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} ${ACTN} -nop -rdfg ${RDFG} >> ${LOGFL} 2>&1
+        RC=$?
+        if [ $RC -ne 0 ] ; then
+                mark "${ACTN} Failed for devices, RC: $RC"
+                return 1
+        else
+                mark "${ACTN} successfully called..."
+                return 0
+        fi
+}
+
+###############################
+#FUNCTION: rdf_track_countdown
+#loop through query till track count is lower than 1
+###############################
+function rdf_track_countdown
+{
+ FILE=$1
+ SID=$2
+ RDFG=$3
+        mark "Querying RDF devices to be close to sync"
+        mark "->symrdf -f ${FILE} -sid ${SID} query -rdfg ${RDFG}"
+        $SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} query -rdfg ${RDFG} >> $LOGFL
+        sleep 30
+        INVTRACKS=2000
+        COUNT=1
+        while [ ${INVTRACKS} -gt 1 ]
+        do
+                CMD="$SUDO ${SYMPATH}/symrdf -f ${FILE} -sid ${SID} query -rdfg ${RDFG} "
+                INVTRACKS=$(${CMD} | grep "Track(s)" | awk '{ print $4 }')
+                mark "Still establishing... $INVTRACKS to go.."
+
+                if [ $COUNT -gt $MAXRDF ] ; then
+                        mark "ERROR: Exceeded timeframe to extablish over ${MAXRDF}"
+                        return 0
+                fi
+                COUNT=$(($COUNT + 1))
+                sleep 30
+        done
+        return 0
+}
+
+############
+# END FUNCTIONS
+############
+
+#Set up Directory Structure
+if [ ! -d $LOGDIR ]; then
+   echo "Creating log directory"
+   mkdir $LOGDIR
+   RC=$?
+   if [ $RC -ne 0 ] ; then
+                echo "ERROR: Could not create log file directory"
+                return 2
+   fi
+fi
+
+if [ ! -d $MAPDIR ]; then
+   echo "Creating temp map file directory"
+   mkdir $MAPDIR
+   RC=$?
+   if [ $RC -ne 0 ] ; then
+                echo "ERROR: Could not create temp map file directory"
+                return 2
+   fi
+fi
+
+#Set up logging and mapping files
+if [ $# -lt 1 ]; then
+        RC=1
+        echo "Exit Code $RC : Incorrect options"
+        echo " EMC - SRDF/S Failover-Failback control script v1.0"
+        echo "USAGE:"
+        echo " `basename $0` FLAT_FILE_CONFIG.txt -ACTION"
+        echo "Example:"
+        echo " `basename $0` pairing1.txt -failover"
+
+        exit $RC
+else
+    if [ -f $1 ] ; then
+                echo "Config file $1 was found.. continuing."
+                FLNAME=$(echo $1|awk -F. '{print $1}')
+                LOGFL=${LOGDIR}/${FLNAME}.${TODAY}.log #define log file off of config file
+                MAPFL=${MAPDIR}/R1DEVS_${FLNAME}.map
+
+        else
+            echo "Config file $1 was NOT found, cannot proceed!"
+                exit 2
+        fi
+fi
+
+################
+#Handle old files if they exist
+################
+if [ -f ${MAPFL} ] ; then
+        mark "Old temp Flat file exist, moving to ${MAPFL}.old"
+        mv ${MAPFL} ${MAPFL}.old
+fi
+
+if [ "$2" != "" ] ; then
+    case $2 in
+        -failover)
+                mark "Failover action found"
+                ACTION="failover"
+        ;;
+        failover)
+                mark "Failover action found"
+                ACTION="failover"
+        ;;
+        -failback)
+                mark "Failback action found"
+                ACTION="failback"
+        ;;
+        failback)
+                mark "Failback action found"
+                ACTION="failback"
+        ;;
+        *)
+          mark "Invalid action used with option: $2"
+          exit 1
+        ;;
+        esac
+else
+        mark "NO ACTION WAS GIVEN.. CAN NOT CONTINUE.."
+        exit 1
+fi
+
+#####################
+#Test and Create new temp flat files
+#####################
+cat $1 |grep -v "#" |while read R1D R2D
+do
+#Strip out any newlines in the first column
+//g'`echo $R2D|sed 's/
+# The line above should read as following in vi - 'echo $R1D|sed 's/^M//g'`
+# NOTE THE ^M above NEEDS TO BE CREATED WITH CTRL-V CTRL-M in VI and not just a newline space..
+    case $R1D in
+        R1SID)
+            R1SID=$R2D
+        ;;
+        RDFG)
+            RDFG=$R2D
+        ;;
+        *)
+           # We assume if we are here than the line has a device matrix line ( 6 colums of devices separated by tab)
+                if [ "$R1D" != "" -a "$R2D" != "" ] ; then
+                        echo "${R1D}    ${R2D}"   >> $MAPFL
+                else
+                        mark "ERROR! Data in config file $1 not valid"
+                        exit 4
+                fi
+                ;;
+    esac
+done
+
+######################
+#test environment for solutions enabler
+#######################
+if [ -d ${SYMPATH} ] ; then
+  mark "Found Soutions Enabler, continuing.."
+else
+  mark "Soulutions enabler was not found."
+  exit 3
+fi
+
+#############
+# Begin Main Process
+#############
+if [ "$ACTION" = "failover" ] ; then
+
+##################################
+# 1. Verify that all RDF pairs are SYNCRONIZED
+##################################
+        mark "1. Verify that all RDF pairs are SYNCRONIZED"
+        test_rdf_state "$MAPFL" $R1SID $RDFG "synchronized"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 5: RDF in: `basename $MAPFL` is not fully synchrnonized."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 5
+        fi
+##################################
+# 1a. Verify that all RDF pairs are SYNCRONIZED
+##################################
+        mark "Prompt user to unmount Target disks"
+        clear
+        echo ""
+        echo ""
+        echo "Unmount R1 disks or power down servers attached to disks"
+        echo ""
+        while [ "$READLN" != "Y" ]
+        do
+                echo "Press Y to continue."
+                read READLN
+        done
+        mark "User notified to unmount R1 devices or shut down server"
+
+#####################
+# 2. Perform the Failover
+#####################
+        mark "2. Perform the failover on RDF rdf devices"
+        rdf_action "${MAPFL}" ${R1SID} ${RDFG} "failover"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 6: Could not perform failover."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 6
+        fi
+
+##################################
+# 3. Verify that all RDF pairs are failed over
+##################################
+        mark "3. Verify that all RDF pairs are FAILEDOVER"
+        test_rdf_state "$MAPFL" $R1SID $RDFG "failedover"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 7: RDF in: `basename $MAPFL` is not failed over."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 7
+        fi
+
+#####################
+# 4. Set Mode ACP DISK
+#####################
+        mark "4. Attempt to set mode acp_disk on devices"
+        set_rdf_mode "${MAPFL}" ${R1SID} ${RDFG} "acp_disk"
+        if [ $? -ne 0 ] ; then
+                mark "WARNING: acp_disk mode was not successfully set."
+                mark "File: ${MAPFL}"
+                mark "Sid: ${R1SID}"
+                mark "RDFG: ${RDFG}"
+        fi
+
+ mark "Failover process is now complete.  R2 disks are RW"
+
+else # Action is failback
+
+
+##################################
+# 5. Verify that all RDF pairs are failed over
+##################################
+        mark "5. Verify that all RDF pairs are FAILEDOVER"
+        test_rdf_state "$MAPFL" $R1SID $RDFG "failedover"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 8: RDF in: `basename $MAPFL` is not failed over."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 8
+        fi
+##################################
+# 5a. Verify that all RDF pairs are SYNCRONIZED
+##################################
+        mark "Prompt user to unmount DR disks"
+        clear
+        echo ""
+        echo ""
+        echo "Unmount R2 disks or power down servers attached to disks"
+        echo ""
+        while [ "$READLN" != "Y" ]
+        do
+                echo "Press Y to continue."
+                read READLN
+        done
+        mark "User notified to unmount target devices or shut down server"
+
+#####################
+# 6. Set Mode ACP DISK
+#####################
+        mark "6. Attempt to set mode acp_disk on devices"
+        set_rdf_mode "${MAPFL}" ${R1SID} ${RDFG} "acp_disk"
+        if [ $? -ne 0 ] ; then
+                mark "WARNING: acp_disk mode was not successfully set (may already be set)."
+                mark "File: ${MAPFL}"
+                mark "Sid: ${R1SID}"
+                mark "RDFG: ${RDFG}"
+        fi
+
+#####################
+# 7. Perform the Failback
+#####################
+        mark "7. Perform the failback on RDF rdf devices"
+        rdf_action "${MAPFL}" ${R1SID} ${RDFG} "failback"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 7: Could not perform failback."
+                mark "File: $MAPFL"
+                mark "Sid: $R1SID"
+                mark "RDFG: $RDFG"
+                exit 9
+        fi
+###############################
+# 8. Loop through query till track count is lower than 5000
+###############################
+        mark "8. Loop through query till track count is lower than 5000 on RDC RDF"
+        rdf_track_countdown "${MAPFL}" ${R1SID} ${RDFG}
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 10: Tracks did not get low enough in alloted time."
+                mark "File: ${RDC1TORDC2FL}"
+                mark "Sid: ${RDC1SID}"
+                mark "RDFG: ${RDFGRDC}"
+                exit 10
+        fi
+
+#####################
+# 9. Set Mode SYNC
+#####################
+        mark "9. Attempt to set mode SYNC on devices"
+        set_rdf_mode "${MAPFL}" ${R1SID} ${RDFG} "sync"
+        if [ $? -ne 0 ] ; then
+                mark "ERROR 11: acp_disk mode was not successfully set."
+                mark "File: ${MAPFL}"
+                mark "Sid: ${R1SID}"
+                mark "RDFG: ${RDFG}"
+                exit 11
+        fi
+
+ mark "Failback process is now complete.  R1 disks are RW"
+
+fi # END main test for action
+
+
+
+exit 0
+

@@ -1,0 +1,10 @@
+@TITLE=DLL Registration
+@ECHO OFF
+CLS
+
+ECHO Registering DLLs
+regsvr32 /s C:\PATH\OBJECT.EXE
+regsvr32 /s C:\PATH\OBJECT.DLL
+
+ECHO DLLs Registered
+PAUSE

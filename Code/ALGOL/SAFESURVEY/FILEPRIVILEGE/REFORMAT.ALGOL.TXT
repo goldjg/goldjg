@@ -1,0 +1,125 @@
+$ SET XREF LISTDOLLAR                                                   
+ $ SET LISTDOLLAR STACK LIST ERRLIST FORMAT LINEINFO NOXREFLIST LEVEL 2 
+BEGIN                                                                   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% SAFESURVEY/FILEPRIVILEGE/REFORMAT                              % 
+% ======================================                              % 
+% Takes output from SAFESURVEY FILEPRIVILEGE report,           % 
+% that has been converted by SYSTEM/BACKUP from BACKUPPRINTER to DATA % 
+% and converts it to a CSV file, for easier comparison with previous  % 
+% quarters report (Quarterly Security Reports).                       % 
+%                                                                     % 
+% INPUT:  DATA file from SAFESURVEY FILEPRIVILEGE report              % 
+% OUTPUT: CSV stream file                                             % 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% VERSION 01 - INITIAL IMPLEMENTATION         ##REDACTED## JUN 16 GXG % 
+%                                                                     % 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+                                                                        
+                                                                        
+   %Define input file spec                                              
+   FILE SURVEY (KIND=PACK,DEPENDENTSPECS,                               
+        TITLE="DATA/GN/SAFESURVEY/##REDACTED##/FILEPRIVILEGE.",                
+        PACKNAME = "##REDACTED##."                                              
+        );                                                              
+                                                                        
+   %Define output file spec                                             
+   FILE STREAM (KIND = PACK, PACKNAME = "##REDACTED##.",                        
+        TITLE="PRINT/GN/SAFESURVEY/##REDACTED##/"""FILEPRIVILEGE.CSV""".",     
+        FILEKIND = DATA, FILESTRUCTURE = STREAM,                        
+        BLOCKSTRUCTURE = FIXED,                                         
+        MAXRECSIZE = 150,                                               
+        FRAMESIZE = 8,                                                  
+        INTMODE = EBCDIC,                                               
+        EXTMODE = ASCII,                                                
+        PROTECTION = SAVE                                               
+        );                                                              
+                                                                        
+   ARRAY WORK[0:21];                                                    
+   EBCDIC ARRAY BUFFIN[0] = WORK[*];                                    
+   EBCDIC ARRAY BUFFOUT[0:150];                                         
+                                                                        
+   %Define starting position/length of each field in the input file     
+   DEFINE FNAME   =     0#    ,FNAME_LEN  =     62#                     
+         ,FKIND   =     62#   ,FKIND_LEN  =     15#                     
+         ,SEC     =     78#   ,SEC_LEN    =      4#                     
+         ,PU      =     84#   ,PU_LEN     =      3#                     
+         ,SA      =     88#   ,SA_LEN     =      3#                     
+         ,TK      =     92#   ,TK_LEN     =      2#                     
+         ,SAD     =     95#   ,SAD_LEN    =      3#                     
+         ,KRB     =     99#   ,KRB_LEN    =      3#                     
+         ,CMP     =     103#  ,CMP_LEN    =      3#                     
+         ,CTL     =     107#  ,CTL_LEN    =      3#                     
+         ,SUP     =     111#  ,SUP_LEN    =      3#                     
+         ,RSD     =     115#  ,RSD_LEN    =      3#                     
+         ,TAD     =     119#  ,TAD_LEN    =      3#                     
+         ,RST     =     123#  ,RST_LEN    =      3#                     
+         ,LP      =     127#  ,LP_LEN     =      2#                     
+         ;                                                              
+                                                                        
+   EBCDIC ARRAY MYHEAD[0:149],                                          
+                MYPACK[0:16]                                            
+                  ;                                                     
+                                                                        
+   TRANSLATETABLE SP2NUL(EBCDIC TO EBCDIC, 48"40" TO 48"00");           
+                                                                        
+   POINTER PIN                                                          
+          ;                                                             
+                                                                        
+   %Build Header row                                                    
+   REPLACE MYHEAD[0] BY "FILENAME,FILEKIND,SEC,PU,SA,TK,SAD,",          
+                       "KRB,CMP,CTL,SUP,RSD,TAD,RST,LP,PACK,",          
+                       48"40" FOR 77;                                   
+                                                                        
+   %Write header                                                        
+   WRITE(STREAM,150,MYHEAD[0]);                                         
+                                                                        
+   %Read file, line at a time                                           
+   WHILE NOT READ(SURVEY,132,WORK) DO                                   
+   BEGIN                                                                
+      REPLACE PIN:= BUFFOUT[0] BY " " FOR SIZE(BUFFOUT);                
+                                                                        
+      %If line contains name of pack for the files that follow,         
+      %store that pack name in the MCPACK variable for population of    
+      %the CSV records that follow it.                                  
+      IF BUFFIN[0] EQL "DISKFILE PRIVILEGES REPORT ON " FOR 30 THEN     
+      BEGIN                                                             
+          REPLACE MYPACK[0] BY " " FOR 17;                              
+          REPLACE MYPACK[0] BY BUFFIN[30] FOR 17;                       
+      END;                                                              
+                                                                        
+      %Ignore lines in input file that are not a filename               
+      IF  (BUFFIN[0] EQL "("  FOR 1 OR                                  
+           BUFFIN[0] EQL "*"  FOR 1) AND                                
+           BUFFIN[0] NEQ "**" FOR 2 THEN                                
+      BEGIN                                                             
+         %Must be a file entry so build CSV record from it              
+         REPLACE PIN:PIN BY   BUFFIN[FNAME]  FOR   FNAME_LEN,   ",",    
+                              BUFFIN[FKIND]  FOR   FKIND_LEN,   ",",    
+                              BUFFIN[SEC]    FOR   SEC_LEN,     ",",    
+                              BUFFIN[PU]     FOR   PU_LEN,      ",",    
+                              BUFFIN[SA]     FOR   SA_LEN,      ",",    
+                              BUFFIN[TK]     FOR   TK_LEN,      ",",    
+                              BUFFIN[SAD]    FOR   SAD_LEN,     ",",    
+                              BUFFIN[KRB]    FOR   KRB_LEN,     ",",    
+                              BUFFIN[CMP]    FOR   CMP_LEN,     ",",    
+                              BUFFIN[CTL]    FOR   CTL_LEN,     ",",    
+                              BUFFIN[SUP]    FOR   SUP_LEN,     ",",    
+                              BUFFIN[RSD]    FOR   RSD_LEN,     ",",    
+                              BUFFIN[TAD]    FOR   TAD_LEN,     ",",    
+                              BUFFIN[RST]    FOR   RST_LEN,     ",",    
+                              BUFFIN[LP]     FOR   LP_LEN,      ",",    
+                              MYPACK[0]      FOR   17,          ","     
+                              ;                                         
+                                                                        
+         %Write the record                                              
+         REPLACE BUFFOUT[0] BY BUFFOUT[0] FOR SIZE(BUFFOUT) WITH SP2NUL;
+         WRITE(STREAM,150,BUFFOUT[0]);                                  
+                                                                        
+      END;                                                              
+                                                                        
+   END;                                                                 
+                                                                        
+   LOCK(STREAM,CRUNCH);                                                 
+                                                                        
+END.                                                                    

@@ -1,0 +1,589 @@
+DEFINE * SITUATION CPU_CHECK(TIME,MX):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CHECK SITUATION                                                       %% 
+%% ~~~~~~~~~~~~~~~~~~~                                                       %% 
+%% MONITORS FOR PROGRAMS WITH EXCESSIVE CPU USAGE                            %% 
+%% - System CPU rate 90% or greater                                          %% 
+%%    AND                                                                    %% 
+%% - Task elapsed time greater than 15 minutes                               %% 
+%%    AND                                                                    %% 
+%% - Task CPU rate more than 65%                                             %% 
+%%    AND                                                                    %% 
+%% - Task running under ##REDACTED## usercode,                                    %% 
+%%   or ##REDACTED##/TEST/##REDACTED##/##REDACTED## usercodes                                       %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CHECK DO CPU_CHECK                                 %% 
+%% CALLS: CPU_CHECK ODTS                                                     %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%% Version  2 - - Amend CPU thresholds            JUN '15  GXG.    %% 
+%% Version  3 - - Throttle earlier/more aggressive JUN '16 GXG.    %% 
+%% Version  4 - -Fix to make sure throttled programs don't escape %% 
+%%                          further throttling               FEB '17 GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+   (CPMUSER GEQ 90 AND                                                          
+   ELAPSEDTIME GTR 900 AND                                                      
+   CPURATE GTR 65 AND                                                           
+   USER HDIS {"##REDACTED##","##REDACTED##","##REDACTED##","##REDACTED##","##REDACTED##"}) OR (CPURATEBIAS GTR 0)   
+\                                                                               
+DEFINE * SITUATION CPU_CLEAN_WL(LOGEOJ):                                        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_WL SITUATION                                                    %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~                                                    %% 
+%% MONITORS SUMLOG FOR EOJ OF PROGRAMS THAT ARE ON THE WHITELIST             %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_WL DO CPU_CLEAN_WL                           %% 
+%% CALLS: CPU_CLEAN_WL ODTS                                                  %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - ##REDACTED##- Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+String(MIXNO,*) ISIN $CPU_WHITELIST_MAP.GLOBAL                                  
+\                                                                               
+DEFINE * ODTSEQUENCE CPU_CLEAN_WL(LOG):                                         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_WL ODTSEQUENCE                                                  %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~                                                  %% 
+%% REMOVES MIX NUMBERS FROM WHITELIST WHEN THE PROGRAM COMPLETES             %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_WL DO CPU_CLEAN_WL                           %% 
+%% CALLED BY: CPU_CLEAN_WL SITU                                              %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - ##REDACTED##- Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$CPU_WHITELIST_MAP.GLOBAL.CUT(STRING(MIXNO,*));                                 
+DISPLAY(#(MIXNO,,"has completed and has been removed from whitelist"));         
+\                                                                               
+DEFINE * SITUATION CPU_CLEAN_THROT(LOGEOJ):                                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_THROT SITUATION                                                 %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~                                                 %% 
+%% MONITORS SUMLOG FOR EOJ OF PROGRAMS THAT ARE ON THE THROTTLE LIST         %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_THROT DO CPU_CLEAN_THROT                     %% 
+%% CALLS: CPU_CLEAN_THROT ODTS                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - ##REDACTED##- Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+String(MIXNO,*) ISIN $CPU_THROTTLED_MAP.GLOBAL                                  
+\                                                                               
+DEFINE * ODTSEQUENCE CPU_CLEAN_THROT(LOG):                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_THROT ODTSEQUENCE                                               %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                               %% 
+%% REMOVES MIX NUMBERS FROM THROTTLE LIST WHEN THE PROGRAM COMPLETES         %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_THROT DO CPU_CLEAN_THROT                     %% 
+%% CALLS: CPU_CLEAN_THROT ODTS                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$CPU_THROTTLED_MAP.GLOBAL.CUT(STRING(MIXNO,*));                                 
+DISPLAY(#(MIXNO,,"has completed and has been removed from throttle list"));     
+\                                                                               
+DEFINE * SITUATION CPU_CLEAN_ALERT(LOGEOJ):                                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_ALERT SITUATION                                                 %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~                                                 %% 
+%% MONITORS SUMLOG FOR EOJ OF PROGRAMS THAT ARE ON THE ALERTED LIST          %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_ALERT DO CPU_CLEAN_ALERT                     %% 
+%% CALLS: CPU_CLEAN_ALERT ODTS                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+String(MIXNO,*) ISIN $CPU_ALERT_MAP.GLOBAL                                      
+\                                                                               
+DEFINE * ODTSEQUENCE CPU_CLEAN_ALERT(LOG):                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_ALERT ODTSEQUENCE                                               %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                               %% 
+%% REMOVES MIX NUMBERS FROM ALERTED LIST WHEN THE PROGRAM COMPLETES          %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_ALERT DO CPU_CLEAN_ALERT                     %% 
+%% CALLS: CPU_CLEAN_ALERT ODTS                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$OLD_ENTRY:="";                                                                 
+$OLD_ENTRY:=$CPU_ALERT_MAP.GLOBAL.COPY(#(MIXNO,"!="));                          
+$CPU_ALERT_MAP.GLOBAL.CUT(#($OLD_ENTRY));                                       
+DISPLAY(#(MIXNO,,"has completed and has been removed from alert list"));        
+\                                                                               
+DEFINE * ODTSEQUENCE SET_CPU_BIAS(MSG):                                         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% SET_CPU_BIAS ODTSEQUENCE                                                  %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~                                                  %% 
+%% Sets a value in the CPURATEBIAS task attribute of a given mix number      %% 
+%% using the supplied parameter, so that MCP will throttle the task.         %% 
+%% Uses USERFN22 in the SLed OPALUSERLIB program to do the get/set status.   %% 
+%%                                                                           %% 
+%% Invoked using DO SET_CPU_BIAS <MIXNO> <PERCENTAGE THROTTLE>               %% 
+%% e.g DO SET_CPU_BIAS 1234 0.5                                              %% 
+%%                                                                           %% 
+%% CALLED BY: CPU_CHECK ODTS                                                 %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+IF TEXT = EMPTY THEN                                                            
+   SHOW("EXPECTS A PARAMETER OF MIXNUMBER RATE WHERE RATE IS BETWEEN 0 AND 1",/,
+        "EX DO SET_CPU_BIAS 1234 0.5")                                          
+ELSE                                                                            
+BEGIN                                                                           
+   ODT(#(TEXT,"ST"));                                                           
+   $RSLT:=USERFN(22,TEXT);                                                      
+   $MX:=HEAD(TRIM(TEXT),NOT " ");                                               
+   $RSLT.INSERT(VIA(TASKSTR($MX):#(MIXNUMBER,,NAME,/,"BIAS=",                   
+   STRING8(CPURATEBIAS,*))),/);                                                 
+   SHOW($RSLT);                                                                 
+   ODT(#(TEXT,"OK"));                                                           
+END;                                                                            
+\                                                                               
+DEFINE * ODTSEQUENCE CLEAR_CPU_BIAS(MSG):                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CLEAR_CPU_BIAS ODTSEQUENCE                                                %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~~                                                %% 
+%% Clears CPURATEBIAS task attribute of a given mix number using the         %% 
+%% the supplied parameter, so that MCP will stop throttling the task.        %% 
+%% Uses USERFN22 in the SLed OPALUSERLIB program to do the get/set status.   %% 
+%%                                                                           %% 
+%% Invoked using DO CLEAR_CPU_BIAS <MIXNO>                                   %% 
+%% e.g DO SET_CPU_BIAS 1234                                                  %% 
+%%                                                                           %% 
+%% CALLED BY: CPU_CHECK and CPU_RELEASE_ME ODTS                              %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+IF TEXT = EMPTY THEN                                                            
+   SHOW("EXPECTS A PARAMETER OF MIXNUMBER",/,                                   
+        "EX DO CLEAR_CPU_BIAS 1234")                                            
+ELSE                                                                            
+BEGIN                                                                           
+   $PARAM:=#(TEXT,,"0");                                                        
+   $RSLT:=USERFN(22,$PARAM);                                                    
+   $MX:=HEAD(TRIM(TEXT),NOT " ");                                               
+   $RSLT.INSERT(VIA(TASKSTR($MX):#(MIXNUMBER,,NAME,/,"BIAS=",                   
+   STRING8(CPURATEBIAS,*))),/);                                                 
+   SHOW($RSLT);                                                                 
+END;                                                                            
+\                                                                               
+DEFINE * ODTSEQUENCE CPU_RELEASE_ME(MSG):                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_RELEASE_ME ODTSEQUENCE                                                %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~~                                                %% 
+%% Clears CPURATEBIAS task attribute of a given mix number using the         %% 
+%% the supplied parameter, so that MCP will stop throttling the task.        %% 
+%%                                                                           %% 
+%% Invoked using DO CPU_RELEASE_ME <MIXNO>                                   %% 
+%% e.g DO CPU_RELEASE_ME 1234                                                %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%% Version  2 - - Clear some more globals.            APR '18 LW. %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+CALL DO "CLEAR_CPU_BIAS" #(TRIM(TEXT),,"0");                                    
+$CPU_THROTTLED_MAP.GLOBAL.CUT(#(TRIM(TEXT)));                                   
+$CPU_WHITELIST_MAP.GLOBAL.INSERT(#(TRIM(TEXT)));                                
+$OLD_RM_ENTRY:="";                                                              
+$OLD_RM_ENTRY:= $CPU_ALERT_MAP.GLOBAL.COPY(#(TRIM(TEXT),"!="));                 
+$CPU_ALERT_MAP.GLOBAL.CUT($OLD_RM_ENTRY);                                       
+$OLD_RM_ENTRY:="";                                                              
+$OLD_RM_ENTRY:= $CPU_POKED_MAP.GLOBAL.COPY(#(TRIM(TEXT),"!="));                 
+$CPU_POKED_MAP.GLOBAL.CUT($OLD_RM_ENTRY);                                       
+                                                                                
+\                                                                               
+DEFINE * ODTSEQUENCE CPU_CHECK(MX):                                             
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CHECK SITUATION                                                       %% 
+%% ~~~~~~~~~~~~~~~~~~~                                                       %% 
+%% Analyses programs flagged by CPU_CHECK SITU for excessive usage and:      %% 
+%% - Sends alert email                                                       %% 
+%%    AND                                                                    %% 
+%% - Applies MCP throttling at increasing rates based on elapsed time and    %% 
+%%    CPU usage  OR                                                          %% 
+%%   Releases a previously throttled task if it is no longer one of the      %% 
+%%    highest users of CPU.                                                  %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CHECK DO CPU_CHECK                                 %% 
+%% CALLED BY: CPU_CHECK SITU                                                 %% 
+%% CALLS: SET_CPU_BIAS, CLEAR_CPU_BIAS ODTS                                  %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation          MAR '16, GXG.    %% 
+%% Version  2 - - Add support for alert timestamps JUN '16 GXG.    %% 
+%% Version  3 - - Throttle earlier/more aggressive JUN '16 GXG.    %% 
+%% Version  4 - -Fix to make sure throttled programs don't escape %% 
+%%                          further throttling               FEB '17 GXG.    %% 
+%% Version  5 - -Allow throttled tasks that are no longer the     %% 
+%%                          biggest hoggers back in with no throttling after %% 
+%%                          they're behaving for 30 minutes. Also moved the  %% 
+%%                          logic about a bit.                    APR '18  %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+CLEAR;                                                                          
+                                                                                
+IF $CPU_WHITELIST_MAP.GLOBAL.COPY(#(MIXNO)) NEQ EMPTY THEN                      
+  %%Task number is in the whitelist.  No further processing required. Nasty     
+  %% but effective.                                                             
+  EXIT;                                                                         
+                                                                                
+%Get accesscode associated with task that has triggered the script.             
+$AC:=#(ACCESSCODE,"ZZ");                                                        
+                                                                                
+%Get the name of the user.                                                      
+$ID:=USERDATA($AC,IDENTITY);                                                    
+                                                                                
+%Get information on any portfiles the task has open                             
+#LIM:=FIFILECOUNT;                                                              
+#INX:=-1;                                                                       
+                                                                                
+$PFILES:= Empty;                                                                
+                                                                                
+While #INX.SUM(1) < #LIM DO                                                     
+If FIUNITTYPE(#INX)=PORTFILE THEN                                               
+   $PFILES.INSERT(#(FITITLE(#INX) 17,,FITRANSACTIONS(#INX)),/);                 
+                                                                                
+%Initialise timestamp variables                                                 
+#TS:=#HRS:=#MINS:=#SECS:=0;                                                     
+$STAMP:="";                                                                     
+IF #CPU_ALERT_THRESH.GLOBAL > 0 THEN                                            
+  #THRESH := #CPU_ALERT_THRESH.GLOBAL                                           
+ELSE                                                                            
+  #THRESH := 900;                                                               
+                                                                                
+%Get current MCP Time (Time since last halt/load)                               
+$STAMP:= TIME(MCPTIME);                                                         
+#TIMESZ := LENGTH($STAMP);                                                      
+%convert from H..H:MM:SS to seconds                                             
+#HRS    := DECIMAL(TAKE($STAMP,#TIMESZ-6));                                     
+#MINS   := DECIMAL(TAKE(DROP($STAMP,#TIMESZ-5),2));                             
+#SECS   := DECIMAL(TAKE(DROP($STAMP,#TIMESZ-2),2));                             
+#TS:=(#HRS*60*60)+(#MINS*60)+#SECS;                                             
+                                                                                
+#OLD_CPURATEBIAS := CPURATEBIAS;                                                
+#NEW_CPURATEBIAS := CPURATEBIAS;                                                
+                                                                                
+#THROTTLED:=0;                                                                  
+                                                                                
+IF String(MIXNO,*) ISIN $CPU_POKED_MAP.GLOBAL THEN                              
+   BEGIN                                                                        
+   %Found an entry in poke map so check how long since last poke                
+   $OLD_POKE_ENTRY:= $CPU_POKED_MAP.GLOBAL.COPY(#(MIXNO,"!="));                 
+   #OLD_POKE:=DECIMAL(DECAT($OLD_POKE_ENTRY,"!",1));                            
+   #SINCE_LAST_POKE:=#TS-#OLD_POKE;                                             
+   END                                                                          
+ELSE                                                                            
+   #SINCE_LAST_POKE:=ELAPSEDTIME;                                               
+                                                                                
+$RECIPIENTS:=#('##REDACTED##,',                     
+ '##REDACTED##');            
+                                                                                
+%If there is an accesscode for the task, and if the accesscode has an           
+% email address populated in the EMAIL field of the USERDATA entry              
+% add it to the recipient list                                                  
+IF NOT(ACCESSCODE = EMPTY) THEN                                                 
+BEGIN                                                                           
+  $EMAIL:=USERDATA($AC,EMAIL);                                                  
+  IF NOT($EMAIL = EMPTY) THEN                                                   
+  BEGIN                                                                         
+     $RECIPIENTS:=#($RECIPIENTS,',',$EMAIL);                                    
+  END;                                                                          
+END;                                                                            
+                                                                                
+IF CPURATEBIAS > 0 AND #SINCE_LAST_POKE > 3600 THEN                             
+  BEGIN                                                                         
+  %DISPLAY("CHECKING ALREADY SET/AUTO RELEASE");                                
+  CALL DO "CPU_TOP_TRUMP" #(MIXNO);                                             
+  IF $CPU_TOP_OFFENDER = "N" THEN                                               
+    BEGIN                                                                       
+      %DISPLAY("RELEASEING IT");                                                
+      CALL DO "CLEAR_CPU_BIAS" (#(MIXNO));                                      
+      $CPU_THROTTLED_MAP.GLOBAL.CUT(#(MIXNO));                                  
+      %Update alert and poked to start counting again and stop                  
+      % it getting throttled almost immediately. Give it a chance at least.     
+      CALL DO "CPU_UPDATE_POKED" (#(MIXNO));                                    
+      CALL DO "CPU_UPDATE_ALERT" (#(MIXNO));                                    
+                                                                                
+      %Build and send email notification for task that has been reinstated.     
+                                                                                
+      #ML:=MAIL(#('To:',$RECIPIENTS,';Subject:',                                
+        'BETA: (',USER,') ',NAME,'(',MIXNO,') released after resource drop'),   
+        #("Accesscode = ",ACCESSCODE,/,                                         
+      "Identity = ",$ID,/,                                                      
+      "BOT: ",BOTTS,/,                                                          
+      "Elapsed Time (HH:MM:SS) = ",TIMETOTEXT(ELAPSEDTIME,HHMMSS),/,            
+      "IO Time (HH:MM:SS) = ",TIMETOTEXT(ACCUMIOTIME,HHMMSS),/,                 
+      "Processor Time (HH:MM:SS) = ",TIMETOTEXT(ACCUMPROCTIME,HHMMSS),/,        
+      "CPU Rate = ",CPURATE,"%",/,                                              
+      "System CPU Rate = ",CPMUSER,"%",/,                                       
+      "Percentage Throttling Applied (CPURATEBIAS) = ",$THROTTLE_PCNT,"%",/,    
+      "Last Display = ",DISPLAY,/,                                              
+      "  At ",DISPLAYTS,/,/,                                                    
+      "Portfiles in use by this mix entry:",/,                                  
+      $PFILES));                                                                
+                                                                                
+      EXIT                                                                      
+    END                                                                         
+  END;                                                                          
+                                                                                
+%If 30 minutes since last poke and already throttled by 50% then throttle by    
+% 75%                                                                           
+IF #SINCE_LAST_POKE GTR 1800 AND CPURATEBIAS = 0.50 AND                         
+   $SKIPPED:= $CPU_WHITELIST_MAP.GLOBAL.COPY(#(MIXNO)) = EMPTY THEN             
+            BEGIN                                                               
+               %DISPLAY("Setting BIAS to 0.75");                                
+               %$SCB:= #("SET_CPU_BIAS ",MIXNO,,"0.75");                        
+               CALL DO "SET_CPU_BIAS" #(MIXNO,,"0.75");                         
+               #NEW_CPURATEBIAS := 0.75;                                        
+               DISPLAY (#("Task",,MIXNO,,                                       
+               "has had CPU usage throttled by 75% due to excessive usage"));   
+               WHILE $L:=$CPU_THROTTLED_MAP.GLOBAL.COPY(#(MIXNO))NEQ EMPTY DO   
+                  BEGIN                                                         
+                  $CPU_THROTTLED_MAP.GLOBAL.CUT(#(MIXNO));                      
+                  END;                                                          
+               $CPU_THROTTLED_MAP.GLOBAL.INSERT(#(MIXNO));                      
+               #THROTTLED:=MIXNO;                                               
+               $THROTTLED:=EMPTY;                                               
+               CALL DO "CPU_UPDATE_POKED" (#(MIXNO));                           
+            END;                                                                
+                                                                                
+%If 30 mins since last poke, throttle by 50% if already throttled by 25%.       
+IF (#SINCE_LAST_POKE GTR 1800 AND CPURATEBIAS = 0.25 AND                        
+    $SKIPPED:= $CPU_WHITELIST_MAP.GLOBAL.COPY(#(MIXNO)) = EMPTY) THEN           
+            BEGIN                                                               
+               %DISPLAY("Setting BIAS to 0.5");                                 
+               CALL DO "SET_CPU_BIAS" #(MIXNO,,"0.5");                          
+               #NEW_CPURATEBIAS := 0.5;                                         
+               DISPLAY (#("Task",,MIXNO,,                                       
+               "has had CPU usage throttled by 50% due to excessive usage"));   
+               WHILE $L:=$CPU_THROTTLED_MAP.GLOBAL.COPY(#(MIXNO))NEQ EMPTY DO   
+                  BEGIN                                                         
+                  $CPU_THROTTLED_MAP.GLOBAL.CUT(#(MIXNO));                      
+                  END;                                                          
+               $CPU_THROTTLED_MAP.GLOBAL.INSERT(#(MIXNO));                      
+               #THROTTLED:=MIXNO;                                               
+               $THROTTLED:=EMPTY;                                               
+               CALL DO "CPU_UPDATE_POKED" (#(MIXNO));                           
+            END;                                                                
+                                                                                
+%Check if task is using more than 65% CPU, 30 minutes since the last poke,      
+% overall system usage more than 90% and task not already throttled, throttle   
+% by 25%.                                                                       
+IF (CPMUSER GEQ 90 AND                                                          
+   #SINCE_LAST_POKE GTR 1800 AND                                                
+   CPURATE GTR 65 AND                                                           
+   CPURATEBIAS < 0.25 AND                                                       
+   ($SKIPPED:= $CPU_WHITELIST_MAP.GLOBAL.COPY(#(MIXNO)) = EMPTY)) THEN          
+      BEGIN                                                                     
+      %DISPLAY("Setting BIAS to 0.25");                                         
+      CALL DO "SET_CPU_BIAS" #(MIXNO,,"0.25");                                  
+      #NEW_CPURATEBIAS := 0.25;                                                 
+      DISPLAY (#("Task",,MIXNO,,                                                
+                 "has had CPU usage throttled by 25% due to excessive usage")); 
+      WHILE $L:=$CPU_THROTTLED_MAP.GLOBAL.COPY(#(MIXNO))NEQ EMPTY DO            
+         BEGIN                                                                  
+         $CPU_THROTTLED_MAP.GLOBAL.CUT(#(MIXNO));                               
+         END;                                                                   
+      $CPU_THROTTLED_MAP.GLOBAL.INSERT(#(MIXNO));                               
+      #THROTTLED:=MIXNO;                                                        
+      $THROTTLED:=EMPTY;                                                        
+      CALL DO "CPU_UPDATE_POKED" (#(MIXNO));                                    
+      END;                                                                      
+                                                                                
+$THROTTLE_PCNT:=#(DECIMAL(STRING8(CPURATEBIAS,*))*100);                         
+                                                                                
+%Check if task has been alerted on before                                       
+                                                                                
+%Build and send email notification for task that has been throttled.            
+IF #THROTTLED GTR 0 THEN                                                        
+   BEGIN                                                                        
+                                                                                
+   IF CPURATEBIAS > 0 THEN                                                      
+     $BIAS_WORDING := "Throttled by " & STRING(CPURATEBIAS*100,*) & "%"         
+   ELSE                                                                         
+     $BIAS_WORDING := "No throttling applied, yet";                             
+                                                                                
+   #ML:=MAIL(#('To:',$RECIPIENTS,';Subject:',                                   
+  'BETA: (',USER,') ',NAME,'(',MIXNO,') throttled for excessive CPU usage'),    
+    #("Accesscode = ",ACCESSCODE,/,                                             
+      "Identity = ",$ID,/,                                                      
+      "BOT: ",BOTTS,/,                                                          
+      "Elapsed Time (HH:MM:SS) = ",TIMETOTEXT(ELAPSEDTIME,HHMMSS),/,            
+      "IO Time (HH:MM:SS) = ",TIMETOTEXT(ACCUMIOTIME,HHMMSS),/,                 
+      "Processor Time (HH:MM:SS) = ",TIMETOTEXT(ACCUMPROCTIME,HHMMSS),/,        
+      "CPU Rate = ",CPURATE,"%",/,                                              
+      "System CPU Rate = ",CPMUSER,"%",/,                                       
+      "Percentage Throttling Applied (CPURATEBIAS) = ",$THROTTLE_PCNT,"%",/,    
+      "Last Display = ",DISPLAY,/,                                              
+      "  At ",DISPLAYTS,/,                                                      
+      $BIAS_WORDING,/,/,                                                        
+      "Portfiles in use by this mix entry:",/,                                  
+      $PFILES));                                                                
+    END;                                                                        
+                                                                                
+IF #(MIXNO,"!") ISIN $CPU_ALERT_MAP.GLOBAL THEN                                 
+   BEGIN                                                                        
+      %Found an entry in alert map so check how long since last alert           
+      $OLD_TS_ENTRY:= $CPU_ALERT_MAP.GLOBAL.COPY(#(MIXNO,"!="));                
+      #OLD_TS:=DECIMAL(DECAT($OLD_TS_ENTRY,"!",1));                             
+      IF (#TS-#OLD_TS LEQ #THRESH) AND                                          
+         (#OLD_CPURATEBIAS = #NEW_CPURATEBIAS) THEN                             
+            EXIT;                                                               
+      $CPU_ALERT_MAP.GLOBAL.CUT($OLD_TS_ENTRY);                                 
+      CALL DO "CPU_UPDATE_ALERT" (#(MIXNO));                                    
+   END                                                                          
+ELSE                                                                            
+   CALL DO "CPU_UPDATE_ALERT" (#(MIXNO));                                       
+                                                                                
+%Build and send email notification for task not yet throttled                   
+IF (#THROTTLED = 0) AND                                                         
+      ($SKIPPED:= $CPU_WHITELIST_MAP.GLOBAL.COPY(#(MIXNO)) = EMPTY) THEN        
+   BEGIN                                                                        
+                                                                                
+   IF CPURATEBIAS > 0 THEN                                                      
+     $BIAS_WORDING := "Throttled by " & STRING(CPURATEBIAS*100,*) & "%"         
+   ELSE                                                                         
+     $BIAS_WORDING := "No throttling applied, yet";                             
+                                                                                
+   #ML:=MAIL(#('To:',$RECIPIENTS,';Subject:',                                   
+       'BETA: (',USER,') ',NAME,'(',MIXNO,') - excessive CPU usage'),           
+    #("Accesscode = ",ACCESSCODE,/,                                             
+      "Identity = ",$ID,/,                                                      
+      "BOT: ",BOTTS,/,                                                          
+      "Elapsed Time (HH:MM:SS) = ",TIMETOTEXT(ELAPSEDTIME,HHMMSS),/,            
+      "IO Time (HH:MM:SS) = ",TIMETOTEXT(ACCUMIOTIME,HHMMSS),/,                 
+      "Processor Time (HH:MM:SS) = ",TIMETOTEXT(ACCUMPROCTIME,HHMMSS),/,        
+      "CPU Rate = ",CPURATE,"%",/,                                              
+      "System CPU Rate = ",CPMUSER,"%",/,                                       
+      "Last Display = ",DISPLAY,/,                                              
+      "  At ",DISPLAYTS,/,                                                      
+      $BIAS_WORDING,/,/,                                                        
+      "Portfiles in use by this mix entry:",/,                                  
+      $PFILES));                                                                
+    END;                                                                        
+\                                                                               
+ DEFINE * ODTSEQUENCE CPU_ALERT_THRESH(MSG):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% SETUP_THRESHOLD ODTSEQUENCE                                                %%
+%% ~~~~~~~~~~~~~~~~~~~                                                        %%
+%% Alows the setup of : #CPU_ALERT_THRESH.GLOBAL which holds the number of    %%
+%%                      seconds between alert emails. The figure is input as  %%
+%%                      a number of minutes and defaults to 15 minutes if     %%
+%%                      the global is not set up.                             %%
+%%                                                                            %%
+%% Example            : "DO CPU_ALERT_THRESH 15" to set to 900 seconds        %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Version  1 - - Initial Implementation              Apr 18, LW.  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+IF DECIMAL(TEXT) > 0 AND DECIMAL(TEXT) <  91 THEN                               
+   BEGIN                                                                        
+   #CPU_ALERT_THRESH.GLOBAL := (DECIMAL(TEXT)) * 60;                            
+   DISPLAY("Alert threshold set to ", STRING(#CPU_ALERT_THRESH.GLOBAL/60,*),    
+           " minute(s)")                                                        
+   END                                                                          
+ELSE                                                                            
+   DISPLAY ("THRESHOLD MUST BE FROM 1 TO 90 MINUTES");                          
+\                                                                               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+TT DEF + ODTS CPU_TOP_TRUMP (MSG):                                              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ENTRY    : MSG contains mix number of task that is being monitored and has %%
+%%            been throttled.                                                 %%
+%% FUNCTION : Identify whether the task is still in the top X (TOP_HOWMANY)   %%
+%%            CPU use tasks.                                                  %%
+%% EXIT     : $CPU_TOP_OFFENDER = "N" - Task is not in the top X (TOP_HOWMANY)%%
+%%            $CPU_TOP_OFFENDER = "Y" - Task is in the top X (TOP_HOWMANY)    %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Version  1 - - Initial Implementation              Apr 18, .  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Constants and initialisation                                                 
+#TOP_HOWMANY := 10;                                                             
+$TheMix := "";                                                                  
+#CNT := 0;                                                                      
+                                                                                
+$CPU_TOP_OFFENDER := "N";                                                       
+$TheMix := KEYIN('AA SORT CPURATE');                                            
+                                                                                
+WHILE $NextEntry := $TheMix.SPLIT(/) NEQ EMPTY DO                               
+  BEGIN                                                                         
+  #CNT := #CNT + 1;                                                             
+  IF #CNT > 1 THEN                                                              
+    BEGIN                                                                       
+    $NextMixNo := Take(Drop($NextEntry,2),4);                                   
+    IF TRIM($NextMixNo,ALL) = #(TRIM(TEXT)) THEN                                
+      BEGIN                                                                     
+      $CPU_TOP_OFFENDER := "Y";                                                 
+      $TheMix := "";                                                            
+      END;                                                                      
+    IF #CNT > #TOP_HOWMANY THEN                                                 
+      $TheMix := "";                                                            
+    END;                                                                        
+  END;                                                                          
+\                                                                               
+ DEFINE * ODTSEQUENCE CPU_UPDATE_POKED(MSG):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% ENTRY    : Task has been "poked", so update the timer.                       
+%% FUNCTION : Enter or update $CPU_POKED_MAP.GLOBAL with the number of seconds  
+%%            derived from the MCP CPUTIME.                                     
+%% EXIT     : Mix number and MCP CPUTIME in seconds entered into                
+%%            $CPU_POKED_MAP.GLOBAL                                             
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% Version  1 - - Initial Implementation              Apr 18, .  %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+$OLD_ENTRY:="";                                                                 
+$OLD_ENTRY:=$CPU_POKED_MAP.GLOBAL.COPY(#(TEXT,"!="));                           
+$CPU_POKED_MAP.GLOBAL.CUT(#($OLD_ENTRY));                                       
+$CPU_POKED_MAP.GLOBAL.INSERT(#(TEXT,"!",#TS))                                   
+\                                                                               
+ DEFINE * ODTSEQUENCE CPU_UPDATE_ALERT(MSG):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% ENTRY    : Task has had an alert email sent, so update the timer.            
+%% FUNCTION : Enter or update $CPU_ALERT_MAP.GLOBAL with the number of seconds  
+%%            derived from the MCP CPUTIME.                                     
+%% EXIT     : Mix number and MCP CPUTIME in seconds entered into                
+%%            $CPU_ALERT_MAP.GLOBAL                                             
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation              Apr 18, . %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$OLD_ENTRY:="";                                                                 
+$OLD_ENTRY:=$CPU_ALERT_MAP.GLOBAL.COPY(#(TEXT,"!="));                           
+$CPU_ALERT_MAP.GLOBAL.CUT(#($OLD_ENTRY));                                       
+$CPU_ALERT_MAP.GLOBAL.INSERT(#(TEXT,"!",#TS))                                   
+\                                                                               
+DEFINE * SITUATION CPU_CLEAN_POKED(LOGEOJ):                                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_POKED SITUATION                                                 %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~                                                 %% 
+%% MONITORS SUMLOG FOR EOJ OF PROGRAMS THAT ARE ON THE POKED LIST            %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_POKED DO CPU_CLEAN_POKED                     %% 
+%% CALLS: CPU_CLEAN_POKED ODTS                                               %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation             APR '18, . %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+String(MIXNO,*) ISIN $CPU_POKED_MAP.GLOBAL                                      
+\                                                                               
+DEFINE * ODTSEQUENCE CPU_CLEAN_POKED(LOG):                                      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% CPU_CLEAN_POKED ODTSEQUENCE                                               %% 
+%% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                               %% 
+%% REMOVES MIX NUMBERS FROM POKED LIST WHEN THE PROGRAM COMPLETES            %% 
+%%                                                                           %% 
+%% Invoked using WHEN CPU_CLEAN_POKED DO CPU_CLEAN_POKED and clears the      %% 
+%% poked map of the task number priovided.                                   %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%% Version  1 - - Initial Implementation             APR '18, . %% 
+%%                                                                           %% 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+$OLD_ENTRY:="";                                                                 
+$OLD_ENTRY:=$CPU_POKED_MAP.GLOBAL.COPY(#(MIXNO,"!="));                          
+$CPU_POKED_MAP.GLOBAL.CUT(#($OLD_ENTRY));                                       
+DISPLAY(#(MIXNO,,"has completed and has been removed from POKED list"));        
+                                                                                

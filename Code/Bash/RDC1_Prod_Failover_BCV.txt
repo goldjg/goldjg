@@ -1,0 +1,505 @@
+# %%% Mapping Script for Production BCV Set on Libra690.
+# %%%
+# %%% Version 1. For Pre Failover Production Backup - Nov 2008, 
+#
+#
+#
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symdg -type RDF1 create Prod_Failover_BCV
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symgate -sid 1234 define dev 1509
+/usr/local/bin/sudo /usr/symcli/bin/symgate -sid 1234 -g Prod_Failover_BCV associate dev 1509
+#
+#
+# %%% add individual (labelled) std (R1) devices    
+#
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1533 PK4000
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1534 PK4001
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1535 PK4002
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1536 PK4003
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1537 PK4004
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1538 PK4005
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1539 PK4006
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 153A PK4007
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 153B PK4008
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 153C PK4009
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 153D PK4010
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 153E PK4011
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 153F PK4012
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1540 PK4013
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1541 PK4014
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1542 PK4015
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1543 PK4016
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1544 PK4017
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1545 PK4018
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1546 PK4019
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1547 PK4020
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1548 PK4021
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1549 PK4022
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 154A PK4023
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 154B PK4024
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 154C PK4025
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 154D PK4026
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 154E PK4027
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 154F PK4028
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1550 PK4029
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1551 PK4030
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1552 PK4031
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1553 PK4032
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1554 PK4033
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1555 PK4034
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1556 PK4035
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1557 PK4036
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1558 PK4037
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1559 PK4038
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 155A PK4039
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 155B PK4040
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 155C PK4041
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 155D PK4042
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 155E PK4043
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 155F PK4044
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1560 PK4045
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1561 PK4046
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1562 PK4047
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1563 PK4048
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1564 PK4049
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1565 PK4050
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1566 PK4051
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1567 PK4052
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1568 PK4053
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1569 PK4054
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 156A PK4055
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 156B PK4056
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 156C PK4057
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 156D PK4058
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 156E PK4059
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 156F PK4060
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1570 PK4061
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1571 PK4062
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1572 PK4063
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1573 PK4064
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1574 PK4065
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1575 PK4066
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1576 PK4067
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1577 PK4068
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1578 PK4069
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1579 PK4070
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 157A PK4071
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 157B PK4072
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 157C PK4073
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 157D PK4074
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 157E PK4075
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 157F PK4076
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1580 PK4077
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1581 PK4078
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1582 PK4079
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1583 PK4080
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1584 PK4081
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1585 PK4082
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1586 PK4083
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1587 PK4084
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1588 PK4085
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1589 PK4086
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 158A PK4087
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 158B PK4088
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 158C PK4089
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 158D PK4090
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 158E PK4091
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 158F PK4092
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1590 PK4093
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1591 PK4094
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1592 PK4095
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1593 PK4096
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1594 PK4097
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1595 PK4098
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1596 PK4099
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1597 PK4100
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1598 PK4101
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 1599 PK4102
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 159A PK4103
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 159B PK4104
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 159C PK4105
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 159D PK4106
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 159E PK4107
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 159F PK4108
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A0 PK4109
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A1 PK4110
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A2 PK4111
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A3 PK4112
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A4 PK4113
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A5 PK4114
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A6 PK4115
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A7 PK4116
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A8 PK4117
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15A9 PK4118
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15AA PK4119
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15AB PK4120
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15AC PK4121
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15AD PK4122
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15AE PK4123
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15AF PK4124
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B0 PK4125
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B1 PK4126
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B2 PK4127
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B3 PK4128
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B4 PK4129
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B5 PK4130
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B6 PK4131
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B7 PK4132
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B8 PK4133
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15B9 PK4134
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15BA PK4135
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15BB PK4136
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15BC PK4137
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15BD PK4138
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15BE PK4139
+#
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15BF PK4140
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15C0 PK4141
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15C1 PK4142
+/usr/local/bin/sudo /usr/symcli/bin/symld -sid 1234 -g Prod_Failover_BCV add dev 15C2 PK4143
+#
+#
+#
+#
+# %%% associate individual (labelled) BCVs
+#
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 186F PK6436
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1870 PK6437
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1871 PK6438
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1872 PK6439
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1873 PK6440
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1874 PK6441
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1875 PK6442
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1876 PK6443
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1877 PK6444
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1878 PK6445
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1879 PK6446
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 187A PK6447
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 187B PK6448
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 187C PK6449
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 187D PK6450
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 187E PK6451
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 187F PK6452
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1880 PK6453
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1881 PK6454
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1882 PK6455
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1883 PK6456
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1884 PK6457
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1885 PK6458
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1886 PK6459
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1887 PK6460
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1888 PK6461
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1889 PK6462
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 188A PK6463
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 188B PK6464
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 188C PK6465
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 188D PK6466
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 188E PK6467
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 188F PK6468
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1890 PK6469
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1891 PK6470
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1892 PK6471
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1893 PK6472
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1894 PK6473
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1895 PK6474
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1896 PK6475
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1897 PK6476
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1898 PK6477
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 1899 PK6478
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 189A PK6479
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 189B PK6480
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 189C PK6481
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 189D PK6482
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 189E PK6483
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 189F PK6484
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A0 PK6485
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A1 PK6486
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A2 PK6487
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A3 PK6488
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A4 PK6489
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A5 PK6490
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A6 PK6491
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A7 PK6492
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A8 PK6493
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18A9 PK6494
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18AA PK6495
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18AB PK6496
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18AC PK6497
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18AD PK6498
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18AE PK6499
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18AF PK6500
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B0 PK6501
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B1 PK6502
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B2 PK6503
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B3 PK6504
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B4 PK6505
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B5 PK6506
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B6 PK6507
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B7 PK6508
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B8 PK6509
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18B9 PK6510
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18BA PK6511
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18BB PK6512
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18BC PK6513
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18BD PK6514
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18BE PK6515
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18BF PK6516
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C0 PK6517
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C1 PK6518
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C2 PK6519
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C3 PK6520
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C4 PK6521
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C5 PK6522
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C6 PK6523
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C7 PK6524
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C8 PK6525
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18C9 PK6526
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18CA PK6527
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18CB PK6528
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18CC PK6529
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18CD PK6530
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18CE PK6531
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18CF PK6532
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D0 PK6533
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D1 PK6534
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D2 PK6535
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D3 PK6536
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D4 PK6537
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D5 PK6538
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D6 PK6539
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D7 PK6540
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D8 PK6541
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18D9 PK6542
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18DA PK6543
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18DB PK6544
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18DC PK6545
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18DD PK6546
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18DE PK6547
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18DF PK6548
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E0 PK6549
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E1 PK6550
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E2 PK6551
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E3 PK6552
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E4 PK6553
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E5 PK6554
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E6 PK6555
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E7 PK6556
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E8 PK6557
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18E9 PK6558
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18EA PK6559
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18EB PK6560
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18EC PK6561
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18ED PK6562
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18EE PK6563
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18EF PK6564
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F0 PK6565
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F1 PK6566
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F2 PK6567
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F3 PK6568
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F4 PK6569
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F5 PK6570
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F6 PK6571
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F7 PK6572
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F8 PK6573
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18F9 PK6574
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18FA PK6575
+#
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18FB PK6576
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18FC PK6577
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18FD PK6578
+/usr/local/bin/sudo /usr/symcli/bin/symbcv -sid 1234 -g Prod_Failover_BCV associate dev 18FE PK6579
+#
+#
+#
+#
+# %%% attach R1s to BCVs
+#
+# %%% Packs 4000 - 4143 to 6436 - 6579
+#
+#
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4000 BCV ld PK6436
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4001 BCV ld PK6437
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4002 BCV ld PK6438
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4003 BCV ld PK6439
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4004 BCV ld PK6440
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4005 BCV ld PK6441
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4006 BCV ld PK6442
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4007 BCV ld PK6443
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4008 BCV ld PK6444
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4009 BCV ld PK6445
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4010 BCV ld PK6446
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4011 BCV ld PK6447
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4012 BCV ld PK6448
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4013 BCV ld PK6449
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4014 BCV ld PK6450
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4015 BCV ld PK6451
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4016 BCV ld PK6452
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4017 BCV ld PK6453
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4018 BCV ld PK6454
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4019 BCV ld PK6455
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4020 BCV ld PK6456
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4021 BCV ld PK6457
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4022 BCV ld PK6458
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4023 BCV ld PK6459
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4024 BCV ld PK6460
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4025 BCV ld PK6461
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4026 BCV ld PK6462
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4027 BCV ld PK6463
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4028 BCV ld PK6464
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4029 BCV ld PK6465
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4030 BCV ld PK6466
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4031 BCV ld PK6467
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4032 BCV ld PK6468
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4033 BCV ld PK6469
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4034 BCV ld PK6470
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4035 BCV ld PK6471
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4036 BCV ld PK6472
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4037 BCV ld PK6473
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4038 BCV ld PK6474
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4039 BCV ld PK6475
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4040 BCV ld PK6476
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4041 BCV ld PK6477
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4042 BCV ld PK6478
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4043 BCV ld PK6479
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4044 BCV ld PK6480
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4045 BCV ld PK6481
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4046 BCV ld PK6482
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4047 BCV ld PK6483
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4048 BCV ld PK6484
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4049 BCV ld PK6485
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4050 BCV ld PK6486
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4051 BCV ld PK6487
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4052 BCV ld PK6488
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4053 BCV ld PK6489
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4054 BCV ld PK6490
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4055 BCV ld PK6491
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4056 BCV ld PK6492
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4057 BCV ld PK6493
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4058 BCV ld PK6494
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4059 BCV ld PK6495
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4060 BCV ld PK6496
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4061 BCV ld PK6497
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4062 BCV ld PK6498
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4063 BCV ld PK6499
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4064 BCV ld PK6500
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4065 BCV ld PK6501
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4066 BCV ld PK6502
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4067 BCV ld PK6503
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4068 BCV ld PK6504
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4069 BCV ld PK6505
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4070 BCV ld PK6506
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4071 BCV ld PK6507
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4072 BCV ld PK6508
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4073 BCV ld PK6509
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4074 BCV ld PK6510
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4075 BCV ld PK6511
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4076 BCV ld PK6512
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4077 BCV ld PK6513
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4078 BCV ld PK6514
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4079 BCV ld PK6515
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4080 BCV ld PK6516
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4081 BCV ld PK6517
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4082 BCV ld PK6518
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4083 BCV ld PK6519
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4084 BCV ld PK6520
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4085 BCV ld PK6521
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4086 BCV ld PK6522
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4087 BCV ld PK6523
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4088 BCV ld PK6524
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4089 BCV ld PK6525
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4090 BCV ld PK6526
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4091 BCV ld PK6527
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4092 BCV ld PK6528
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4093 BCV ld PK6529
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4094 BCV ld PK6530
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4095 BCV ld PK6531
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4096 BCV ld PK6532
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4097 BCV ld PK6533
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4098 BCV ld PK6534
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4099 BCV ld PK6535
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4100 BCV ld PK6536
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4101 BCV ld PK6537
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4102 BCV ld PK6538
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4103 BCV ld PK6539
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4104 BCV ld PK6540
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4105 BCV ld PK6541
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4106 BCV ld PK6542
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4107 BCV ld PK6543
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4108 BCV ld PK6544
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4109 BCV ld PK6545
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4110 BCV ld PK6546
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4111 BCV ld PK6547
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4112 BCV ld PK6548
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4113 BCV ld PK6549
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4114 BCV ld PK6550
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4115 BCV ld PK6551
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4116 BCV ld PK6552
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4117 BCV ld PK6553
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4118 BCV ld PK6554
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4119 BCV ld PK6555
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4120 BCV ld PK6556
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4121 BCV ld PK6557
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4122 BCV ld PK6558
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4123 BCV ld PK6559
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4124 BCV ld PK6560
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4125 BCV ld PK6561
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4126 BCV ld PK6562
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4127 BCV ld PK6563
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4128 BCV ld PK6564
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4129 BCV ld PK6565
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4130 BCV ld PK6566
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4131 BCV ld PK6567
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4132 BCV ld PK6568
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4133 BCV ld PK6569
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4134 BCV ld PK6570
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4135 BCV ld PK6571
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4136 BCV ld PK6572
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4137 BCV ld PK6573
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4138 BCV ld PK6574
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4139 BCV ld PK6575
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4140 BCV ld PK6576
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4141 BCV ld PK6577
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4142 BCV ld PK6578
+/usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV attach PK4143 BCV ld PK6579
+#
+#
+# %%% create mirrors - and check results !!!
+# %%% leave out of script until attachments verified...
+#
+# /usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV -full -force establish
+#
+#
+# /usr/local/bin/sudo /usr/symcli/bin/symmir -sid 1234 -g Prod_Failover_BCV establish

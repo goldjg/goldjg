@@ -1,0 +1,88 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
+%% ONLY EDIT THIS SCRIPT IN PROGRAMMERS WORKBENCH                       %%      
+%%                                                                      %%      
+%% OS_NET_MON                                                           %%      
+%% ==========                                                           %%      
+%% This script monitors mainframe connection groups for incoming        %%      
+%% broadcast traffic (BROADCASTSRCVD) using the NW CONN <CGNAME> ALL    %%      
+%% command. If the rate of incoming broadcast messages on a connection  %%      
+%% group is above a certain rate, an email alert is sent to the ICC.    %%      
+%%                                                                      %%      
+%% This rate, and the delay between each check, is determined when the  %%      
+%% script is initiated.                                                 %%      
+%%                                                                      %%      
+%% The parameters are DELAY and THRESHOLD, and must be supplied for the %%      
+%% script to run. DELAY is the number of minutes the script should wait %%      
+%% between each check, and THRESHOLD is the rate (messages per minute)  %%      
+%% of BROADCASTS above which an alert should be sent.                   %%      
+%%                                                                      %%      
+%% Usage: TT DO OS_NET_MON DELAY nnn THRESHOLD nn                       %%      
+%%                                                                      %%      
+%% VERSION 01 - INITIAL IMPLEMENTATION - ########        JULY 2005 GXG  %%      
+%%                                                                      %%      
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%      
+   DEFINE + ODTSEQUENCE OS_NET_MON(MSG):                                        
+  #MIND:= 1;    %MINUTES                                                        
+  #MAXD:= 60;                                                                   
+  $TX:=Trim(Upper(TEXT));                                                       
+  While $KEY:=$TX.SPLIT(" ") Neq EMPTY Do                                       
+     If $KEY Eql "DELAY" Then                                                   
+        #DELAY:= Decimal($TX.SPLIT(" "))                                        
+     Else                                                                       
+     If $KEY Eql "THRESHOLD" Then                                               
+     Begin                                                                      
+        #THRESHOLD:=Decimal($TX.Split(" "));                                    
+        If #THRESHOLD Eql 0 Or #THRESHOLD Gtr 1500 Then                         
+           ABORT("'THRESHOLD' must be 1-1500");                                 
+     End;                                                                       
+  #DELAY:=Max(Min(#DELAY,#MAXD),#MIND);                                         
+  If #THRESHOLD Eql 0 Then                                                      
+     ABORT("'THRESHOLD' must be specified");                                    
+  $NW:=KEYIN("NW CONN");                                                        
+  While $N:=$NW.SPLIT(/) Neq EMPTY Do                                           
+     If $N Hdis "CONNECTION" Then                                               
+        $CG:=&Trim(Decat($N," ",1))&",";                                        
+  $CGLIST:=Take($CG,Length($CG)-1);                                             
+  While TRUE Do                                                                 
+  Begin                                                                         
+     $CGS:= $CGLIST;                                                            
+     While $CG:=$CGS.SPLIT Neq EMPTY Do                                         
+     Begin                                                                      
+%%        SHOW("PROCESSING "&$CG);                                              
+        $NWS:=KEYIN("NW CONN "&$CG&" ALL");                                     
+        #BRCVD:=#FRCVD:=-1;                                                     
+        While $L:=$NWS.SPLIT(/) Neq EMPTY And (#FRCVD=-1 Or #BRCVD=-1) Do       
+           If $L Incl "BROADCASTSRCVDCOUNTER" Then                              
+              #BRCVD:= Decimal(Decat($L,"= ",1))                                
+           Else                                                                 
+           If $L Incl "FRAMERECEIVEDCOUNTER" Then                               
+              #FRCVD:= Decimal(Decat($L,"= ",1));                               
+        $FVAR:="F"&$CG;                                                         
+        $BVAR:="B"&$CG;                                                         
+        If Get($FVAR) Gtr 0 And Get($BVAR) Gtr 0 Then                           
+        Begin                                                                   
+           #BDIFF:= #BRCVD-Get($BVAR);                                          
+           #FDIFF:= #FRCVD-Get($FVAR);                                          
+           If #FDIFF Gtr 0 Then                                                 
+           Begin                                                                
+              #Rate:=#BDIFF/#DELAY;                                             
+%%              SHOW($CG,/,"B'cast rcvd  = ",#BDIFF,," Frames rcvd = ",#FDIFF,  
+%%                   " Rate = ",#Rate 10.2);                                    
+              If #Rate Gtr #THRESHOLD Then                                      
+                 #M:=MAIL("To:####;"&        
+                          "Subject:Mainframe Network Monitor Alert for "&$CG,   
+                     #("Connection group ",$CG," monitoring",/,                 
+                       "Broadcast rate exceeded!",/,                            
+                       "Delay period is ",#DELAY," minutes",/,/,                
+                       #FDIFF, " rcvd frames since last poll",/                 
+                       #BDIFF, " rcvd broadcasts since last poll",/,            
+                       Trim(#(#Rate 10.2))," broadcasts per minute exceeds ",   
+                       #THRESHOLD," broadcasts per minute user threshold"));    
+           End;                                                                 
+        End;                                                                    
+        Store($FVAR,#FRCVD);                                                    
+        Store($BVAR,#BRCVD);                                                    
+     End;                                                                       
+     WAIT(#DELAY*60);                                                           
+  End;                                                                          
+\                                                                               

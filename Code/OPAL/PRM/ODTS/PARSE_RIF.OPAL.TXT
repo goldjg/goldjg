@@ -1,0 +1,29 @@
+TT DEFINE + ODTSEQUENCE PARSE_RIF(CUSTOM):                                      
+   Case EVENTTYPE of                                                            
+   Begin                                                                        
+   "STARTELEMENT":                                                              
+      Begin                                                                     
+         Case LOCALNAME Of                                                      
+         Begin                                                                  
+         "Mix":  #SMix:=1;                                                      
+                 Exit;                                                          
+         "Station": #STN:=1;                                                    
+                    Exit;                                                       
+         "Notify_Address": #Notify_Address:=1;                                  
+                           Exit;                                                
+         End;                                                                   
+      End;                                                                      
+   "ENDELEMENT":                                                                
+      Begin                                                                     
+         If #SMix ~= 1 Then                                                     
+            Exit;                                                               
+         If #STN ~= 1 Then                                                      
+            Exit;                                                               
+         If #Notify_Address ~= 1 Then                                           
+            Exit;                                                               
+      End;                                                                      
+   "CHARACTERS":                                                                
+      Begin                                                                     
+         Display(TEXT);                                                         
+      End;                                                                      
+   End;                                                                         

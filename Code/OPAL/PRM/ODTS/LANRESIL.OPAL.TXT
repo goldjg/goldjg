@@ -1,0 +1,102 @@
+   DEFINE + SITUATION OS_LANRESIL(LOG=19,6):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_LANRESIL SITUATION                                               %         
+% ~~~~~~~~~~~~~~~~~~~~~                                               %         
+%                                                                     %         
+% SITUATION THAT DETECTS CNS GENERIC SERVICES LOG ENTRIES             %         
+% (LOG MAJOR 19, LOG MINOR 6) RELATING TO LAN RESILIENCY              %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        CHG21899 GXG APR 2012    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%% Checking DIAG(TCPIP) log entries                                             
+%% If 10.9.34. is in the logtext and logtext after date/time/mix/log entry type 
+%% starts with "MoveIPv4ATAI" or "--- IP" then it's a Lan Resil IP address move 
+  LOGTEXT EQW "=10.9.34.=" AND                                                  
+  DROP(LOGTEXT,41) HDIS {"MoveIPv4ATAI","--- IP"}                               
+\                                                                               
+   DEFINE + ODTSEQUENCE OS_LANRESIL(LOG):                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_RRD_LOG ODTSEQUENCE                                              %         
+% ~~~~~~~~~~~~~~~~~~~~~~                                              %         
+%                                                                     %         
+% ODTSEQUENCE THAT SCANS CNS GS LAN RESILIENCY LOG ENTRIES AND ALERTS %         
+% WHENEVER A LIVE NETWORK CONNECTION IS RELOCATED TO ANOTHER ADAPTER  %         
+% FOR LAN RESILIENCEY PURPOSES, OR WHEN IT MOVES BACK.                %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        CHG21899 GXG APR 2012    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%%Grab IP address of affected card                                              
+$IP:=DECAT(DECAT(LOGTEXT,"IP Address ",1)," ",4);                               
+                                                                                
+$NP201:=DECAT(KEYIN("NW TCPIP ID NP 201 LINE 1"),/,1);                          
+$NP202:=DECAT(KEYIN("NW TCPIP ID NP 202 LINE 1"),/,1);                          
+$NP211:=DECAT(KEYIN("NW TCPIP ID NP 211 LINE 1"),/,1);                          
+$NP212:=DECAT(KEYIN("NW TCPIP ID NP 212 LINE 1"),/,1);                          
+$NIC_STATUS:=#($NP201,/,/,$NP202,/,/,$NP211,/,/,$NP212);                        
+                                                                                
+IF DROP(LOGTEXT,41) HDIS "--- IP" THEN                                          
+%Recovering an IP Address to original network card                              
+BEGIN                                                                           
+   %Format email body with log entry and NW TCPIP ID response                   
+   $RECOVERMSG:=#(LOGTEXT,/,/,"Current Status of Network Adapters:",/,          
+               $NIC_STATUS);                                                    
+                                                                                
+   %Send email alert                                                            
+   #RSLT:=MAIL(#("TO:PGDS.MAINFRAME.UNISYS,INFRASTRUCTURE.CONTROL",             
+      ";SUBJECT:IP Address",,$IP,,"on ",                                        
+      HOSTNAME,,"recovered to original network adapter"),$RECOVERMSG);          
+   EXIT;                                                                        
+END;                                                                            
+                                                                                
+IF DROP(LOGTEXT,41) HDIS "MoveIPv4ATAI" THEN                                    
+%Moving address to alternate card due to failure                                
+BEGIN                                                                           
+                                                                                
+   $NP:=TAKE(DECAT(DECAT(KEYIN("NW TCPIP ID"),$IP,1),                           
+         "RELOCATED FROM: NP-DEVICE ",1),3);                                    
+                                                                                
+   %Give system time to write LOG CNS(GS) NW report to log (not instantaneous). 
+   WAIT(20); %seconds                                                           
+                                                                                
+   %Check last sumlog entry of Major Type 33 (CNS) and Minor Type 2 (GS)        
+   % where the logtext includes "CONNECTION CLOSED"  and affects the NP         
+   % detected in the SITU and put that line of the text into $ERROR variable    
+   TT(#('EV (LOG=33,2:',                                                        
+      '("CONNECTION CLOSED" ISIN LOGTEXT AND ',                                 
+      '"_',$NP,'" ISIN LOGTEXT)) DO ',                                          
+      '($ERROR:=DECAT(LOGTEXT,"CONNECTION CLOSED",3);)[1]'));                   
+                                                                                
+   %Grab "SC -" output                                                          
+   $SC:=KEYIN("SC -");                                                          
+                                                                                
+   %Get NP number from CNS error output (CG_ICP_<NP><LineID>_0)                 
+   %$NP:=TAKE(DECAT($ERROR,"CG_ICP_",1),3);                                     
+                                                                                
+   %Find that NP in the "SC-" output then grab port number from next line       
+   $TMP:=DECAT(DECAT($SC,#($NP,":"),3),"PORT",1);                               
+   $PORT:=TRIM($TMP.SPLIT(":"));                                                
+                                                                                
+   %Do an OL of the port to get status for email alert                          
+   $OL:=KEYIN(#("OL PORT ",$PORT));                                             
+                                                                                
+   %Format email body                                                           
+   $FAILMSG:=#(LOGTEXT,/,/,                                                     
+            "CNS Error logged for connection close was:",/,                     
+            $ERROR,/,/,                                                         
+            "Status of Port ",$PORT,"(NP ",$NP,"):",/,                          
+            $OL,/,                                                              
+            "Current Status of Network Adapters:",/,                            
+                  $NIC_STATUS);                                                 
+                                                                                
+   %Send email alert                                                            
+   #RSLT:=MAIL(#("TO:PGDS.MAINFRAME.UNISYS,INFRASTRUCTURE.CONTROL",             
+      ";SUBJECT:IP Address",,$IP,,"on ",Hostname,,                              
+         "moved for LAN Resiliency reasons"),                                   
+               $FAILMSG);                                                       
+   EXIT;                                                                        
+END;                                                                            
+\                                                                               

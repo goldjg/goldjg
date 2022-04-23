@@ -1,0 +1,28 @@
+BEGIN JOB OS/MAKEUSER/DCT(STRING FNAME);                                        
+%% TEMPORARY JOB TO AMEND REMOTEUSER LISTS FOR ##REDACTED## USERCODE                
+%% DURING ##REDACTED##REHEARSAL/MIGRATION       MAY 2008        GXG                     
+%%                                                                              
+%% RUNS WITH A STRING PARAMETER MATCHING LAST NODE OF A MAKEUSER                
+%% CARDFILE WITH TITLE STARTING (##REDACTED##/DCT/= ON ##REDACTED##
+%%                                                                              
+%% MUST BE STARTED FROM ##REDACTED##OR OTHER PRIVILEGED USERCODE                 
+%%                                                                              
+                                                                                
+ PRINTDEFAULTS = (DESTINATION="MAIL",                                           
+          NOTE = "TO:GRAHAM.GOLD;SUBJECT:##REDACTED## - "&            
+                 FNAME);                                                        
+ TASK T1;                                                                       
+ STRING JOBNUM, JOBNAME;                                                        
+                                                                                
+ JOBNUM := STRING(MYJOB(JOBNUMBER),4);                                          
+ JOBNAME := "JOBSUM" / MYJOB(NAME) / JOBNUM;                                    
+ MYJOB(BDNAME=#JOBNAME);                                                        
+                                                                                
+ RUN SYSTEM/MAKEUSER[T1];                                                       
+ FILE TASKFILE(USERBACKUPNAME=FALSE);                                           
+ FILE CARD(KIND=DISK, TITLE##REDACTED##/DCT/#FNAME,                    
+      PACKNAME=##REDACTED##);                                                       
+                                                                                
+ PRINT #JOBNAME/= ON ##REDACTED##;                                                      
+                                                                                
+END JOB.                                                                        

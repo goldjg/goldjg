@@ -1,0 +1,8 @@
+ BEGIN JOB GXG/RESCHECK;                                                        
+ FAMILY DISK=DISK ONLY;                                                         
+ TASK T;                                                                        
+ RUN *SYSTEM/PDIR                                                               
+    ("*PATH/TO/FILE:TASKSTRING(OTHERX)")[T];                             
+ IF T(TASKSTRING) = "TRUE" THEN                                                 
+    DISPLAY ("I CAN RUN IT!");                                                  
+ END JOB.                                                                       

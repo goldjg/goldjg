@@ -1,0 +1,227 @@
+   DEFINE * ODTSEQUENCE OS_PATH_CHECK:                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_PATH_CHECK ODT SEQUENCE                                          %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~                                          %         
+%                                                                     %         
+% ODTS THAT CAN BE RUN TO CHECK IF ANY DISK CONTROLLER PATHS ARE      %         
+% NOT IN THE "ONLINE" STATE AND SEND EMAIL ALERT IF THAT IS THE CASE. %         
+%                                                                     %         
+% *** METALOGIC SUPPLIED CODE ***                                     %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%Call the OS_PATH_MAP ODT sequence to get a list of offline paths               
+CALL DO "OS_PATH_MAP";                                                          
+                                                                                
+%If any paths are online then loop through the list of offline paths            
+IF $OFFLINE NEQ EMPTY THEN                                                      
+BEGIN                                                                           
+   WHILE $CTL:=$OFFLINE.SPLIT NEQ EMPTY DO                                      
+      %Do an OL of the offline controller and add to email message body         
+      $BODY.INSERT(KEYIN("OL CTL "&$CTL),/);                                    
+   %When no more offline paths to check, send email                             
+   #RSLT:=MAIL(#("TO:####",             
+      ";SUBJECT:Bad Pack Controllers on ",Hostname),                            
+               #("The following controllers are offline  ",/,,/,$Body));        
+End                                                                             
+\                                                                               
+   DEFINE * SITUATION OS_PATH_LOG_MF(LOG=2):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_PATH_LOG_MF SITUATION                                            %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~                                            %         
+%                                                                     %         
+% SITUATION THAT TRIGGERS WHEN "LOG MAINFRAME" ENTRIES ARE WRITTEN    %         
+% TO THE SUMLOG RELATING TO PORT FAILURES. (MAJOR 2, MINOR 23)        %         
+%                                                                     %         
+% LINKED TO OS_PATH_LOG_MF ODT SEQUENCE                               %         
+%                                                                     %         
+% *** METALOGIC SUPPLIED CODE ***                                     %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+  LOGMINOR=23 AND LOGFIELD(10,7,8)=5 AND                                        
+  #Port:=LogField(19,15,16) NEQ 0                                               
+\                                                                               
+   DEFINE * SITUATION OS_PATH_LOG_MSG(LOG=3):                                   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_PATH_LOG_MSG SITUATION                                           %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~~                                           %         
+%                                                                     %         
+% SITUATION THAT TRIGGERS WHEN MESSAGES ARE WRITTEN TO THE SUMLOG     %         
+% CONTAINING THE EMC DISK PORT NUMBERS. (MAJOR TYPE 3, MINOR TYPE 4)  %         
+%                                                                     %         
+% LINKED TO OS_PATH_LOG_MSG ODT SEQUENCE                              %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+% VERSION 02   Avoid false positives         GXG DEC 2013    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+  LOGMINOR=4 AND LOGTEXT NISI {" 1234 "," 4321 "," 6789 "," 9876 "}         
+                                                                                
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_PATH_LOG_MF(LOG):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_PATH_LOG_MF ODT SEQUENCE                                         %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         
+%                                                                     %         
+% ODT SEQUENCE TRIGGERED BY OS_PATH_LOG_MF SITUATION BY PORT ERRORS.  %         
+% CHECKS FOR OFFLINE EMC DISK CONTROLLERS AND ALERTS FOR ANY THAT     %         
+% ARE OFFLINE.                                                        %         
+%                                                                     %         
+% *** METALOGIC SUPPLIED CODE ***                                     %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%Grab faulting port number from SITU                                            
+$PORT:=STRING(#PORT,*);                                                         
+$FAULT:="F"&$PORT;                                                              
+                                                                                
+%Check for an existing map of ports vs controllers for Halt/Load unit           
+IF $CTLMAP = EMPTY THEN  %need to build it                                      
+      CALL DO "OS_PATH_MAP";                                                    
+                                                                                
+%If the port is in the map of ports belonging to the Halt/Load unit             
+% (.COPY string search will find at least one match and put the match           
+%  into the $POSTCTL string variable so it won't be empty) then...              
+IF $POSTCTL:=$CTLMAP.COPY($PORT&"\==") NEQ EMPTY THEN                           
+BEGIN                                                                           
+   %Get the CTL number from the map                                             
+   $CTL:=DECAT($POSTCTL,"=",1);                                                 
+                                                                                
+   %Do an OL of it to get more info                                             
+   $OL:=KEYIN("OL CTL "&$CTL);                                                  
+                                                                                
+   %If status of this port in the OL response isn't "ONLINE" then...            
+   IF NOT $PORT&" ONLINE" ISIN $OL THEN                                         
+   BEGIN                                                                        
+      %If fault status not already set for this port send alert email           
+      % then set fault status to avoid a repeat alert.                          
+      IF #$FAULT = 0 THEN                                                       
+      #RSLT:=MAIL(#("####",             
+         ";Subject:Bad Pack Controllers on ",Hostname),                         
+          #("The following controllers are offline  ",/,,/,$Body));             
+      #$FAULT:=1                                                                
+   END                                                                          
+   ELSE                                                                         
+      %No fault, this port is online so reset fault status                      
+      #$FAULT:=0;                                                               
+END;                                                                            
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_PATH_LOG_MSG(LOG):                                   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_PATH_LOG_MSG ODT SEQUENCE                                        %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                        %         
+%                                                                     %         
+% ODT SEQUENCE TRIGGERED BY OS_PATH_LOG_MSG SITUATION BY LOG MESSAGES %         
+% RELATING TO CHANGE OF STATUS ON EMC DISK CONTROLLERS E.G.           %         
+% CTLs BEING URed OR FREEd.                                           %         
+%                                                                     %         
+% CHECKS FOR OFFLINE EMC DISK CONTROLLERS AND ALERTS FOR ANY THAT     %         
+% ARE OFFLINE.                                                        %         
+%                                                                     %         
+% *** ADAPTED FROM METALOGIC SUPPLIED CODE ***                        %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%Grab the port number from the log message                                      
+$PORT:=DECAT(LOGTEXT,"PORT",1);                                                 
+$PORT:=$PORT.Split(" ");                                                        
+$FAULT:="F"&$PORT;                                                              
+                                                                                
+%Check for an existing map of ports vs controllers for Halt/Load unit           
+IF $CTLMAP = EMPTY THEN  %need to build it                                      
+      CALL DO "OS_PATH_MAP";                                                    
+                                                                                
+%If the port is in the map of ports belonging to the Halt/Load unit             
+% (.COPY string search will find at least one match and put the match           
+%  into the $POSTCTL string variable so it won't be empty) then...              
+IF $POSTCTL:=$CTLMAP.COPY($PORT&"\==") NEQ EMPTY THEN                           
+BEGIN                                                                           
+   %Get the CTL number from the map                                             
+   $CTL:=DECAT($POSTCTL,"=",1);                                                 
+                                                                                
+   %Do an OL of it to get more info                                             
+   $OL:=KEYIN("OL CTL "&$CTL);                                                  
+                                                                                
+   %If status of this port in the OL response isn't "ONLINE" then...            
+   IF NOT $PORT&" ONLINE" ISIN $OL THEN                                         
+   BEGIN                                                                        
+      %If fault status not already set for this port send alert email           
+      % then set fault status to avoid a repeat alert.                          
+      IF #$FAULT = 0 THEN                                                       
+      #RSLT:=MAIL(#("####",          
+         ";Subject:Bad Pack Controllers on ",Hostname),                         
+          #("The following controllers are offline  ",/,,/,$OL));               
+      #$FAULT:=1                                                                
+   END                                                                          
+   ELSE                                                                         
+      %No fault, this port is online so reset fault status                      
+      #$FAULT:=0;                                                               
+END;                                                                            
+                                                                                
+\                                                                               
+   DEFINE * ODTS OS_PATH_MAP:                                                   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_PATH_MAP ODT SEQUENCE                                            %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~                                            %         
+%                                                                     %         
+% ODT SEQUENCE CALLED BY OS_PATH_ ODT SEQUENCES TO BUILD A MAP OF     %         
+% EMC DISK CONTROLLERS FOR THE HALT/LOAD UNIT TO THEIR RESPECTIVE     %         
+% PORTS AND RECORD WHICH ARE OFFLINE.                                 %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+% VERSION 02   Fix OL CTL keyin scanning to find PORT info anywhere   %         
+%                in the response (position can vary if SAN connected) %         
+%                                            GXG DEC 2013    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%Set offline variable to empty to avoid false positives                         
+$OFFLINE:=EMPTY;                                                                
+                                                                                
+%Interrogate the Halt/Load via OL command                                       
+$CMD:=#("OL PK ",HLUNIT);                                                       
+$HLK:=KEYIN($CMD);                                                              
+                                                                                
+%Get OL response lines including "CTL"                                          
+$MYCTLS:=DECAT($HLK,"CTL",3);                                                   
+                                                                                
+%Remove the header by splitting on carriage return                              
+$HEADER:=TRIM($MYCTLS.SPLIT(/));                                                
+                                                                                
+%Scan $MYCTLS line at a time until it is empty (all CTLs scanned)               
+WHILE $LINE:=$MYCTLS.SPLIT(/) NEQ EMPTY DO                                      
+   BEGIN                                                                        
+     %Get the CTL (first 10 chars minus spaces)                                 
+     $THISCTL:=TRIM(TAKE($LINE,10));                                            
+                                                                                
+     %Get the CTL state (drop first 20 chars then trim spaces)                  
+     $THISSTATE:=TRIM(DROP($LINE,20));                                          
+                                                                                
+     %If the STATE is not ONLINE, add to the list of OFFLINE CTLs               
+     IF $THISSTATE NEQ "ONLINE" THEN                                            
+        $OFFLINE.INSERT($THISCTL);                                              
+                                                                                
+     %Interrogate the CTL via OL command                                        
+     $CMD:=#("OL CTL ",$THISCTL);                                               
+     $PKEYIN:=KEYIN($CMD);                                                      
+                                                                                
+     %Skip the start of the OL response up to and incl "PORT  STATUS" line      
+     $CTLPORT:=DECAT($PKEYIN,"PORT ",3);                                        
+     $PLINE:=$CTLPORT.SPLIT(/);                                                 
+     $PLINE:=$CTLPORT.SPLIT(/);                                                 
+                                                                                
+     %Get the port number of this CTL (first 5 chars minus spaces)              
+     $PORT:=TRIM(TAKE($PLINE,5));                                               
+                                                                                
+     %Add port and ctl to map in format PORT=CTL e.g. 8702=21702                
+     $CTLMAP.INSERT(#($PORT,"=",$THISCTL));                                     
+   END;                                                                         
+\                                                                               

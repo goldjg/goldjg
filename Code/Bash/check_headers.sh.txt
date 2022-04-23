@@ -1,0 +1,23 @@
+#!/bin/bash
+echo -e "Tidying up files from last run..."
+rm alltapes.txt
+rm headers.txt
+rm headers_VOL1.txt
+rm header_errors.txt
+
+echo "Getting list of tapes in all VAULTs..."
+find /VAULT1* -type f > alltapes.txt
+
+echo "Querying VOL1 record for each tape..."
+while read line; do echo $line >> headers.txt;dd bs=1M skip=26 conv=ascii count=1 if=$line 2>/dev/null|egrep -ao "VOL1.{6}" >> headers.txt;done < alltapes.txt
+
+echo "Merging tape filenames and VOL1 records..."
+cat headers.txt | sed ':a $!N;s/\nVOL1/ VOL1/;ta P;D'| grep "VOL1" >> headers_VOL1.txt
+
+echo "Producing list of tapes where filename and VOL1 do not match..."
+cat headers_VOL1.txt | awk '{ if (substr($1,(length($1)-5)) != substr($2,(length($2)-5))) print "ERROR: Tape " substr($1,(length($1)-5)) " has a label of " substr($2,(length($2)-5)) "!!!" }' >> header_errors.txt
+
+echo
+echo
+echo "Run completed, review header_errors.txt file in current directory."
+

@@ -1,0 +1,1 @@
+gci *.log|foreach {$infile=$_.Fullname;(gc $infile|Select-String sudo).Line.Split("]").TrimStart()|where-object {$_ -notmatch  [regex]::escape("[")}|Out-File ($infile -replace '.log','.log.txt')}

@@ -1,0 +1,2 @@
+cd E:\SERVER\APPS\BATCH\THUND-MANIFEST\BIN
+PowerShell -NoExit -NoProfile -ExecutionPolicy Bypass -Command ".\Batch_ThunderHead_To_XML_specv2.ps1"

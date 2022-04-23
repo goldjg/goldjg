@@ -1,0 +1,1 @@
+cat test.txt | awk '/VOL1/{a=1}/HDR1/{b=1}/HDR2/{c=1}/EOF1/{d=1}/EOF2/{e=1}END{ if (a && b && c && d && e) {print "All Headers Found"} else {print "Some Headers Missing"} }'

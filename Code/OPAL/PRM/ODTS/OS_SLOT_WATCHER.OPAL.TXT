@@ -1,0 +1,20 @@
+DEFINE + SITUATION OS_SLOT_WATCHER(WHEN):                                       
+  slotfault                                                                     
+\                                                                               
+DEFINE + ODTSEQUENCE OS_SLOT_WATCHER(WHEN):                                     
+$EMAIL:='##REDACTED##,'&                
+        '##REDACTED##';                                         
+                                                                                
+$Subj:=#("Slot Failure ",Slot,,FaultReason,,Situname,"+",OdtsName);             
+IF SITUNAME = "CPU_CHECK"  THEN                                                 
+  IF #LAST.DELTA(MCPTIME) > 5 THEN  %NOT RESTARTED RECENTLY                     
+  BEGIN                                                                         
+    ODT("TT WHEN CPU_CHECK DO CPU_CHECK");                                      
+    $MSG:="RESTARTED CPU_CHECK";                                                
+  END                                                                           
+  ELSE                                                                          
+    $MSG:="CPU_CHECK FAILED LESS THAN 5 SECONDS AGO.  NOT RESTARTED"            
+ELSE                                                                            
+   $MSG:="NOT CPU_CHECK! NOT RESTARTED!";                                       
+#Rslt:=Mail('To:'&$EMAIL&';SUBJECT:'&$Subj,$Msg);                               
+                                                                                

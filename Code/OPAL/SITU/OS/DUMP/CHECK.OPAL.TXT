@@ -1,0 +1,13 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%% OS_DUMP_CHECK SITUATION                                            %%
+%% =======================                                            %%
+%% TRAPS WHEN AN MSRMISC57 MESSAGE IS DISPLAYED THAT CONTAINS THE     %%
+%% STRING "Dump by". THIS OCCURS AFTER A MEMORY DUMP HAS BEEN SAVED.  %%
+%%                                                                    %%
+%% THE OS_DUMP_CHECK ODTS IS THEN TRIGGERED.                          %%
+%%                                                                    %%
+%% VERSION 01   INITIAL IMPLEMENTATION    SEPT 06 GXG       %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+TT DEF + SITUATION OS_DUMP_CHECK(MSG):                                  
+MsgCat=MSRMISC And MsgNo=57 And Text HdIs "Dump by "                    
+\                                                                       

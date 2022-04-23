@@ -1,0 +1,45 @@
+#!/bin/ksh
+# %%% ##REDACTED## Mapping Script for BCV_TEST Set on Libra690.
+# %%%
+# %%% Version 1. ##REDACTED## Initial Creation 	Feb 2016, GXG.
+#
+#
+#
+/usr/symcli/bin/symdg -type RDF2 create BCV_TEST
+#
+#
+####  MYPACK (R2) ####
+/usr/symcli/bin/symdg -sid 1234 -g BCV_TEST add dev 0219 PK4422
+/usr/symcli/bin/symdg -sid 1234 -g BCV_TEST add dev 021A PK4423
+/usr/symcli/bin/symdg -sid 1234 -g BCV_TEST add dev 021B PK4424
+/usr/symcli/bin/symdg -sid 1234 -g BCV_TEST add dev 021C PK4425
+/usr/symcli/bin/symdg -sid 1234 -g BCV_TEST add dev 021D PK4426
+#
+#
+#
+#
+####  MYPACK (BCV) ####
+/usr/symcli/bin/symbcv -sid 1234 -g BCV_TEST associate dev 03BA PK6822
+/usr/symcli/bin/symbcv -sid 1234 -g BCV_TEST associate dev 03BB PK6823
+/usr/symcli/bin/symbcv -sid 1234 -g BCV_TEST associate dev 03BC PK6824
+/usr/symcli/bin/symbcv -sid 1234 -g BCV_TEST associate dev 03BD PK6825
+/usr/symcli/bin/symbcv -sid 1234 -g BCV_TEST associate dev 03BE PK6826
+#
+#
+#
+# %%% attach R2s to BCVs
+#
+####  MYPACK  ####
+/usr/symcli/bin/symmir -sid 1234 -g BCV_TEST attach PK4422 BCV ld PK6822
+/usr/symcli/bin/symmir -sid 1234 -g BCV_TEST attach PK4423 BCV ld PK6823
+/usr/symcli/bin/symmir -sid 1234 -g BCV_TEST attach PK4424 BCV ld PK6824
+/usr/symcli/bin/symmir -sid 1234 -g BCV_TEST attach PK4425 BCV ld PK6825
+/usr/symcli/bin/symmir -sid 1234 -g BCV_TEST attach PK4426 BCV ld PK6826
+#
+#
+# %%% create mirrors - and check results !!!
+# %%% leave out of script until attachments verified...
+# %%% first time sync...
+# /usr/symcli/bin/symmir -sid 1234 -g BCV_TEST -full -force establish
+# %%% subsequently..incremental...
+# /usr/symcli/bin/symmir -sid 1234 -g BCV_TEST establish

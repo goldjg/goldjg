@@ -1,0 +1,58 @@
+#!/bin/bash
+############################################################################
+# 								           #
+############################################################################
+
+#Setup runtime variables
+LOGFILE="/path/to/logs/export.log"
+SITEA="SITE_A_PRIMARY_HOST"
+SITEB="SITE_B_PRIMARY_HOST"
+
+#tail the export log in a while loop
+while read LINE; do
+    
+    #Check if the line just written to the log contains "Import Done"
+    if [[ $LINE =~ .*Import\ Done.* ]]; then
+        
+	#Get the tape number from the line
+	TAPE="$(echo $LINE | awk '{print $7}' | awk -F : '{print $2}')";
+	
+	#report in the message variable
+	MSG=""
+	MSG=$"$MSG\nDetected Import of tape $TAPE";
+	
+	#copy the tape to the primary DC1 live server
+	scp /VAULT00/IMPORTED_V00/$TAPE user@$SITEA:/VAULT11/IMPORTED_V11/$TAPE;
+	
+	#check the result of the copy
+	if [ "$?" = 0 ]; then
+           
+	   #Worked, add this to the message variable
+	   MSG=$"$MSG\nCopy of $TAPE to /VAULT11/IMPORTED_V11/$TAPE on $SITEA successful"
+	else
+	   
+	   #Failed, add this to the message variable
+	   MSG=$"$MSG\nCopy of $TAPE to /VAULT11/IMPORTED_V11/$TAPE on $SITEA failed!"
+	fi
+        
+	#copy the tape to the primary DC3 live server
+	scp /VAULT00/IMPORTED_V00/$TAPE user@$SITEB:/VAULT11/IMPORTED_V11/$TAPE;
+        if [ "$?" = 0 ]; then
+           
+	   #Worked, add this to the message variable
+	   MSG=$"$MSG\nCopy of $TAPE to /VAULT11/IMPORTED_V11/$TAPE on $SITEB successful"
+        else
+           
+	   #Failed, add this to the message variable
+	   MSG=$"$MSG\nCopy of $TAPE to /VAULT11/IMPORTED_V11/$TAPE on $SITEB failed!"
+        fi
+
+	#broadcast the message to all users through the wall command
+	echo -e $MSG|wall
+	
+	#add the message, preceded by a timestamp, to the logfile
+	echo -e $"****************\n`date '+%F %H:%M'`\n****************$MSG\n" >> /home/bill/import_monitor.log
+    fi
+
+#end of loop
+done < <(tail -f -n0 $LOGFILE)

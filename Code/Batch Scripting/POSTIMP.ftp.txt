@@ -1,0 +1,5 @@
+U
+P
+CD /FILE/PATH/
+DIR
+QUIT

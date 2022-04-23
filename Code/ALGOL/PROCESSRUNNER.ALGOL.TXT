@@ -1,0 +1,151 @@
+$$ SET LIST ERRLIST STACK LINEINFO FORMAT NOXREFLIST LISTDOLLAR         
+$$ SET LEVEL 2                                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%% OS/P/PROCESSRUNNER                                        %%         
+%% ==================                                        %%         
+%% PROGRAM CALLED BY OS/JOB/PROCESSRUNNER.                   %%         
+%% PROGRAM NEEDS PU PRIVILEGE & MUST BE RUN FROM ##REDACTED##. %%         
+%% PROGRAM MUST BE PP'D WITH PU OR TASKING.                  %%         
+%%                                                           %%         
+%% FUNCTION: PASSES OPSRUNNER COMMAND FROM JOB TO SUPERVISOR.%%         
+%%                                                           %%         
+%% INPUT PARAMS FROM CALLING WFL                             %%         
+%% =============================                             %%         
+%% INPUT: COMMAND TO BE PROCESSED BY SUPERVISOR.             %%         
+%%                                                           %%         
+%% OUTPUTS                                                   %%         
+%% =======                                                   %%         
+%% NONE                                                      %%         
+%%                                                           %%         
+%% CALLS EXTERNALCOMMAND ENTRYPOINT IN SUPERVISOR TO PROCESS %%         
+%% SUPERVISOR CMDS ONLY ("TT" NOT REQUIRED. ODT CMDS NOT     %%         
+%% SUPPORTED.                                                %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                                                           %%         
+%% VERSION 01 INITIAL IMPLEMENTATION   OCT 2010 GXG %%         
+%% VERSION 02 ADD MULTIPLE REQUEST PROCESSING       %%         
+%%                                              NOV 2010 GXG %%         
+%% VERSION 03 VALIDATE INPUT IS ALPHANUMERIC         %%         
+%% VERSION 04 CHANGE REQUEST FILE FAMILY TO LIVEPACK %%         
+%%                                              JUN 2011 GXG %%         
+%% VERSION 05 FIX ALPHAS TRUTHSET      MAR 2012 GXG %%         
+%% VERSION 06 SCRIPT NAME ADDED TO SUPERVISOR REPLY %%         
+%%                                              19/12/12/ LW %%         
+%% VERSION 07 RECOMPILE FOR CMP 17    JN 15 AJD   %%          
+%% VERSION 08 PASS TIMEOUT BACK TO JOB (T99)  05/05/17 LW    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                        
+%% CALLSUPERVISOR PROCEDURE.                                            
+%% PARAM NAME MATCHES WFL STRING PASSED FROM CALLING WFL.               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+PROCEDURE CALLSUPERVISOR(INPUT);                                        
+REAL ARRAY INPUT[*];                                                    
+                                                                        
+BEGIN                                                                   
+                                                                        
+DEFINE REQID_LEN = 10#; % LENGTH OF REQUEST IDENTIFIER                  
+                                                                        
+TRUTHSET                                                                
+  NUMS   ("0123456789")                                                 
+ ,ALPHAS ("AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz")       
+ ,ALPHANUM  (ALPHAS OR NUMS)                                            
+ ;                                                                      
+                                                                        
+%% DECLARE SUPERVISOR LIBRARY USING EXTERNALCOMMAND PROCEDURE           
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
+   LIBRARY SUP(LIBACCESS=BYTITLE,                                       
+                  TITLE="*METALOGIC/SUPERVISOR.");                      
+                                                                        
+      INTEGER PROCEDURE EXTERNALCOMMAND(INP,OUT);                       
+      ARRAY INP,OUT[0];                                                 
+   LIBRARY SUP;                                                         
+                                                                        
+   %% DEFINE REALS/ARRAYS REQUIRED FOR EXTERNALCOMMAND CALL             
+   %% DEFINE OUTPUT ARRAY WITH NO BOUNDS, EXTERNALCOMMAND               
+   %% PROCEDURE WILL RESIZE AS NEEDED.                                  
+   REAL EXTCMD;                                                         
+   ARRAY OUTPUT[0:0];                                                   
+   ARRAY CMDINP[0:0];                                                   
+   POINTER PSCAN;                                                       
+                                                                        
+   %% USE ADDRESS EQUATION TO MAP REAL ARRAYS TO EBCDIC ARRAYS.         
+   EBCDIC ARRAY OUTPUTEX[0]=OUTPUT;                                     
+   EBCDIC ARRAY INPUTEX[0]=INPUT;                                       
+   EBCDIC STRING EOUT,EREQ,ECMD1,ECMD2;                                 
+                                                                        
+   %% RESTRICT USAGE TO ##REDACTED##USERCODE ONLY                        
+   EBCDIC ARRAY UCODE[0:16];                                            
+   EBCDIC STRING EUCODE;                                                
+   REPLACE UCODE[0] BY MYSELF.USERCODE;                                 
+   EUCODE := STRING8(UCODE,10);                                         
+                                                                        
+   IF EUCODE NEQ "##REDACTED##" THEN                                      
+      BEGIN                                                             
+      DISPLAY("THIS PROGRAM MUST BE RUN UNDER ##REDACTED##, QUITTING");   
+      MYSELF.STATUS := VALUE(TERMINATED);                               
+      END;                                                              
+                                                                        
+   REPLACE MYSELF.FAMILY BY ".";                                        
+                                                                        
+   %% CHECK INPUT IS ALPHANUMERIC                                       
+   SCAN PSCAN:INPUTEX[0] FOR REQID_LEN WHILE IN ALPHANUM;               
+   IF NOT PSCAN = 48"00" THEN                                           
+      IF NOT PSCAN IN ALPHANUM THEN                                     
+      BEGIN                                                             
+      DISPLAY("NON-ALPHANUMERIC CHAR(S) IN REQUEST ID, QUITTING");      
+      MYSELF.STATUS := VALUE(TERMINATED);                               
+      END;                                                              
+                                                                        
+   %% BUILD INLINE OPAL TO SCAN FOR REQUEST FILES                       
+   SCAN PSCAN:INPUTEX[0] FOR REQID_LEN WHILE NEQ 48"00";                
+   EREQ := STRING8(INPUTEX,OFFSET(PSCAN));                              
+   ECMD1 := "/ (PD:TITLE) *PRM/D/OPSRUNNER/";                           
+   ECMD2 := "= ON ##REDACTED##:FAST";                                       
+   RESIZE (CMDINP,60,DISCARD);                                          
+   REPLACE CMDINP BY ECMD1,EREQ,ECMD2;                                  
+                                                                        
+                                                                        
+   %%CALL SUPERVISOR LIBRARY TO PROCESS INLINE OPAL                     
+   %%AND GET RESPONSE BACK.                                             
+   EXTCMD:=EXTERNALCOMMAND(CMDINP,OUTPUT);                              
+                                                                        
+   %% CHECK RESPONSE SHOWS THAT REQUEST FILE(S) HAVE BEEN FOUND         
+   EOUT := STRING8(OUTPUTEX,24);                                        
+                                                                        
+   IF EOUT = "FLEX Rslt: No Files/Dirs" THEN                            
+      BEGIN                                                             
+      EOUT := "NO OPSRUNNER REQUEST(S) FOUND FOR " CAT EREQ;            
+      DISPLAY(EOUT);                                                    
+      MYSELF.STATUS := VALUE(TERMINATED);                               
+      END                                                               
+   ELSE                                                                 
+      BEGIN                                                             
+      EOUT := "REQUEST(S) FOUND FOR " CAT EREQ;                         
+      DISPLAY (EOUT);                                                   
+                                                                        
+      RESIZE (CMDINP,40,DISCARD);                                       
+                                                                        
+      %% BUILD COMMAND TO RUN SUPERVISOR SCRIPT                         
+      REPLACE CMDINP BY "FOR ##REDACTED## DO OPS_FINDREQ ",EREQ;          
+                                                                        
+   %%CALL SUPERVISOR LIBRARY TO PROCESS COMMAND                         
+   %%AND GET RESPONSE BACK.                                             
+      EXTCMD:=EXTERNALCOMMAND(CMDINP,OUTPUT);                           
+                                                                        
+   %% CHECK RESPONSE SHOWS THAT SCRIPT HAS BEEN FIRED OFF OK            
+   EOUT := STRING8(OUTPUTEX,24);                                        
+                                                                        
+   IF EOUT = "COMMAND TIMEOUT:NO REPLY" THEN                            
+      BEGIN                                                             
+      DISPLAY(OUTPUTEX);                                                
+      MYSELF.TASKVALUE := 99;                                           
+      END                                                               
+   ELSE IF EOUT NEQ "OPS_FINDREQ WILL BE DONE" THEN                     
+      BEGIN                                                             
+      DISPLAY(OUTPUTEX);                                                
+      MYSELF.STATUS := VALUE(TERMINATED);                               
+      END                                                               
+   ELSE                                                                 
+         DISPLAY ("REQUEST(S) PASSED TO SUPERVISOR FOR PROCESSING");    
+      END;                                                              
+END.                                                                    

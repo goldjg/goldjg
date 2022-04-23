@@ -1,0 +1,122 @@
+#!/bin/bash
+
+
+# ** Script to setup static arp table entries for other test services     **
+
+# ** in same environment to ensure replication continues to work even if  **
+# ** ARP Broadcast is not functioning properly on the network.		  **
+
+# **************************************************************************
+
+
+#
+
+# Define live server IP and MAC info in variables
+
+prod_srv1a='1.2.3.1 00:01:02:03:04:05';
+
+prod_srv1b='1.2.3.2 00:01:02:03:04:05';
+
+prod_srv1c='1.2.3.3 00:01:02:03:04:05';
+
+prod_srv2a='1.2.3.4 00:01:02:03:04:05';
+
+prod_srv2b='1.2.3.5 00:01:02:03:04:05';
+
+prod_srv2c='1.2.3.6 00:01:02:03:04:05';
+
+
+
+# Define test server IP and MAC info in variables
+
+dev_srv1a='1.2.4.1 00:01:02:03:04:05';
+
+dev_srv1b='1.2.4.2 00:01:02:03:04:05';
+
+dev_srv2a='1.2.4.3 00:01:02:03:04:05';
+
+dev_srv2b='1.2.4.4 00:01:02:03:04:05';
+
+
+
+
+
+# Declare live and test server name arrays
+
+declare -a live_srv=( 'prod_srv1a' 'prod_srv1b' 'prod_srv1c' 'prod_srv2a' 'prod_srv2b' 'prod_srv2c' );
+
+declare -a test_srv=( 'dev_srv1a' 'dev_srv1b' 'dev_srv2a' 'dev_srv2b');
+
+
+
+# Define variable for hostname of the server the script is running on
+
+myhost=`echo $(hostname) | awk -F'.' '{print $1}'`;
+
+
+
+# Show current arp entries for eth1 in log file
+
+echo "Current eth1 arp entries are:" >> /home/test/arp_$myhost.log;
+
+arp -i eth1 >> /home/test/arp_$myhost.log;
+
+
+
+# check if script running on live or test server
+
+
+if echo $myhost|grep -c "dev" > 0; then
+
+	# Running on test server
+
+	# Loop through each element of test_srv array
+
+	for t in "${test_srv[@]}"
+
+	do
+
+	  # If element in array doesn't match my hostname, add ARP for it
+
+	  # using value of variable matching element value.
+
+	  if [ "$myhost" != "$t" ]; then
+
+	       arp -i eth1 -s ${!t}
+
+	  fi
+
+	done
+
+
+	else
+
+	# Running on live server
+
+	# Loop through each element of live_srv array
+
+        for l in "${live_srv[@]}"
+
+        do
+
+          # If element in array doesn't match my hostname, add ARP for it
+
+          # using value of variable matching element value.
+
+	  if [ "$myhost" != "$l" ]; then
+
+               arp -i eth1 -s ${!l}
+
+          fi
+
+        done
+
+	fi
+
+
+
+# Show arp entries for eth1 after updates
+
+echo "New eth1 arp entries are:" >> /home/test/arp_$myhost.log;
+
+arp -i eth1 >> /home/test/arp_$myhost.log;

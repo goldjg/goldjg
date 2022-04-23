@@ -1,0 +1,13 @@
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\ResolveAssemblyReference.cache
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.Resources.resources
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\GenerateResource.read.1.tlog
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\GenerateResource.write.1.tlog
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\bin\Debug\PoSH_Wrapper.exe
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\bin\Debug\PoSH_Wrapper.pdb
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\bin\Debug\PoSH_Wrapper.xml
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.exe
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.xml
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.pdb
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.exe
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.xml
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSH_Wrapper\PoSH_Wrapper\obj\x86\Debug\PoSH_Wrapper.pdb

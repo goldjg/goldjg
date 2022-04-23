@@ -1,0 +1,9 @@
+IF NOT EXIST SavedIP.txt ipconfig | find "IP Address" > SavedIP.txt
+
+IF EXIST CurrentIP.txt del CurrentIP.txt
+
+IF EXIST SavedIP.txt ipconfig | find "IP Address" > CurrentIP.txt
+
+IF EXIST CurrentIP.txt FC SavedIP.txt CurrentIP.txt | FIND "FC: no dif" >NUL
+
+IF ERRORLEVEL 1 (FC SavedIP.txt CurrentIP.txt > IPError.txt)

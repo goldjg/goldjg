@@ -1,0 +1,705 @@
+$$ SET MAP LIST LIST$ ERRORLIST NOXREFLIST FEDLEVEL = 5 LINEINFO  
+$$ SET AUTOINSERT                                                 
+ IDENTIFICATION DIVISION.                                         
+ PROGRAM-ID.                                                      
+      DBCULL.                                                   
+ AUTHOR.                                                          
+      GRAHAM GOLD.                                                
+ DATE-WRITTEN.                                                    
+      NOV 09.                                                     
+ DATE-COMPILED.                                                   
+* FUNCTION.                                                       
+*     TO AUTOMATICALLY SUSPEND OR DELETE DB ACCOUNTS            
+* EXTERNAL-PARAMETERS.                                            
+*     DATASET1COUNT,SUSPCOUNT,DELCOUNT RECEIVED BY REFERENCE          
+*     FROM CALLING WFL, SO CAN PASS BACK COUNTS TO WFL AT END     
+*     OF RUN.                                                     
+*                                                                 
+*     SUSPDAYS,DELDAYS,GRACEDAYS RECEIVED BY VALUE FROM CALLING   
+*     WFL, SPECIFIES THRESHOLD FOR DELETION/SUSPENSION AND        
+*     GRACE PERIOD FOR NEW ACCOUNTS NOT YET LOGGED INTO.          
+*                                                                 
+* VERSION-HISTORY.                                                
+*     VERSION 1   ######## INITIAL IMPLEMENTATION  05 DEC 09 GXG  
+*     VERSION 2   ######## Amend test for dept 999    Feb 12   
+*     VERSION 3   ######## Add grace period for new accts         
+*                          not yet logged into for x days         
+*                          since account creation.                
+*                                                     Mar 12   
+*     VERSION 4   ######## Fix display bug and enhance reports.   
+*                                                     Feb 13   
+*     VERSION 5 ######## NEW VERSION OF DB STRUCTURES - 29/10/15. 
+* VERSION 6 ######### LONGER SEC IDs (##REDACTED##)         NOV 2015 
+* VERSION 7 ########  NEW VERSION OF DATABASE STRUCTURE            
+*                    DATASET2 OF DB- 07/12/16.               
+* VERSION 8 ######## NEW VERSION OF DATABASE                   
+*                       DB - 16/11/17.                        
+* VERSION 9 ######## REMOVE COLCAT RESTRICTIONS        DEC 18 
+/                                                                 
+ ENVIRONMENT DIVISION.                                            
+ INPUT-OUTPUT SECTION.                                            
+*                                                                 
+* 3 OUTPUT FILES LISTING ACCOUNTS DELETED/SUSPENDED/SKIPPED       
+*                                                                 
+ FILE-CONTROL.                                                    
+      SELECT DELETES ASSIGN TO DISK ACCESS MODE SEQUENTIAL.       
+      SELECT SUSPENDS ASSIGN TO DISK ACCESS MODE SEQUENTIAL.      
+      SELECT ERRS ASSIGN TO DISK ACCESS MODE SEQUENTIAL.          
+      SELECT SUMMARY ASSIGN TO DISK ACCESS MODE SEQUENTIAL.       
+/                                                                 
+ DATA DIVISION.                                                   
+ FILE SECTION.                                                    
+*                                                                 
+* DELETES/SUSPENDS FILES LIST SECID AND DAYS SINCE LASTLOGON      
+* IN SEPERATE COLUMNS                                             
+*                                                                 
+ FD DELETES.                                                      
+ 01 DELREC.                                                       
+      03 DR-SID          PIC X(9).                              
+      03 FILLER            PIC X.                                 
+      03 DR-DIFF           PIC X(20).                             
+      03 FILLER            PIC X.                                 
+      03 DR-LASTLOGON      PIC X(12).                             
+                                                                  
+ FD SUSPENDS.                                                     
+ 01 SUSPREC.                                                      
+      03 SD2-SID          PIC X(9).                              
+      03 FILLER            PIC X.                                 
+      03 SD2-DIFF           PIC X(20).                             
+      03 FILLER            PIC X.                                 
+      03 SD2-LASTLOGON      PIC X(12).                             
+*                                                                 
+* ERRS FILE IS FREE FORMAT, 40 CHARS PER LINE                     
+*                                                                 
+ FD ERRS.                                                         
+ 01 ERRREC                 PIC X(40).                             
+                                                                  
+*                                                                 
+* SUMMARY FILE IS FREE FORMAT, 55 CHARS PER LINE                  
+*                                                                 
+ FD SUMMARY.                                                      
+ 01 SUMREC                 PIC X(55).                             
+                                                                  
+/                                                                 
+*                                                                 
+* ONLY DECLARE DATASET1, DATASET2 AND DBRESTART DATASETS,           
+* OTHER DATA SETS NOT USED BY THIS PROG                           
+*                                                                 
+ DATA-BASE SECTION.                                               
+ DB DB.                                                       
+ 01 DATASET1.                                                         
+ 01 DATASET2.                                                     
+ 01 RESTARTDATASET.                                                  
+/                                                                 
+ WORKING-STORAGE SECTION.                                         
+* NUMERIC PARAMS                                                  
+* COUNTERS (REFERENCE SO VALUE PASSED BACK TO CALLING WFL)        
+   77 DATASET1COUNT            PIC 9(6) BINARY RECEIVED BY REFERENCE. 
+   77 SUSPCOUNT            PIC 9(6) BINARY RECEIVED BY REFERENCE. 
+   77 DELCOUNT             PIC 9(6) BINARY RECEIVED BY REFERENCE. 
+                                                                  
+* THRESHOLD FOR DAYS SINCE LASTLOGON FOR SUSPEND/DELETE           
+   77 SUSPDAYS             PIC 9(3) BINARY RECEIVED BY CONTENT.   
+   77 DELDAYS              PIC 9(3) BINARY RECEIVED BY CONTENT.   
+                                                                  
+* THRESHOLD FOR GRACE DAYS BETWEEN ACCOUNT CREATION & FIRST LOGIN 
+   77 GRACEDAYS            PIC 9(3) BINARY RECEIVED BY CONTENT.   
+                                                                  
+* ELEMENTATALS FOR DATE FUNCTIONS                                 
+   77 WS-LASTLOGON         PIC 9(6).                              
+   77 WS-FRIENDLYDATE      PIC X(8).                              
+   77 WS-D1-DATEMOD         PIC 9(6).                              
+   77 WS-D1-OPTS            PIC 9 BINARY VALUE 1.                  
+   77 WS-PARAM-DATEMOD     PIC 9(6) BINARY.                       
+   77 WS-PARAM-LASTLOGON   PIC 9(6) BINARY.                       
+   77 WS-TODAY             PIC 9(6).                              
+   77 WS-PARAM-TODAY       PIC 9(6) BINARY.                       
+   77 WS-DIFF              PIC 9(5) BINARY.                       
+   77 WS-DIFF2             PIC 9(5) BINARY.                       
+   77 WS-OPTS              PIC 9 BINARY VALUE 0.                  
+   77 JUL-LASTLOGON        PIC 9(5) BINARY.                       
+   77 JUL-TODAY            PIC 9(5) BINARY.                       
+   77 JUL-D1-DATEMOD        PIC 9(5) BINARY.                       
+                                                                  
+* COMPS FOR COUNTERS                                              
+   01 DATASET1-COUNT           PIC 9(6) COMP.                         
+   01 SUSD2-COUNT           PIC 9(6) COMP.                         
+   01 DEL-COUNT            PIC 9(6) COMP.                         
+   01 CHAR-COUNT           PIC 9 COMP.                            
+   01 DB-OPEN-WAITS      PIC 9 COMP VALUE 0.                    
+                                                                  
+* FREEFORMAT DISPLAY MSG FIELD                                    
+   01 MSG                  PIC X(40) DISPLAY.                     
+                                                                  
+* ELEMENTALS FOR TRACKING STATUS OF CURRENT ACCOUNT               
+   01 WS-DELETE            PIC X.                                 
+   01 WS-SUSPEND           PIC X.                                 
+                                                                  
+* DISPLAY FORMAT FOR SUMMARY REPORT                               
+   01 WS-SUSPDAYS          PIC ZZ9 DISPLAY.                       
+   01 WS-DELDAYS           PIC ZZ9 DISPLAY.                       
+   01 WS-GRACEDAYS         PIC ZZ9 DISPLAY.                       
+   01 WS-DATASET1-COUNT        PIC ZZZZZ9 DISPLAY.                    
+   01 WS-SUSD2-COUNT        PIC ZZZZZ9 DISPLAY.                    
+   01 WS-DEL-COUNT         PIC ZZZZZ9 DISPLAY.                    
+                                                                  
+                                                                  
+* GROUP ITEMS FOR DATE FUNCTIONS                                  
+   01 DB-LASTLOGON.                                             
+      03 DB-LL-CC        COMP PIC 99.                           
+      03 DB-LL-YY        COMP PIC 99.                           
+      03 DB-LL-MM        COMP PIC 99.                           
+      03 DB-LL-DD        COMP PIC 99.                           
+      03 DB-LL-HH        COMP PIC 99.                           
+      03 DB-LL-MIN       COMP PIC 99.                           
+   01 DATE-YYYYMMDD.                                              
+      03 WS-DTE-CC         PIC 99.                                
+      03 WS-DTE-YY         PIC 99.                                
+      03 WS-DTE-MM         PIC 99.                                
+      03 WS-DTE-DD         PIC 99.                                
+   01 REALDATE.                                                   
+      03 RD-DTE-MM         PIC 99.                                
+      03 RD-DTE-DD         PIC 99.                                
+      03 RD-DTE-YY         PIC 99.                                
+   01 DDMMYY-LASTLOGON.                                           
+      03 WS-LL-MM          PIC 99.                                
+      03 WS-LL-DD          PIC 99.                                
+      03 WS-LL-YY          PIC 99.                                
+   01 DDMMYY-DATEMOD.                                             
+      03 WS-UDM-MM         PIC 99.                                
+      03 WS-UDM-DD         PIC 99.                                
+      03 WS-UDM-YY         PIC 99.                                
+   01 UDATEMOD.                                                   
+      03 D1-DM-DD          PIC 99 COMP.                            
+      03 D1-DM-MM          PIC 99 COMP.                            
+      03 D1-DM-CC          PIC 99 COMP.                            
+      03 D1-DM-YY          PIC 99 COMP.                            
+   01 DATEMOD.                                                    
+      03 WS-DM-DD          PIC 99 COMP.                           
+      03 WS-DM-MM          PIC 99 COMP.                           
+      03 WS-DM-CC          PIC 99 COMP.                           
+      03 WS-DM-YY          PIC 99 COMP.                           
+   01 FRIENDLY-DATE.                                              
+      03 WS-FD-DD          PIC 99.                                
+      03 FILLER            PIC X VALUE "/".                       
+      03 WS-FD-MM          PIC 99.                                
+      03 FILLER            PIC X VALUE "/".                       
+      03 WS-FD-YY          PIC 99.                                
+                                                                  
+* 2-PART DISPLAY MESSAGE FOR SID ERR DISPLAYS                   
+   01 COMBINE-MSG.                                                
+      03 CMB-MSG-SID     PIC X(9) DISPLAY.                      
+      03 CMB-MSG-REST      PIC X(33) DISPLAY.                     
+                                                                  
+* GROUP FOR BUILDING UP ERRS FILE RECORDS                         
+   01 WS-ERRREC.                                                  
+      03 ERR-SID         PIC X(9) DISPLAY.                      
+      03 ERR-REST          PIC X(33) DISPLAY.                     
+                                                                  
+* GROUP FOR BUILDING UP DELETES FILE RECORDS                      
+   01 WS-DELREC.                                                  
+      03 WS-DR-SID       PIC X(9).                              
+      03 FILLER            PIC X VALUE SPACE.                     
+      03 WS-DR-DIFF        PIC X(20).                             
+      03 FILLER            PIC X VALUE SPACE.                     
+      03 WS-DR-LASTLOGON   PIC X(12).                             
+                                                                  
+                                                                  
+* GROUP FOR BUILDING UP SUSPENDS FILE RECORDS                     
+   01 WS-SUSPREC.                                                 
+      03 WS-SD2-SID       PIC X(9).                              
+      03 FILLER            PIC X VALUE SPACE.                     
+      03 WS-SD2-DIFF        PIC X(20).                             
+      03 FILLER            PIC X VALUE SPACE.                     
+      03 WS-SD2-LASTLOGON   PIC X(12).                             
+                                                                  
+/                                                                 
+ PROCEDURE DIVISION                                               
+      USING DATASET1COUNT,SUSPCOUNT,DELCOUNT,                         
+            SUSPDAYS,DELDAYS,GRACEDAYS.                           
+ MAIN SECTION 010.                                                
+ MAIN-PROCEDURE.                                                  
+*                                                                 
+* MAIN CONTROL OF PROGRAM                                         
+*                                                                 
+                                                                  
+* OPEN DB FOR UPDATE, PROTECT AGAINST OPENERROR FOR           
+* CONTROLFILE LOCKED, REBUILD/ROLLBACK IN PROG, REORG IN PROG     
+* AND RETRY IN 5 MINUTES. ABORT AFTER 3 ATTEMPTS.                 
+*                                                                 
+      OPEN UPDATE DB                                          
+         ON EXCEPTION                                             
+            IF DMSTATUS(OPENERROR) AND                            
+               (DMSTATUS(DMERRORTYPE)=39 OR                       
+                DMSTATUS(DMERRORTYPE)=69 OR                       
+                DMSTATUS(DMERRORTYPE)=71 OR                       
+                DMSTATUS(DMERRORTYPE)=72) THEN                    
+                IF DB-OPEN-WAITS EQUAL 3 OR GREATER 3 THEN      
+                  DISPLAY "ABORTING - 3 FAILED OPEN ATTEMPTS"     
+                  PERFORM ABORTS-PROCEDURE ELSE                   
+                 MOVE "DB OPEN ERR - WAITING 5 MINUTES" TO MSG
+                 DISPLAY MSG                                      
+                 WAIT 300                                         
+                 COMPUTE DB-OPEN-WAITS = DB-OPEN-WAITS + 1    
+                 GO TO MAIN-PROCEDURE                             
+                ELSE                                              
+                 CALL SYSTEM DMTERMINATE.                         
+                                                                  
+* OPEN FILES, SETUP HEADER RECORDS, OPEN DB, GET DATE             
+      PERFORM INIT THRU INIT-EXIT.                                
+                                                                  
+* READ THROUGH DATASET2 DATASET FOR PEOPLE AND CALL OTHER         
+* PROCEDURES TO ANALYSE AND UPDATE/DELETE AS APPROPRIATE          
+      PERFORM FINDPEOPLE THRU FD2-EXIT.                            
+      CALL SYSTEM DUMP.                                           
+* CLOSE DB, FILES, DISPLAY RUN STATS                              
+      PERFORM CLOSES THRU CLOSES-EXIT.                            
+      STOP RUN.                                                   
+*      CALL SYSTEM DUMP.                                          
+/                                                                 
+**************                                                    
+ INIT SECTION 010.                                                
+ INIT-PROC.                                                       
+**************                                                    
+* GO TO START OF DATASET2 DATASET, OPEN OUTPUT FILES AND          
+* WRITE HEADER RECORDS TO FILES.                                  
+      SET DATASET2 TO BEGINNING.                                  
+      OPEN OUTPUT DELETES.                                        
+      OPEN OUTPUT SUSPENDS.                                       
+      OPEN OUTPUT ERRS.                                           
+      OPEN OUTPUT SUMMARY.                                        
+      MOVE "ACCOUNT" TO WS-DR-SID,WS-SD2-SID.                  
+      MOVE "DAYS SINCE LASTLOGON" TO WS-DR-DIFF,WS-SD2-DIFF.       
+      MOVE "LAST LOGON" TO WS-DR-LASTLOGON,WS-SD2-LASTLOGON.       
+      MOVE WS-DELREC TO DELREC.                                   
+      MOVE WS-SUSPREC TO SUSPREC.                                 
+      WRITE DELREC.                                               
+      WRITE SUSPREC.                                              
+      MOVE "=========" TO WS-DR-SID,WS-SD2-SID.                
+      MOVE "====================" TO WS-DR-DIFF,WS-SD2-DIFF.       
+      MOVE "==========" TO WS-DR-LASTLOGON,WS-SD2-LASTLOGON.       
+      MOVE WS-DELREC TO DELREC.                                   
+      MOVE WS-SUSPREC TO SUSPREC.                                 
+      WRITE DELREC.                                               
+      WRITE SUSPREC.                                              
+      MOVE "NOT SUSPENDED/DELETED:" TO ERRREC.                    
+      WRITE ERRREC.                                               
+      MOVE SPACES TO ERRREC.                                      
+      WRITE ERRREC.                                               
+                                                                  
+* GET CURRENT DATE IN YYYYMMDD FORMAT, BREAK INTO COMPONENTS      
+* AND SETUP REALDATE, DATEMOD FOR TODAYS DATE IN FORMATS          
+* REQUIRED FOR DATE CALCS AND D2-DATEMOD DB FIELD                  
+      ACCEPT DATE-YYYYMMDD FROM DATE YYYYMMDD.                    
+      MOVE WS-DTE-MM TO RD-DTE-MM.                                
+      MOVE WS-DTE-DD TO RD-DTE-DD.                                
+      MOVE WS-DTE-YY TO RD-DTE-YY.                                
+      COMPUTE WS-DM-DD = WS-DTE-DD.                               
+      COMPUTE WS-DM-MM = WS-DTE-MM.                               
+      COMPUTE WS-DM-CC = WS-DTE-CC.                               
+      COMPUTE WS-DM-YY = WS-DTE-YY.                               
+      MOVE REALDATE TO WS-TODAY.                                  
+      MOVE WS-TODAY TO WS-PARAM-TODAY.                            
+                                                                  
+* POINT SITESUPPORT LIBRARY CALLS AT CORRECT CODEFILE             
+      CHANGE ATTRIBUTE TITLE OF "SITESUPPORT"                     
+         TO ##REDACTED##.".                                 
+                                                                  
+* OK TO BTR/ETR ROUND WHOLE PROG, WANT ALL UPDATES ROLLED BACK    
+* IF PROG FAILS.                                                  
+      BEGIN-TRANSACTION NO-AUDIT DBRESTART.                     
+ INIT-EXIT.                                                       
+/                                                                 
+      EXIT.                                                       
+********************                                              
+ FINDPEOPLE SECTION 010.                                          
+ FD2-PROC-LOOP.                                                    
+********************                                              
+                                                                  
+* INITIALISE VARIABLES.                                           
+      MOVE ZEROS TO CHAR-COUNT.                                   
+      MOVE SPACES TO WS-DELREC, WS-SUSPREC.                       
+                                                                  
+* BEGIN A FIND NEXT LOOP THROUGH DATASET2 DATASET,                
+* BREAKING OUT OF PROCEDURE AND LOOP WHEN END OF DATASET          
+* REACHED (FIND NEXT RETURNS A NOTFOUND RESULT).                  
+* DETECT ANY OTHER ERRORS AND CALL DMTERMINATE TO HANDLE.         
+      FIND NEXT DATASET2                                          
+         ON EXCEPTION IF DMSTATUS(NOTFOUND)                       
+               GO TO FD2-EXIT                                      
+         ELSE CALL SYSTEM DMTERMINATE.                            
+                                                                  
+* GET LASTLOGON DATE FOR CURRENTLY SELECTED ACCOUNT.              
+      MOVE D2-LASTLOGON TO DB-LASTLOGON.                         
+                                                                  
+* PERFORM GETDATES PROCEDURE TO CALCULATE NO. OF DAYS AGO         
+* DATASET1 LAST LOGGED ON.                                            
+      PERFORM GETDATES THRU GD-EXIT.                              
+                                                                  
+* PERFORM THESCIENCE PROCEDURE TO DETERMINE IF DATASET1 SHOULD BE     
+* SUSPENDED OR DELETED AND SET APPROPRIATE FLAGS.                 
+      PERFORM THESCIENCE THRU TS-EXIT.                            
+                                                                  
+* IF DATASET1 IS NOT SUSPENDED, AND FLAG SET TO SUSPEND, PERFORM      
+* SUSPENDIT PROC TO UPDATE DATABASE AND SUSPENDS FILE.            
+      IF NOT D2-SUSPENDED THEN                                     
+         IF WS-SUSPEND = "Y" THEN                                 
+         PERFORM SUSPENDIT THRU SUSD2-EXIT                         
+         ELSE NEXT SENTENCE.                                      
+                                                                  
+* IF DATASET1 FLAGGED FOR DELETION, PERFORM DELETEIT PROC TO UPDATE   
+* DATABASE AND DELETES FILE.                                      
+      IF WS-DELETE = "Y" THEN                                     
+         PERFORM DELETEIT THRU DEL-EXIT                           
+         ELSE NEXT SENTENCE.                                      
+                                                                  
+* IF ACCOUNT NOT FLAGGED FOR DELETION OR SUSPENSION, INITIALISE   
+* DATE AND OUTPUT FILE STORAGE AND GO TO START OF PROCEDURE       
+* (NEXT RECORD).                                                  
+      IF WS-DELETE ="N" AND WS-SUSPEND ="N" THEN                  
+         MOVE ZEROS TO WS-LASTLOGON,WS-TODAY,WS-DIFF              
+         GO TO FD2-PROC-LOOP                                       
+      ELSE                                                        
+         MOVE SPACES TO WS-DELREC,WS-SUSPREC,                     
+                        DELREC,SUSPREC                            
+         MOVE ZEROS TO WS-LASTLOGON,WS-TODAY,WS-DIFF              
+         GO TO FD2-PROC-LOOP.                                      
+ FD2-EXIT.                                                         
+      EXIT.                                                       
+/                                                                 
+******************                                                
+ GETDATES SECTION 010.                                            
+ GD-PROC.                                                         
+******************                                                
+                                                                  
+* THIS SECTION CALLED FROM FINDPEOPLE PROCEDURE.                  
+                                                                  
+* GET LASTLOGON DATE INTO DDMMYY FORMAT.                          
+      MOVE DB-LL-MM TO WS-LL-MM.                                
+      MOVE DB-LL-DD TO WS-LL-DD.                                
+      MOVE DB-LL-YY TO WS-LL-YY.                                
+      MOVE DDMMYY-LASTLOGON TO WS-LASTLOGON.                      
+      MOVE WS-LASTLOGON TO WS-PARAM-LASTLOGON.                    
+                                                                  
+* CONVERT LASTLOGON DATE TO JULIAN DATE FORMAT USING SITESUPPORT  
+* LIBRARY ENTRYPOINT.                                             
+      CALL "C74GREGORIANTOJULIAN OF SITESUPPORT"                  
+         USING WS-PARAM-LASTLOGON                                 
+         GIVING JUL-LASTLOGON.                                    
+                                                                  
+* CONVERT TODAYS DATE TO JULIAN DATE FORMAT USING SITESUPPORT     
+* LIBRARY ENTRYPOINT.                                             
+      CALL "C74GREGORIANTOJULIAN OF SITESUPPORT"                  
+         USING WS-PARAM-TODAY                                     
+         GIVING JUL-TODAY.                                        
+                                                                  
+* CALCULATE NO. OF DAYS BETWEEN TODAY AND LASTLOGON USING         
+* SITESUPPORT LIBRARY ENTRYPOINT, USING WS-OPTS = 0 (FALSE)       
+* E.G. DON'T SUBTRACT HOLIDAYS FROM NO. OF DAYS.                  
+                                                                  
+      CALL "C74DATEDIFFERENCE OF SITESUPPORT"                     
+         USING JUL-LASTLOGON JUL-TODAY                            
+               WS-OPTS                                            
+         GIVING WS-DIFF.                                          
+ GD-EXIT.                                                         
+      EXIT.                                                       
+/                                                                 
+********************                                              
+ THESCIENCE SECTION 010.                                          
+ TS-PROC.                                                         
+********************                                              
+                                                                  
+* THIS SECTION CALLED FROM FINDPEOPLE PROCEDURE.                  
+                                                                  
+* SET/RESET SUSPEND/DELETE FLAGS TO "N".                          
+      MOVE "N" TO WS-SUSPEND, WS-DELETE.                          
+                                                                  
+* IF NO OF DAYS SINCE LASTLOGON IS GREATER THAN OR EQUAL TO       
+* THE SUSPENSION THRESHOLD PASSED FROM THE WFL, FLAG FOR          
+* SUSPENSION.                                                     
+      IF WS-DIFF IS GREATER SUSPDAYS OR EQUAL SUSPDAYS THEN       
+            IF WS-DIFF IS LESS DELDAYS THEN                       
+               MOVE "Y" TO WS-SUSPEND ELSE NEXT SENTENCE.         
+                                                                  
+* IF CONDITIONS ABOVE NOT TRUE, CHECK IF NO OF DAYS SINCE         
+* LASTLOGON IS GREATER THAN OR EQUAL TO THE DELETION THRESHOLD    
+* PASSED FROM THE WFL, FLAG FOR DELETION.                         
+      IF WS-DIFF GREATER DELDAYS OR EQUAL DELDAYS THEN            
+            MOVE "Y" TO WS-DELETE.                                
+                                                                  
+* WHETHER A FLAG IS SET OR NOT, INCREASE COUNT OF DATASET1S CHECKED   
+* BY 1.                                                           
+      COMPUTE DATASET1-COUNT = DATASET1-COUNT + 1.                        
+                                                                  
+* CHECK IF THE SID HAS A "1" AS THE FIRST CHARACTER.            
+* IF INSPECT RETURNS "1" THEN FIRST CHARACTER IS 1 THEREFORE      
+* RESET SUSPEND/DELETE FLAGS AS WE DON'T WANT TO SUSPEND OR       
+* DELETE 1nnnnn ACCOUNTS (BACKGROUND PC'S/DR ACCOUNTS).           
+      INSPECT D2-SID TALLYING CHAR-COUNT FOR LEADING "1".        
+      IF CHAR-COUNT EQUAL 1 THEN MOVE "N" TO WS-SUSPEND,WS-DELETE.
+                                                                  
+* LOOKUP SID FOUND IN DATASET2 DATASET IN THE DATASET1 DATASET      
+* USING DATASET1BYSID SET.                                          
+* IF CORRESPONDING DATASET1 RECORD NOT FOUND, DISPLAY MESSAGE THEN    
+* RESET SUSPEND/DELETE FLAGS AND EXIT THESCIENCE PROCEDURE.       
+      FIND DATASET1BYSID WHERE D1-SID = D2-SID                    
+         ON EXCEPTION IF DMSTATUS(NOTFOUND) THEN                  
+         MOVE D2-SID TO CMB-MSG-SID                            
+         MOVE ": NOT FOUND" TO CMB-MSG-REST                       
+         DISPLAY COMBINE-MSG                                      
+         MOVE "N" TO WS-SUSPEND,WS-DELETE                         
+         GO TO TS-EXIT                                            
+         ELSE CALL SYSTEM DMTERMINATE.                            
+                                                                  
+* IF DATASET1 RECORD FOUND, RESET SUSPEND/DELETE FLAGS IF DATASET1        
+* HAS NO LASTLOGON DATE (MDM DATASET1) AND DEPT = 999 (DEFAULT        
+* VALUE SETUP BY DBFEEDER E.G. ACCOUNT NEVER BEEN USED).        
+      IF D2-LASTLOGON EQUAL 0 AND                                  
+         D1-DEPT = 999 THEN                                        
+            MOVE "N" TO WS-SUSPEND,WS-DELETE                      
+            ELSE NEXT SENTENCE.                                   
+                                                                  
+* GET LAST MODIFIED DATE OF DATASET1 RECORD                           
+      MOVE D1-DATEMOD TO UDATEMOD.                                 
+      MOVE D1-DM-MM TO WS-UDM-MM.                                  
+      MOVE D1-DM-DD TO WS-UDM-DD.                                  
+      MOVE D1-DM-YY TO WS-UDM-YY.                                  
+      MOVE DDMMYY-DATEMOD TO WS-D1-DATEMOD.                        
+      MOVE WS-D1-DATEMOD TO WS-PARAM-DATEMOD.                      
+                                                                  
+* CONVERT LAST MODIFIED DATE TO JULIAN DATE FORMAT USING          
+* SITESUPPORT LIBRARY ENTRYPOINT.                                 
+      CALL "C74GREGORIANTOJULIAN OF SITESUPPORT"                  
+         USING WS-PARAM-DATEMOD                                   
+         GIVING JUL-D1-DATEMOD.                                    
+                                                                  
+* CALCULATE NO. OF DAYS BETWEEN TODAY AND MODIFIED DATE           
+* USING SITESUPPORT LIBRARY ENTRYPOINT, WITH WS-OPTS = 1          
+* (FALSE).                                                        
+                                                                  
+      CALL "C74DATEDIFFERENCE OF SITESUPPORT"                     
+         USING JUL-D1-DATEMOD JUL-TODAY                            
+               WS-D1-OPTS                                          
+         GIVING WS-DIFF2.                                         
+                                                                  
+* IF NO OF DAYS SINCE MODIFIED DATE OF ACCOUNT IS LESS THAN       
+* THE GRACEDAYS THRESHOLD PASSED FROM THE WFL, AND NO LASTLOGON   
+* DATE AND DEPT NOT 999, REMOVE SUSPENSION/DELETION FLAGS.        
+      IF D2-LASTLOGON EQUAL 0 AND                                  
+         WS-DIFF2 IS LESS GRACEDAYS AND D1-DEPT NOT EQUAL 999 THEN 
+             MOVE "N" TO WS-SUSPEND,WS-DELETE                     
+             MOVE D2-SID TO CMB-MSG-SID                        
+             MOVE ": WITHIN GRACE PERIOD" TO CMB-MSG-REST         
+             DISPLAY COMBINE-MSG                                  
+             ELSE NEXT SENTENCE.                                  
+                                                                  
+* IF DATASET1 HAS NO APPS, RESET SUSPEND/DELETE FLAGS AND WRITE       
+* RECORD TO ERRS FILE. ALL DATASET1S SHOULD AT LEAST HAVE ONE APP,    
+* SECADM, SO WANT TO FLAG THEIR ACCOUNT FOR FURTHER ATTENTION.    
+      IF D1-NO-APPS = 0                                            
+         MOVE D1-SID TO ERR-SID                                
+         MOVE "N" TO WS-SUSPEND,WS-DELETE                         
+         MOVE "HAS NO APPS, SKIPPED" TO ERR-REST                  
+         MOVE WS-ERRREC TO ERRREC                                 
+         WRITE ERRREC.                                            
+                                                                  
+ TS-EXIT.                                                         
+      EXIT.                                                       
+/                                                                 
+*******************                                               
+ SUSPENDIT SECTION 010.                                           
+ SUSD2-PROC.                                                       
+*******************                                               
+                                                                  
+* THIS PROCEDURE CALLED FROM FINDPEOPLE PROCEDURE.                
+                                                                  
+* LOCK DATASET2 DATASET AT CURRENT RECORD, ON ERROR,              
+* DISPLAY MESSAGE, RESET FLAG, GO TO START OF                     
+* FINDPEOPLE PROCEDURE (GO TO NEXT RECORD).                       
+      MOVE D2-SID TO WS-SD2-SID.                                
+      LOCK DATASET2                                               
+         ON EXCEPTION IF DMSTATUS(NOTFOUND) THEN                  
+         MOVE ": NOT FOUND, NOT SUSPENDED"                        
+            TO CMB-MSG-REST,ERR-REST                              
+         DISPLAY COMBINE-MSG                                      
+         MOVE WS-ERRREC TO ERRREC                                 
+         WRITE ERRREC                                             
+         MOVE "N" TO WS-SUSPEND,WS-DELETE                         
+         FREE DATASET2                                            
+         GO SUSD2-EXIT                                             
+         ELSE CALL SYSTEM DMTERMINATE.                            
+                                                                  
+* ONCE DATASET LOCKED, SET D2-SUSPENDED TO TRUE, UPDATE WHOMOD     
+* WITH "DBCUL" AND UPDATE WHOMOD WITH TODAY'S DATE.             
+* ONCE DB FIELDS UPDATED, STORE AND FREE THE LOCK, INCREASE       
+* SUSPENSION COUNT, THEN WRITE ENTRY IN SUSPENDS FILE.            
+      COMPUTE D2-SUSPENDED = TRUE.                                 
+      MOVE "DBCUL" TO D2-WHOMOD.                                 
+      MOVE DATEMOD TO D2-DATEMOD.                                  
+      STORE DATASET2.                                             
+      FREE DATASET2.                                              
+      COMPUTE SUSD2-COUNT = SUSD2-COUNT + 1.                        
+      IF D2-LASTLOGON EQUAL 0 THEN                                 
+         MOVE SPACES TO WS-SD2-DIFF                                
+         MOVE "NEVER" TO WS-SD2-LASTLOGON                          
+      ELSE                                                        
+         MOVE WS-DIFF TO WS-SD2-DIFF                               
+         MOVE WS-LL-DD TO WS-FD-DD                                
+         MOVE WS-LL-MM TO WS-FD-MM                                
+         MOVE WS-LL-YY TO WS-FD-YY                                
+         MOVE FRIENDLY-DATE TO WS-FRIENDLYDATE                    
+         MOVE WS-FRIENDLYDATE TO WS-SD2-LASTLOGON.                 
+      MOVE WS-SUSPREC TO SUSPREC.                                 
+      WRITE SUSPREC.                                              
+ SUSD2-EXIT.                                                       
+      EXIT.                                                       
+/                                                                 
+******************                                                
+ DELETEIT SECTION 010.                                            
+ DEL-PROC.                                                        
+******************                                                
+                                                                  
+* THIS PROCEDURE CALLED FROM FINDPEOPLE PROCEDURE.                
+                                                                  
+* LOCK DATASET2 DATASET AT CURRENT RECORD, ON ERROR,              
+* DISPLAY MESSAGE, RESET FLAG, GO TO START OF                     
+* FINDPEOPLE PROCEDURE (GO TO NEXT RECORD).                       
+      MOVE D2-SID TO WS-DR-SID                                 
+      LOCK DATASET2                                               
+         ON EXCEPTION IF DMSTATUS(NOTFOUND) THEN                  
+         MOVE ": NOT FOUND, NOT DELETED"                          
+            TO CMB-MSG-REST,ERR-REST                              
+         DISPLAY COMBINE-MSG                                      
+         MOVE WS-ERRREC TO ERRREC                                 
+         WRITE ERRREC                                             
+         MOVE "N" TO WS-SUSPEND,WS-DELETE                         
+         FREE DATASET2                                            
+         GO DEL-EXIT                                              
+         ELSE CALL SYSTEM DMTERMINATE.                            
+                                                                  
+* ONCE DATASET LOCKED, DELETE RECORD, FREE THE LOCK AND           
+* INCREASE DELETION COUNT.                                        
+      DELETE DATASET2.                                            
+      FREE DATASET2.                                              
+      COMPUTE DEL-COUNT = DEL-COUNT + 1                           
+                                                                  
+* LOCK DATASET1BYSID SET WHERE D1-SID IN DATASET1 DATASET MATCHES      
+* THE D2-SID WE JUST DELETED.                                    
+* ON ERROR, DISPLAY MESSAGE, RESET FLAG AND GO TO START OF        
+* FINDPEOPLE PROCEDURE (GO TO NEXT RECORD).                       
+      LOCK DATASET1BYSID AT D1-SID = D2-SID                       
+         ON EXCEPTION IF DMSTATUS(NOTFOUND) THEN                  
+         MOVE ": NOT FOUND, NOT DELETED"                          
+            TO CMB-MSG-REST,ERR-REST                              
+         DISPLAY COMBINE-MSG                                      
+         MOVE WS-ERRREC TO ERRREC                                 
+         WRITE ERRREC                                             
+         MOVE "N" TO WS-SUSPEND,WS-DELETE                         
+         FREE DATASET1                                                
+         GO TO FD2-PROC-LOOP                                       
+         ELSE CALL SYSTEM DMTERMINATE.                            
+                                                                  
+* ONCE DATASET LOCKED, DELETE RECORD AND FREE THE LOCK THEN       
+* WRITE OUT RECORD IN DELETES FILE.                               
+      DELETE DATASET1.                                                
+      FREE DATASET1.                                                  
+      IF D2-LASTLOGON EQUAL 0 THEN                                 
+         MOVE SPACES TO WS-DR-DIFF                                
+         MOVE "NEVER" TO WS-DR-LASTLOGON                          
+      ELSE                                                        
+         MOVE WS-DIFF TO WS-DR-DIFF                               
+         MOVE WS-LL-DD TO WS-FD-DD                                
+         MOVE WS-LL-MM TO WS-FD-MM                                
+         MOVE WS-LL-YY TO WS-FD-YY                                
+         MOVE FRIENDLY-DATE TO WS-FRIENDLYDATE                    
+         MOVE WS-FRIENDLYDATE TO WS-DR-LASTLOGON.                 
+      MOVE WS-DELREC TO DELREC.                                   
+      WRITE DELREC.                                               
+ DEL-EXIT.                                                        
+      EXIT.                                                       
+/                                                                 
+******************                                                
+ CLOSES SECTION 010.                                              
+ CLOSES-PROCEDURE.                                                
+******************                                                
+                                                                  
+* THIS SECTION ONLY ENTERED WHEN FINDPEOPLE PROCEDURE EXITED      
+* ON SUCCESSFUL RUN THROUGH DATABASE RECORDS.                     
+* ENDS TRANSACTION, DISPLAYS SUCCESS MESSAGE AND STATS,           
+* CLOSES OUTPUT FILES AND PASSES COUNTS BACK OUT TO WFL VIA       
+* PARAMETERS.                                                     
+      END-TRANSACTION NO-AUDIT DBRESTART.                       
+      MOVE SPACES TO MSG.                                         
+      DISPLAY MSG.                                                
+      MOVE "******************************" TO MSG.               
+      DISPLAY MSG.                                                
+      MOVE "SUCCESSFUL RUN OF DBCULL" TO MSG.                   
+      DISPLAY MSG.                                                
+      MOVE "******************************" TO MSG.               
+      DISPLAY MSG.                                                
+      MOVE DATASET1-COUNT TO CMB-MSG-SID.                           
+      MOVE "ACCOUNTS SEARCHED" TO CMB-MSG-REST.                   
+      DISPLAY COMBINE-MSG.                                        
+      MOVE SUSD2-COUNT TO CMB-MSG-SID.                           
+      MOVE "ACCOUNTS SUSPENDED" TO CMB-MSG-REST.                  
+      DISPLAY COMBINE-MSG.                                        
+      MOVE DEL-COUNT TO CMB-MSG-SID.                            
+      MOVE "ACCOUNTS DELETED" TO CMB-MSG-REST.                    
+      DISPLAY COMBINE-MSG.                                        
+      MOVE "******************************" TO MSG.               
+      DISPLAY MSG.                                                
+      MOVE SPACES TO MSG.                                         
+      DISPLAY MSG.                                                
+      MOVE DATASET1-COUNT TO WS-DATASET1-COUNT.                           
+      MOVE SPACES TO SUMREC.                                      
+      STRING "Accounts Searched: ",WS-DATASET1-COUNT                  
+             FOR 55 INTO SUMREC.                                  
+      WRITE SUMREC.                                               
+      MOVE SUSD2-COUNT TO WS-SUSD2-COUNT.                           
+      MOVE SPACES TO SUMREC.                                      
+      STRING "Accounts Suspended: ",WS-SUSD2-COUNT                 
+             FOR 55 INTO SUMREC.                                  
+      WRITE SUMREC.                                               
+      MOVE DEL-COUNT TO WS-DEL-COUNT.                             
+      MOVE SPACES TO SUMREC.                                      
+      STRING "Accounts Deleted: ",WS-DEL-COUNT                    
+             FOR 55 INTO SUMREC.                                  
+      WRITE SUMREC.                                               
+      MOVE SPACES TO SUMREC.                                      
+      WRITE SUMREC.                                               
+      MOVE "<b>Rules/Parameters</b>" TO SUMREC.                   
+      WRITE SUMREC.                                               
+      MOVE SUSPDAYS TO WS-SUSPDAYS.                               
+      MOVE SPACES TO SUMREC.                                      
+      STRING "Suspend if last logon ",WS-SUSPDAYS,                
+             " or more days ago." FOR 55 INTO SUMREC.             
+      WRITE SUMREC.                                               
+      MOVE DELDAYS TO WS-DELDAYS.                                 
+      MOVE SPACES TO SUMREC.                                      
+      STRING "Delete if last logon ",WS-DELDAYS,                  
+             " or more days ago." FOR 55 INTO SUMREC.             
+      WRITE SUMREC.                                               
+      MOVE GRACEDAYS TO WS-GRACEDAYS.                             
+      MOVE SPACES TO SUMREC.                                      
+      STRING "Ignore if account created in last",WS-GRACEDAYS,    
+             " business days." FOR 55 INTO SUMREC.                
+      WRITE SUMREC.                                               
+      CLOSE DELETES WITH CRUNCH.                                  
+      CLOSE SUSPENDS WITH CRUNCH.                                 
+      CLOSE ERRS WITH CRUNCH.                                     
+      CLOSE SUMMARY WITH CRUNCH.                                  
+      MOVE DATASET1-COUNT TO DATASET1COUNT.                               
+      MOVE SUSD2-COUNT TO SUSPCOUNT.                               
+      MOVE DEL-COUNT TO DELCOUNT.                                 
+ CLOSES-EXIT.                                                     
+      EXIT.                                                       
+/                                                                 
+******************                                                
+ ABORTS SECTION 010.                                              
+ ABORTS-PROCEDURE.                                                
+******************                                                
+                                                                  
+      CHANGE ATTRIBUTE STATUS OF MYSELF TO VALUE(TERMINATED).     
+      WAIT ATTRIBUTE EXCEPTIONEVENT OF MYSELF.                    
+ ABORTS-END.                                                      
+      EXIT.                                                       

@@ -1,0 +1,434 @@
+   BEGIN                                                                
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+   %  Title:   GET/INPUT/QUEUE/STATUS                                 % 
+   %                                                                  % 
+   %  This program calls the entrypoint GET_INPUT_QUEUE_STATUS in the % 
+   %  COMS library and returns a formatted report to the station.     % 
+   %  It must be configured in the CFile as a Direct Window Program.  % 
+   %  The program requires station input before returning information % 
+   %  to the station, but could be modified to inquire every <n>      % 
+   %  minutes and notify the operator or write the results to a file. % 
+   %  The results can also be sorted on messages or whatever.         % 
+   %                                                                  % 
+   %  The program now supports Version 1 of the entrypoint. All queues% 
+   %  with memoryinuse or messagecount > 0 are returned in version 1. % 
+   %  The program can filter by MESSAJE count by uncommenting the IF- % 
+   %  test after the label AFTER_GLOBALS, namely "IF MSGS > 0 THEN".  % 
+   %  Several fields from the STATUS COMS result are returned in words% 
+   %  2-4 (zero-relative). These are just before AFTER_GLOBALS.       % 
+   %  In order to get more information per page, MESSAJE count will   % 
+   %  shown on the same line as program name. Also, the other fields  % 
+   %  are shown two per line. Any of these lines may be commented out % 
+   %  by placing a "%" in front of the BUILD_LINE call.               % 
+   %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+   BOOLEAN                                                              
+     BREAK,                                                             
+     DONE;                                                              
+   INTEGER                                                              
+     RESULT,                                                            
+     VERSION;                                                           
+   REAL                                                                 
+     TOTALMEMLIMIT,                                                     
+     TOTALMEMINUSE,                                                     
+     BIGGEST,                                                           
+     BUFMEM,                                                            
+     BUFAVAIL,                                                          
+     DELAY,             % Total writer delay as in Status Coms          
+     DESIGNATOR,                                                        
+     DISAB_NOW,                                                         
+     ENABLED,                                                           
+     HOUR,                                                              
+     I,                                                                 
+     INFO,                                                              
+     INUSE,                                                             
+     J,                                                                 
+     LINES,                                                             
+     LIMIT,                                                             
+     MINUTES,                                                           
+     MEM_INUSE,                                                         
+     MEM_LIMIT,                                                         
+     MSGS,                                                              
+     MSG_COUNT,                                                         
+     OPTION,                                                            
+     PROTEKTED,                                                         
+     PREV_DELAY,                                                        
+     PREV_MEM,         % Amount of buffer memory from previous call     
+     PREV_MSGS,        % Number of queued messages on previous call     
+     QUEUES,                                                            
+     SAVE_QUEUE,                                                        
+     TANKING,                                                           
+     TI,                                                                
+     R,                                                                 
+     COMS_STATUS,                                                       
+     YEAR,                                                              
+     MONTH,                                                             
+     DAY;                                                               
+   POINTER                                                              
+     P,                                                                 
+     P2;                                                                
+   TYPE INPUTHEADER                                                     
+     COMS_IN_TYPE;                                                      
+   COMS_IN_TYPE                                                         
+     COMS_IN;                                                           
+   OUTPUTHEADER                                                         
+     COMS_OUT;                                                          
+   TRANSLATETABLE                                                       
+      LOWERTOUPPER (EBCDIC TO EBCDIC,                                   
+                   "abcdefghijklmnopqrstuvwxyz" TO                      
+                   "ABCDEFGHIJKLMNOPQRSTUVWXYZ");                       
+   DEFINE                                                               
+     EOF_NOTICE = 99 #;                                                 
+   EBCDIC ARRAY                                                         
+     LAST_INPUT[0:72],                                                  
+     POSTABLE[0:79],                                                    
+     SCRATCH [0:255],                                                   
+     MSG_TEXT[0:1919],                                                  
+     MESSAJE [0:1919],      % Output screen built here line at a time   
+     SAVE_NAME [0:19],                                                  
+     PROGRAM_NAME[0:19];                                                
+   ARRAY                                                                
+     INPQ_INFO    [0:2047];  % holds about 250 programs, will be resized
+   ASCII ARRAY ASC[0:80];                                               
+LIBRARY SERVICE_LIB                                                     
+     (LIBACCESS = BYINITIATOR, LIBPARAMETER = "02");                    
+INTEGER PROCEDURE GET_NAME_USING_DESIGNATOR(DESIGNATOR, WIN_NAME);      
+     REAL DESIGNATOR;                                                   
+     EBCDIC ARRAY WIN_NAME [0];                                         
+     LIBRARY SERVICE_LIB;                                               
+ INTEGER PROCEDURE GET_INPUT_QUEUE_STATUS (VERSION, INPQ_INFO);         
+     INTEGER VERSION;                                                   
+     ARRAY INPQ_INFO[0];                                                
+     LIBRARY SERVICE_LIB;                                               
+DEFINE                                                                  
+  CURSOR(C,R) = ESC, QUOTE, POSTABLE[C] FOR 1, POSTABLE[R] FOR 1# ,     
+  BR       = 48"3F"#,                                                   
+  CLR      = 48"0C"#,                                                   
+  CR       = 48"0D"#,                                                   
+  DC1      = 48"11"#,                                                   
+  ESC      = 48"27"#,                                                   
+  NULL     = 48"00"#,                                                   
+  QUOTE    = 48"7F"#,                                                   
+  US       = 48"1F"#,     % Starting forms delimeter                    
+  RS       = 48"1E"#,     % Ending forms      "                         
+  UL       = 48"0F"#,     % Underline                                   
+  DESG_IDF = [47:6]#;                                                   
+                                                                        
+PROCEDURE BUILD_FIRST_3_LINES;   FORWARD;                               
+%-----------------------------------------                              
+PROCEDURE INIT;                                                         
+  BEGIN                                                                 
+  I := 47"20";                                                          
+  FOR J := 0 STEP 1 UNTIL 79 DO                                         
+    BEGIN                                                               
+    REPLACE ASC[J] BY I.[7:48] FOR 1;                                   
+    I := * + 1;                                                         
+    END;                                                                
+  REPLACE POSTABLE BY ASC FOR 80 WITH ASCIITOEBCDIC;                    
+  REPLACE LAST_INPUT BY "MOre       ";                                  
+  P2 := MSG_TEXT;                                                       
+  OPTION := 1;                                                          
+  END;                                                                  
+%------------------------------                                         
+ PROCEDURE SEND_MSG(LENGTH);                                            
+    VALUE LENGTH;                                                       
+    REAL LENGTH;                                                        
+    BEGIN                                                               
+    COMS_OUT.DESTCOUNT := 1;                                            
+    COMS_OUT.DESTINATIONDESG := COMS_IN.STATION;                        
+    COMS_OUT.TEXTLENGTH := LENGTH;                                      
+    COMS_STATUS := SEND(COMS_OUT, COMS_OUT.TEXTLENGTH, MESSAJE);        
+    IF NOT(COMS_STATUS = 0 OR COMS_STATUS = 92) THEN                    
+      COMS_IN.MESSAGECOUNT := 1;                                        
+    END SEND_MSG;                                                       
+%---------------------------------                                      
+PROCEDURE CHECK_COMS_INPUT_ERRORS;                                      
+  BEGIN                                                                 
+  CASE COMS_STATUS OF                                                   
+    BEGIN                                                               
+     89: REPLACE MESSAJE BY "MSG Truncated ";                           
+         SEND_MSG(14);                                                  
+     93: REPLACE MESSAJE BY "MSG Causes Abort, Do Not Retry";           
+         SEND_MSG(30);                                                  
+    102: REPLACE MESSAJE BY "Error in STA Attach/Detachment";           
+         SEND_MSG(30);                                                  
+      0:                                                                
+     92:                                                                
+     ELSE:; % A good MESSAJE, recovery MESSAJE, or EOT notification.    
+         END;                                                           
+  END CHECK_COMS_INPUT_ERRORS;                                          
+%------------------------------------                                   
+PROCEDURE PROCESS_COMS_INPUT;                                           
+  BEGIN                                                                 
+  REPLACE SCRATCH BY NULL FOR 72;                                       
+  COMS_STATUS := RECEIVE(COMS_IN, SCRATCH);                             
+  REPLACE MSG_TEXT BY NULL FOR 72;                                      
+  REPLACE MSG_TEXT BY SCRATCH FOR 72 WITH LOWERTOUPPER," " FOR 12;      
+  IF MSG_TEXT = "IN" THEN                                               
+    OPTION := 1                                                         
+  ELSE                                                                  
+  IF MSG_TEXT = "MO" OR MSG_TEXT = "MORE" THEN                          
+    OPTION := 2                                                         
+  ELSE                                                                  
+    OPTION := 0;                                                        
+  IF OPTION NEQ 0 THEN                                                  
+    REPLACE LAST_INPUT BY MSG_TEXT FOR R:11 UNTIL = NULL, NULL FOR R;   
+  IF COMS_STATUS NEQ EOF_NOTICE THEN                                    
+     CHECK_COMS_INPUT_ERRORS                                            
+  ELSE                                                                  
+     DONE := TRUE;  % 99 Received                                       
+  END PROCESS_COMS_INPUT;                                               
+%---------------------------------------------%                         
+%   Adds line (MSG_TEXT) to total (MESSAJE).  %                         
+%   P2 must be an update pointer to MESSAJE.  %                         
+%   Returns True if rest should be skipped    %                         
+%---------------------------------------------%                         
+ BOOLEAN PROCEDURE BUILD_LINE(LEN);                                     
+   VALUE LEN;  REAL LEN;                                                
+   BEGIN                                                                
+   BREAK := FALSE;                                                      
+   REPLACE P2:P2 BY MSG_TEXT FOR LEN;                                   
+   LINES := * + 1;                                                      
+   IF LINES GTR 22 THEN                                                 
+     BEGIN                                                              
+     REPLACE P2:P2 BY CURSOR(0,22), UL, CR,                             
+                      "MOre ", ESC,"K", ESC, "W";                       
+     SEND_MSG(OFFSET(P2));                                              
+     PROCESS_COMS_INPUT;                                                
+     IF OPTION = 0 THEN            % Invalid option                     
+       BEGIN                                                            
+       BUILD_FIRST_3_LINES;                                             
+       REPLACE P:MSG_TEXT BY CURSOR(5,23), BR, "Invalid Option";        
+       BUILD_LINE(OFFSET(P));                                           
+       BUILD_LINE := TRUE;                                              
+       END                                                              
+     ELSE                                                               
+     IF OPTION NEQ 2 THEN           % Not  MORE                         
+       BEGIN                                                            
+       BREAK := TRUE;                                                   
+       BUILD_LINE := TRUE;          % Skip the rest                     
+       END                                                              
+     ELSE    % 2 = MORE                                                 
+       BEGIN                        % New page                          
+       BUILD_FIRST_3_LINES;                                             
+       END;                                                             
+     END;                                                               
+   REPLACE MSG_TEXT BY 0 FOR 14 WORDS;                                  
+   END; % BUILD LINE                                                    
+%----------------------------------------------                         
+PROCEDURE BUILD_FIRST_3_LINES;                                          
+  BEGIN                                                                 
+   LINES := 3;                   % For paging                           
+   REPLACE MESSAJE BY 0 FOR SIZE(MESSAJE);                              
+   REPLACE P2:MESSAJE BY DC1, CLR, " ",               % Set up P2       
+                         CURSOR(20,0),  BR,                             
+                         "GET INPQ STATUS REPORT",                      
+                         CURSOR(64,0),                                  
+                         HOUR FOR 2 NUMERIC, ":",                       
+                         MINUTES FOR 2 DIGITS, "  ",                    
+                         MONTH FOR 2 DIGITS, "/",                       
+                         DAY FOR 2 DIGITS,   "/",                       
+                         YEAR FOR 2 DIGITS,                             
+                         " Action: ", US,                               
+                         LAST_INPUT FOR 11 WHILE NEQ NULL,              
+                         CURSOR(79,1), RS,     % no cr necessary here   
+                         UL, " " FOR 9, "INquire  MOre ", CR;           
+  END;                                                                  
+%---------------------                                                  
+PROCEDURE GET_TIME;                                                     
+  BEGIN                                                                 
+  TI := TIME(7);                                                        
+  YEAR := TI.[47:12];                                                   
+  MONTH:= TI.[35:6];                                                    
+  DAY  := TI.[29:6];                                                    
+  HOUR := TI.[23:6];                                                    
+  MINUTES  := TI.[17:6];                                                
+  END;                                                                  
+%-----------------------------------                                    
+PROCEDURE GET_INPQING_STUFF;                                            
+  BEGIN                                                                 
+  LABEL                                                                 
+    END_INPQ,                                                           
+    START_OVER,                                                         
+    AFTER_GLOBALS;                                                      
+  IF OPTION = 0 THEN                                                    
+     BEGIN                                                              
+     BUILD_FIRST_3_LINES;                                               
+     REPLACE P:MSG_TEXT BY CURSOR(5,23), BR, "Invalid Option";          
+     BUILD_LINE(OFFSET(P));                                             
+     GO END_INPQ;                                                       
+     END;                                                               
+  REPLACE POINTER(INPQ_INFO) BY 0 FOR SIZE(INPQ_INFO) WORDS;            
+  REPLACE MSG_TEXT BY 0 FOR 311 WORDS;                                  
+  VERSION := 1;                                                         
+START_OVER:                                                             
+  R := GET_INPUT_QUEUE_STATUS(VERSION, INPQ_INFO);                      
+  IF R = 3 THEN      % Array not big enough                             
+     BEGIN                                                              
+     RESIZE(INPQ_INFO, SIZE(INPQ_INFO) + 2047, DISCARD);                
+     DISPLAY("INPQ_INFO resized");                                      
+     GO START_OVER;                                                     
+     END;                                                               
+  IF R = 1 THEN                                                         
+     BEGIN                                                              
+     DISPLAY("COMS does not support version " !! STRING(VERSION,*) !!   
+             "; will use version 0");                                   
+     VERSION := 0;     % must not have Coms with version 1              
+     GO START_OVER;                                                     
+     END;                                                               
+  GET_TIME;                                                             
+  QUEUES    := INPQ_INFO[0];                                            
+  MSGS      := INPQ_INFO[1];                                            
+  BUFMEM    := INPQ_INFO[2];                                            
+  BUFAVAIL  := INPQ_INFO[3];                                            
+  DELAY     := INPQ_INFO[4];                                            
+  BUILD_FIRST_3_LINES;    %0,1,2                                        
+  REPLACE P:MSG_TEXT BY "Total Messages Queued:",  CURSOR(30,3),        
+                        MSGS  FOR 7 NUMERIC, "  (";                     
+  IF MSGS  GEQ PREV_MSGS  THEN                                          
+    REPLACE P:P BY "+", (MSGS  - PREV_MSGS ) FOR * NUMERIC,")", CR      
+  ELSE                                                                  
+     REPLACE P:P BY "-", (PREV_MSGS  - MSGS ) FOR * NUMERIC,")", CR;    
+  BUILD_LINE(OFFSET(P));  % line 3                                      
+  REPLACE P:MSG_TEXT BY "Number Queues:", CURSOR(30,4),                 
+                        QUEUES FOR 7 NUMERIC, CR;                       
+  BUILD_LINE(OFFSET(P));  % line 4                                      
+  PREV_MSGS  := MSGS;                                                   
+                                                                        
+  % The following 3 fields from ?STATUS COMS are new in Version 1       
+                                                                        
+  REPLACE P:MSG_TEXT BY "Buffer Memory:", CURSOR(30,5),                 
+                        BUFMEM FOR 7 NUMERIC, "  (";                    
+  IF BUFMEM GEQ PREV_MEM  THEN                                          
+    REPLACE P:P BY "+", (BUFMEM  - PREV_MEM) FOR * NUMERIC, ")", CR     
+  ELSE                                                                  
+     REPLACE P:P BY "-", (PREV_MEM  - BUFMEM) FOR * NUMERIC, ")", CR;   
+  BUILD_LINE(OFFSET(P));  % line 6                                      
+  PREV_MEM := BUFMEM;                                                   
+                                                                        
+  REPLACE P:MSG_TEXT BY "Buffer Avail:", CURSOR(30,6),                  
+                        BUFAVAIL FOR 7 NUMERIC, CR;                     
+  BUILD_LINE(OFFSET(P));  % line 6                                      
+                                                                        
+  REPLACE P:MSG_TEXT BY "Total Writer Delay:", CURSOR(25,7),            
+                        DELAY FOR 12 NUMERIC;                           
+  IF PREV_DELAY NEQ DELAY THEN   %  can only increase                   
+    REPLACE P:P BY "  (+", (DELAY - PREV_DELAY) FOR * NUMERIC, ")", CR  
+  ELSE                                                                  
+    REPLACE P:P BY CR;                                                  
+  BUILD_LINE(OFFSET(P));  % line 6                                      
+  PREV_DELAY := DELAY;                                                  
+                                                                        
+  REPLACE MSG_TEXT BY CR;                                               
+  BUILD_LINE(1);                                                        
+  REPLACE SAVE_NAME BY " " FOR 18;                                      
+  BIGGEST := 0;                    % keep track of largest inuse        
+  TOTALMEMLIMIT := 0;                                                   
+  TOTALMEMINUSE := 0;                                                   
+AFTER_GLOBALS:                                                          
+%%IF MSGS > 0 THEN                                                      
+    BEGIN                                                               
+    I := 10;                        % Starting index into Array         
+    FOR J := 1 STEP 1 UNTIL QUEUES DO                                   
+      BEGIN                                                             
+      REPLACE P:MSG_TEXT BY "Queue ",                                   
+         INPQ_INFO[I] FOR 4 NUMERIC, "."; % use 3 if # progs < 1000     
+      I := * + 1;                                                       
+      DESIGNATOR := INPQ_INFO[I];                                       
+      R := GET_NAME_USING_DESIGNATOR(DESIGNATOR, PROGRAM_NAME);         
+      IF R EQL 0 THEN                                                   
+        REPLACE P:P BY "  Program: ", PROGRAM_NAME FOR 17               
+                              UNTIL EQL " "                             
+      ELSE                                                              
+        REPLACE P:P BY ">>Program name not known";                      
+                                                                        
+      I := * + 1;                                                       
+      MSG_COUNT := INPQ_INFO[I];                                        
+      REPLACE P:P BY "  (Messages: ",                                   
+                     MSG_COUNT FOR * NUMERIC, ")",  CR;                 
+      IF BUILD_LINE(OFFSET(P)) THEN GO END_INPQ;                        
+                                                                        
+      I := * + 1;                                                       
+      MEM_INUSE := INPQ_INFO[I];                                        
+      TOTALMEMINUSE := * + MEM_INUSE;                                   
+      REPLACE P:MSG_TEXT BY "    Memory Inuse: ", " " FOR 13,           
+                            MEM_INUSE FOR 6 NUMERIC;                    
+      IF MEM_INUSE GTR BIGGEST THEN                                     
+        BEGIN                                                           
+        REPLACE SAVE_NAME BY PROGRAM_NAME FOR 18;                       
+        SAVE_QUEUE := INPQ_INFO [I - 3];                                
+        BIGGEST := MEM_INUSE;                                           
+        END;                                                            
+                                                                        
+      I := * + 1;                                                       
+      MEM_LIMIT := INPQ_INFO[I];                                        
+      TOTALMEMLIMIT := * + MEM_LIMIT;                                   
+      REPLACE P:P BY "    Memory Limit: ", " " FOR 5,                   
+                            MEM_LIMIT FOR 6 NUMERIC, CR;                
+      IF BUILD_LINE(OFFSET(P)) THEN GO END_INPQ;                        
+                                                                        
+      I := * + 1;                                                       
+      TANKING := INPQ_INFO[I].[0:1];                                    
+      REPLACE P:MSG_TEXT BY "    Writing to Disk:", " " FOR 12,         
+                     IF TANKING = 1 THEN "True!" ELSE "False"; %, CR;   
+                                                                        
+      I := * + 1;                                                       
+      PROTEKTED := INPQ_INFO[I].[0:1];                                  
+      REPLACE P:P BY "    PROTEKTED Input:", " " FOR 5,                 
+                     IF PROTEKTED = 1 THEN " True" ELSE "False", CR;    
+      IF BUILD_LINE(OFFSET(P)) THEN GO END_INPQ;                        
+      I := * + 1;                                                       
+                                                                        
+      DISAB_NOW := INPQ_INFO[I];                                        
+      REPLACE P:MSG_TEXT BY "    Disabled Now:", " " FOR 15,            
+                     IF DISAB_NOW = 1 THEN " True" ELSE "False";        
+                                                                        
+      I := * + 1;                                                       
+      ENABLED := INPQ_INFO[I];                                          
+      REPLACE P:P BY "    Enabled: ", " " FOR 11,                       
+                     IF ENABLED = 1 THEN " True" ELSE "False", CR;      
+      IF BUILD_LINE(OFFSET(P)) THEN GO END_INPQ;                        
+      I := * + 1;                                                       
+      END; % FOR J                                                      
+    END; % MSGS > 0                                                     
+                                                                        
+  %  report largest inuse memory                                        
+  REPLACE MSG_TEXT BY CR;                                               
+  BUILD_LINE(1);                         % blank line                   
+  REPLACE P:MSG_TEXT BY "  Largest: ",                                  
+                        SAVE_NAME FOR 18 UNTIL EQL " ", " (",           
+                        SAVE_QUEUE FOR 4 NUMERIC, ") "                  
+                        ",  Inuse = ", BIGGEST FOR 7 NUMERIC, CR,       
+                        "  Total Mem Inuse = ",                         
+                        TOTALMEMINUSE FOR * NUMERIC, CR,                
+                        "  Total Mem Limit = ",                         
+                        TOTALMEMLIMIT FOR * NUMERIC, CR;                
+                                                                        
+  IF BUILD_LINE(OFFSET(P)) THEN GO END_INPQ;                            
+  IF BREAK THEN    % not MORE when more                                 
+    GO END_INPQ;                                                        
+  REPLACE MSG_TEXT BY CR;                                               
+  FOR R := LINES+1 STEP 1 UNTIL 22 DO      % Fill out rest of page      
+    BUILD_LINE(1);                         % with blank lines           
+END_INPQ:                                                               
+  % Add underline, Formsmode to MESSAJE - Don't call build_line         
+  IF NOT BREAK THEN          % Already have ending stuff if break       
+    BEGIN                                                               
+    REPLACE P2:P2 BY CURSOR(0,22), UL, ESC, "W";                        
+    SEND_MSG(OFFSET(P2));                                               
+    END;                                                                
+  END; % GET_INPQING_STUFF                                              
+%-------------------------- Main Body ----------------------------------
+COMSSUPPORT.LIBACCESS := VALUE(BYINITIATOR);                            
+ENABLE(COMS_IN, "ONLINE");                                              
+INIT;                                                                   
+GET_TIME;                                                               
+PROCESS_COMS_INPUT;                                                     
+WHILE NOT DONE DO                                                       
+  BEGIN                                                                 
+  GET_INPQING_STUFF;                                                    
+  IF NOT BREAK AND NOT DONE THEN                                        
+    PROCESS_COMS_INPUT                                                  
+  ELSE                                                                  
+    BREAK := FALSE;                                                     
+  END;                                                                  
+END.                                                                    

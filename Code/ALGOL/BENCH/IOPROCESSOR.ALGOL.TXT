@@ -1,0 +1,157 @@
+                                                                        
+ $ SET LISTDOLLAR LIST ERRLIST LINEINFO STACK NOXREFLIST                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  THIS PROGRAM DOES IO TO SPECIFIC PACKS - EITHER READ,WRITE OR BOTH.  
+%  PARAMETERS ARE DEFINES AS FOLLOWS                                    
+%     START,STOP   -  EVENTS USED BY CONTROLLING PROGRAM TO TIME MODULE 
+%     USE          -  I/O MODE (IN,OUT OR IO)                           
+%     EXTRA        -  EXTRA SWITCH (SINGLE/MULTIPLE)                    
+%     IORES        -  RETURNED IO FIGURES                               
+%                                                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PROCEDURE IOPROCESSOR(START,STOP,DKUSE,EXTRA,IORES);                    
+VALUE EXTRA;                                                            
+EVENT START,STOP;                                                       
+INTEGER EXTRA;                                                          
+REAL IORES;                                                             
+EBCDIC ARRAY DKUSE[*];                                                  
+BEGIN                                                                   
+   DEFINE TICKS = 2.4@-6 #;                                             
+                                                                        
+   INTEGER RECCOUNT,FILECOUNT,BLOCKCOUNT,RECSWRITTEN;                   
+   REAL PTSTART,PTSTOP,IOSTART,IOSTOP,ETSTART,ETSTOP,TIME7,N;           
+   POINTER P;                                                           
+   ARRAY REC[0:2999],WHICHFILE[0:9],FAMILYSUB[0:19];                    
+   EBCDIC ARRAY DKPACKNAME[0:17];                                       
+   ARRAY OUTARRAY[0:131];                                               
+   FILE REPORT(KIND=PRINTER);                                           
+   FILE DKFILE(KIND=PACK,NEWFILE=FALSE,DEPENDENTSPECS=TRUE);            
+   DEFINE SAY = REPLACE OUTARRAY[0] BY#,                                
+          CLEAROUTARRAY = REPLACE OUTARRAY[0] BY " " FOR 132#;          
+                                                                        
+   PROCEDURE FILLREADBUFFER;                                            
+     % Procedure to read from a file                                    
+   BEGIN                                                                
+      IF READ(DKFILE,3000,REC[*]) THEN                                  
+      BEGIN                                                             
+         REWIND(DKFILE);             % At end of file rewind to start   
+         FILECOUNT := * + 1;         % Increment no of files read       
+      END;                                                              
+      RECCOUNT := * + 1;             % Increment records read           
+   END;                                                                 
+                                                                        
+   PROCEDURE FILLWRITEBUFFER;                                           
+     % Procedure to write to a random record in a file                  
+   BEGIN                             % Select random record             
+     N := INTEGER(RANDOM(N) * DKFILE.LASTRECORD);                       
+     IF WRITE(DKFILE[N],3000,P) THEN % Write to record                  
+     BEGIN                                                              
+        DISPLAY("FAILURE ON WRITE TO FILE");                            
+        PROGRAMDUMP(ALL);                                               
+        MYSELF.STATUS := -1;                                            
+     END;                                                               
+     RECCOUNT := * + 1;              % Increment records written        
+   END;                                                                 
+                                                                        
+      INTERRUPT HI;                                                     
+      BEGIN                                                             
+                                                                        
+      END;                                                              
+      N := TIME(7);                  % Initialise random variable       
+      P:=FAMILYSUB[0];                                                  
+      REPLACE P BY MYSELF.FAMILY;    % Get familyname from Family       
+      SCAN P:P WHILE NEQ "=";        % statement                        
+      SCAN P:P UNTIL IN ALPHA;                                          
+      REPLACE DKPACKNAME BY P WHILE IN ALPHA;                           
+      ATTACH HI TO MYSELF.EXCEPTIONEVENT;                               
+      IF DKUSE = "IN" FOR 2 THEN     % Set file use depending on        
+        DKFILE.FILEUSE := VALUE(IN)  % input variable                   
+      ELSE                                                              
+      IF DKUSE = "OUT" FOR 3 THEN                                       
+      BEGIN                                                             
+         DKFILE.FILEUSE := VALUE(OUT);                                  
+         DKFILE.UPDATEFILE := TRUE;                                     
+      END                                                               
+      ELSE DISPLAY("INV FILE SPEC - USE");                              
+      IF EXTRA = 0 THEN              % Decide which file to be used     
+                                     % depending of EXTRA input variable
+        REPLACE WHICHFILE[0] BY "BENCH/D/SINGLE."                       
+      ELSE IF EXTRA = 1 THEN                                            
+             REPLACE WHICHFILE[0] BY "BENCH/D/MULTIPLE."                
+           ELSE DISPLAY("INVALID 'WHICH' FILE");                        
+      REPLACE DKFILE.TITLE BY POINTER(WHICHFILE[0]);                    
+      IF DKUSE = "IN" FOR 2 THEN     % Initialise array                 
+        REPLACE P := REC[0] BY "READ  " FOR 3000 WORDS                  
+      ELSE                                                              
+      IF DKUSE = "OUT" FOR 3 THEN                                       
+        REPLACE P := REC[0] BY "WRITE " FOR 3000 WORDS;                 
+      DKFILE.OPEN := TRUE;                                              
+      WAIT(START);                   % Wait for start event             
+      PTSTART := TIME(12);           % Note initial times               
+      IOSTART := TIME(13);                                              
+      ETSTART := TIME(14);                                              
+      IF DKUSE = "IN" FOR 2 THEN                                        
+        WHILE NOT HAPPENED(STOP) DO  % Call the relevent procedure until
+        BEGIN                        % the sopt event is triggered      
+           FILLREADBUFFER;                                              
+           RECSWRITTEN := * + 1;                                        
+        END                                                             
+      ELSE                                                              
+      IF DKUSE = "OUT" FOR 3 THEN                                       
+        WHILE NOT HAPPENED(STOP) DO                                     
+        BEGIN                                                           
+           FILLWRITEBUFFER;                                             
+           RECSWRITTEN := * + 1;                                        
+        END;                                                            
+      PTSTOP := TIME(12);            % Note the final times             
+      IOSTOP := TIME(13);                                               
+      ETSTOP := TIME(14);                                               
+     %REPORTS                                                           
+      CLEAROUTARRAY;                 % Write results to report          
+      SAY "=== ",STRING(DKPACKNAME,15),                                 
+          " ACCESS MODE - ",DKUSE FOR 3," ==="," " FOR 10,              
+          "[ON ",MYSELF.HOSTNAME,"]";                                   
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      TIME7 := TIME(7);                                                 
+      SAY STRING(TIME7.[23:6],*),":",STRING(TIME7.[17:6],*),":",        
+          STRING(TIME7.[11:6],*),"   ",                                 
+          STRING(TIME7.[29:6],*),"/",STRING(TIME7.[35:6],*),"/",        
+          DROP(STRING(TIME7.[47:12],*),2);                              
+      WRITE(REPORT[SPACE 4],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "MAXRECSIZE = 3000 WORDS.";                                   
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "ACCESSED FILE - ",POINTER(WHICHFILE) UNTIL = ".";            
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      SAY "ELAPSED TIME   = ",                                          
+           STRING((ETSTOP - ETSTART) * TICKS,*)," SECONDS";             
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "PROCESSOR TIME = ",                                          
+           STRING((PTSTOP - PTSTART) * TICKS,*)," SECONDS";             
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "I/O TIME       = ",                                          
+           STRING((IOSTOP-IOSTART) * TICKS,*)," SECONDS";               
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "FILECOUNT = ", STRING(FILECOUNT,*), " : ",                   
+          "RECSWRITTEN = ", STRING(RECSWRITTEN,*);                      
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "RECORDS PROCESSED/SECOND = ",STRING(                         
+        RECSWRITTEN/((ETSTOP-ETSTART)*TICKS),*);                        
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      SAY "I/O RATE = ",STRING(                                         
+        (RECSWRITTEN * DKFILE.MAXRECSIZE * 6)/                          
+        ((ETSTOP-ETSTART)*TICKS),*)," BYTES PER SECOND.";               
+      WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                           
+      CLEAROUTARRAY;                                                    
+      LOCK(REPORT);                                                     
+                                     % Return comparison figure         
+      IORES:=(RECSWRITTEN * DKFILE.MAXRECSIZE * 6)/                     
+             ((ETSTOP-ETSTART)*TICKS);                                  
+END.                                                                    

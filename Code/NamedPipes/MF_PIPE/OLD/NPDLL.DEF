@@ -1,0 +1,9 @@
+;NPDLL.DLL
+LIBRARY NPDLL
+DESCRIPTION ' Sandys Named Pipe DLL
+EXPORTS
+	OpenPipe
+	WritePipe
+	ClosePipe
+	ReadPipe
+	Delay

@@ -1,0 +1,306 @@
+   DEFINE * SITUATION OS_TANK_COMMANDER(LOG=19,9):                              
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_TANK_COMMANDER SITUATION                                         %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         
+%                                                                     %         
+% SITUATION THAT DETECTS COMS DIAGNOSTIC LOG ENTRIES (LOG 19,9) FOR   %         
+% STATIONS HITTING MAX TANKED MESSAGES PER STATION LIMIT IN COMS.     %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG JUL 2015   %         
+% VERSION 02   Fix COMS accesscode scanning  GXG SEP 2015   %         
+%              and add IDENTITY into email                            %         
+% VERSION 03   Production Implementation     GXG NOV 2015   %         
+% VERSION 04   Add Pseudo Station Support    GXG DEC 2015   %         
+% VERSION 05   Fix Remote Exec Detection     GXG JAN 2016   %         
+% VERSION 06   Email tanked user if possible GXG MAR 2016   %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%% Check for messages in correct format                                         
+  LOGFIELD(4,11,12) = 0 AND           %SUBTYPE LOG_DIAG_COMS_OTHER              
+  LOGFIELD(5,39,32) = 3565266752      % "Max " as integer value - 4 D481A740    
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_TANK_COMMANDER(LOG):                                 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+% OS_TANK_COMMANDER ODTSEQUENCE                                         %       
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %       
+%                                                                       %       
+% ODTSEQUENCE THAT DIRECTS RESPONSE TO A TANKING STATION BASED UPON     %       
+% STATION TYPE.  CALLED BY OS_TANK_COMMANDER SITU                       %       
+%                                                                       %       
+% VERSION 01   INITIAL IMPLEMENTATION        GXG JUL 2015     %       
+% VERSION 02   Fix COMS accesscode scanning  GXG SEP 2015     %       
+%              and add IDENTITY into email                              %       
+% VERSION 03   Production Implementation     GXG NOV 2015     %       
+% VERSION 04   Add Pseudo Station Support    GXG DEC 2015     %       
+% VERSION 05   Fix Remote Exec Detection     GXG JAN 2016     %       
+% VERSION 06   Email tanked user if possible GXG MAR 2016     %       
+%                                                                       %       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%% Clear variables (as variables from last eval still populated)                
+CLEAR;                                                                          
+%Grab the station from the COMS log entry                                       
+$STN:=DECAT(LOGTEXT,"= ",1);                                                    
+                                                                                
+%Query station info in COMS and grab the output                                 
+$COMSINF:=COMS("STATUS "&$STN);                                                 
+                                                                                
+%Check station type and call appropriate ODTS to handle                         
+IF "Pseudo Station" ISIN $COMSINF THEN                                          
+   BEGIN                                                                        
+      CALL DO "OS_TANK_PSEUDO" $STN;                                            
+      CALL DO "OS_TANK_REMOTE" $STN;                                            
+   END;                                                                         
+                                                                                
+IF "LAN Station" ISIN $COMSINF THEN                                             
+   CALL DO "OS_TANK_LAN" $STN;                                                  
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_TANK_LAN(MSG):                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+% OS_TANK_LAN ODTSEQUENCE                                               %       
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %       
+%                                                                       %       
+% ODTSEQUENCE THAT CLEARS A TANKING CCF (LAN) STATION IN CCF AND CALLS  %       
+% OS_TANK_ALERT TO ISSUE AN EMAIL ALERT.                                %       
+% CALLED BY OS_TANK_COMMANDER AND OS_TANK_REMOTE                        %       
+%                                                                       %       
+% VERSION 01   INITIAL IMPLEMENTATION        GXG JUL 2015     %       
+% VERSION 02   Fix COMS accesscode scanning  GXG SEP 2015     %       
+%              and add IDENTITY into email                              %       
+% VERSION 03   Production Implementation     GXG NOV 2015     %       
+% VERSION 04   Add Pseudo Station Support    GXG DEC 2015     %       
+% VERSION 05   Fix Remote Exec Detection     GXG JAN 2016     %       
+% VERSION 06   Email tanked user if possible GXG MAR 2016     %       
+%                                                                       %       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%Check how I was called                                                         
+$SOURCE:=IF MYSELF(CALLDEPTH) = 0 THEN "BNA" ELSE "LOCAL";                      
+                                                                                
+%Grab the station name passed in as a parameter                                 
+$LSTN:=UPPER(TRIM(TEXT));                                                       
+                                                                                
+%If I was called remotely, strip the first node (my hostname) and last 2 nodes  
+% (remote window) from the station name.                                        
+IF $SOURCE="BNA" THEN                                                           
+   BEGIN                                                                        
+      $LSTN:=DropFileIDs(DropFileIDs($LSTN,1),-2);                              
+      %Query station info in COMS and grab the output                           
+      $COMSINF:=COMS("STATUS "&$LSTN);                                          
+   END;                                                                         
+                                                                                
+%Query the station info in CCF and grab the output                              
+$CCFSTATUSCMD:=#("NA CCF CUCIPCM SHOW STATION ",$LSTN);                         
+$CCFINF:=KEYIN($CCFSTATUSCMD);                                                  
+                                                                                
+%Parse the CCF info line by line, grabbing the PCUser and Hostname              
+WHILE $CCFLINE:=$CCFINF.SPLIT(/) NEQ EMPTY DO                                   
+   BEGIN                                                                        
+      IF $CCFLINE INCL "PCUser =" THEN                                          
+         BEGIN                                                                  
+            $PCUSER:=DECAT($CCFLINE,"= ",1);                                    
+         END;                                                                   
+      IF $CCFLINE INCL "HostName =" THEN                                        
+         BEGIN                                                                  
+            $HOST:=DECAT($CCFLINE,"= ",1)                                       
+         END;                                                                   
+   END;                                                                         
+                                                                                
+%Parse the COMS info line by line, grabbing Window, User, Accesscode and IP     
+WHILE $COMSLINE:=$COMSINF.SPLIT(/) NEQ EMPTY DO                                 
+   BEGIN                                                                        
+      IF $COMSLINE INCL "Current window =" THEN                                 
+         BEGIN                                                                  
+            $WINDOW:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                      
+         END;                                                                   
+      IF $COMSLINE INCL "COMS/MARC User" THEN                                   
+         BEGIN                                                                  
+            $MFUSER:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                      
+         END;                                                                   
+      IF $COMSLINE INCL "Access code =" THEN                                    
+         BEGIN                                                                  
+            $ACCESS:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                      
+         END;                                                                   
+      IF $COMSLINE INCL "Client =" THEN                                         
+         BEGIN                                                                  
+            $IPADD:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                       
+         END;                                                                   
+   END;                                                                         
+                                                                                
+%Query active mix entries for station                                           
+IF NOT ($WINDOW EQL "MARC/1") THEN %not on marc so add window name to station   
+      BEGIN                                                                     
+         $NEWLSTN:=#($LSTN,'/',$WINDOW);                                        
+         $CULPRIT:=OBJECTS(MX=ACTIVE:SOURCESTATION = $NEWLSTN);                 
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                        
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                    
+      END                                                                       
+   ELSE   %on marc so leave station as it is                                    
+      BEGIN                                                                     
+         $CULPRITMIX:=OBJECTS(MX=ACTIVE:SOURCESTATION = $LSTN);                 
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                        
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                    
+      END;                                                                      
+                                                                                
+%Clear station in CCF, which disconnects user and DSes their program(s)         
+$CLEARCMD:=#("NA CCF CUCIPCM CLEAR STATION ",$LSTN);                            
+ODT($CLEARCMD);                                                                 
+                                                                                
+%Lookup accesscode in the userdatafile and pull back their IDENTITY info        
+$ACCESSCODE:=#($ACCESS,"ZZ");                                                   
+$WHO:=USERDATA($ACCESSCODE,IDENTITY);                                           
+                                                                                
+%Send email alert                                                               
+CALL DO "OS_TANK_ALERT" $LSTN;                                                  
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_TANK_PSEUDO(MSG):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+% OS_TANK_PSEUDO ODTSEQUENCE                                            %       
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %       
+%                                                                       %       
+% ODTSEQUENCE THAT CLEARS A TANKING PSEUDO (BNA) STATION IN COMS AND    %       
+% CALLS OS_TANK_ALERT TO ISSUE AN EMAIL ALERT.                          %       
+% CALLED BY OS_TANK_COMMANDER                                           %       
+%                                                                       %       
+% VERSION 01   INITIAL IMPLEMENTATION        GXG JUL 2015     %       
+% VERSION 02   Fix COMS accesscode scanning  GXG SEP 2015     %       
+%              and add IDENTITY into email                              %       
+% VERSION 03   Production Implementation     GXG NOV 2015     %       
+% VERSION 04   Add Pseudo Station Support    GXG DEC 2015     %       
+% VERSION 05   Fix Remote Exec Detection     GXG JAN 2016     %       
+% VERSION 06   Email tanked user if possible GXG MAR 2016     %       
+%                                                                       %       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+$PSTN:=UPPER(TRIM(TEXT));                                                       
+%Parse the COMS info line by line, grabbing Window, User, Accesscode and IP     
+WHILE $COMSLINE:=$COMSINF.SPLIT(/) NEQ EMPTY DO                                 
+   BEGIN                                                                        
+      IF $COMSLINE INCL "Current window =" THEN                                 
+         BEGIN                                                                  
+            $WINDOW:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                      
+         END;                                                                   
+      IF $COMSLINE INCL "COMS/MARC User" THEN                                   
+         BEGIN                                                                  
+            $MFUSER:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                      
+         END;                                                                   
+      IF $COMSLINE INCL "Access code =" THEN                                    
+         BEGIN                                                                  
+            $ACCESS:=DECAT(DECAT($COMSLINE,"= ",1),".",4);                      
+         END;                                                                   
+      IF $COMSLINE INCL "Client =" THEN                                         
+         BEGIN                                                                  
+            $IPADD:=DECAT(DECAT($COMSLINE,"= ",1)," ",4);                       
+         END;                                                                   
+   END;                                                                         
+                                                                                
+%Query active mix entries for station                                           
+IF NOT ($WINDOW EQL "MARC/1") THEN %not on marc so add window name to station   
+      BEGIN                                                                     
+         $NEWPSTN:=#($PSTN,'/',$WINDOW);                                        
+         $CULPRIT:=OBJECTS(MX=ACTIVE:SOURCESTATION = $NEWPSTN);                 
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                        
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                    
+      END                                                                       
+   ELSE   %on marc so leave station as it is                                    
+      BEGIN                                                                     
+         $CULPRITMIX:=OBJECTS(MX=ACTIVE:SOURCESTATION = $PSTN);                 
+         #CULPRITMIX:=DECIMAL($CULPRIT);                                        
+         $CULPRITNAME:=#CULPRITMIX.MX(NAME);                                    
+      END;                                                                      
+                                                                                
+%Clear station in CCF, which disconnects user and DSes their program(s)         
+$COMSCMD:=COMS("CLEAR STATION "&$PSTN);                                         
+                                                                                
+%Lookup accesscode in the userdatafile and pull back their IDENTITY/EMAIL info  
+$ACCESSCODE:=#($ACCESS,"ZZ");                                                   
+$WHO:=USERDATA($ACCESSCODE,IDENTITY);                                           
+                                                                                
+%Send email alert                                                               
+CALL DO "OS_TANK_ALERT" $PSTN;                                                  
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_TANK_REMOTE(MSG):                                    
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+% OS_TANK_REMOTE ODTSEQUENCE                                            %       
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %       
+%                                                                       %       
+% ODTSEQUENCE THAT CALLS OS_TANK_LAN ON A REMOTE HOST TO CLEAR IN CCF   %       
+% A STATION THAT ORIGINATED ON THAT HOST AND WAS CLEARED IN CCF ON THIS %       
+% HOST FOR TANKING.    CALLED BY OS_TANK_COMMANDER                      %       
+%                                                                       %       
+% VERSION 01   INITIAL IMPLEMENTATION        GXG JUL 2015     %       
+% VERSION 02   Fix COMS accesscode scanning  GXG SEP 2015     %       
+%              and add IDENTITY into email                              %       
+% VERSION 03   Production Implementation     GXG NOV 2015     %       
+% VERSION 04   Add Pseudo Station Support    GXG DEC 2015     %       
+% VERSION 05   Fix Remote Exec Detection     GXG JAN 2016     %       
+% VERSION 06   Email tanked user if possible GXG MAR 2016     %       
+%                                                                       %       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%Grab station name from input parameter                                         
+$RSTN:=UPPER(TRIM(TEXT));                                                       
+                                                                                
+%Grab source hostname from station                                              
+$SRCHOST:=DECAT($RSTN,"/",4);                                                   
+                                                                                
+%Call OS_TANK_LAN at the source host to clear the station there                 
+ODT(#("AT ",$SRCHOST," TT DO OS_TANK_LAN ",$RSTN));                             
+                                                                                
+\                                                                               
+   DEFINE * ODTSEQUENCE OS_TANK_ALERT(MSG):                                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+% OS_TANK_ALERT ODTSEQUENCE                                             %       
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %       
+%                                                                       %       
+% ODTSEQUENCE THAT ISSUES AN EMAIL ALERT ABOUT A CLEARED TANKING STATION%       
+%  - CALLED BY OS_TANK_PSEUDO AND OS_TANK_LAN.                          %       
+%                                                                       %       
+% VERSION 01   INITIAL IMPLEMENTATION        GXG JUL 2015     %       
+% VERSION 02   Fix COMS accesscode scanning  GXG SEP 2015     %       
+%              and add IDENTITY into email                              %       
+% VERSION 03   Production Implementation     GXG NOV 2015     %       
+% VERSION 04   Add Pseudo Station Support    GXG DEC 2015     %       
+% VERSION 05   Fix Remote Exec Detection     GXG JAN 2016     %       
+% VERSION 06   Email tanked user if possible GXG MAR 2016     %       
+%                                                                       %       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%       
+%Grab station from input parameter                                              
+IF NOT (TEXT = EMPTY) THEN                                                      
+   $ASTN:=UPPER(TRIM(TEXT));                                                    
+                                                                                
+%Set up the email address for the alerts                                        
+$EMAIL:=#("####",           
+            ",####");                                         
+                                                                                
+%If there is an accesscode for the station, and if the accesscode has an        
+% email address populated in the EMAIL field of the USERDATA entry              
+% add it to the recipient list                                                  
+IF NOT($ACCESSCODE = EMPTY) THEN                                                
+BEGIN                                                                           
+  $USER_EMAIL:=USERDATA($ACCESSCODE,EMAIL);                                     
+END;                                                                            
+                                                                                
+IF NOT($USER_EMAIL = EMPTY) THEN                                                
+BEGIN                                                                           
+  $EMAIL:=#($EMAIL,',',$USER_EMAIL);                                            
+END;                                                                            
+                                                                                
+%Send alert email                                                               
+#ML:=MAIL(#('To:',$EMAIL,';',                                                   
+   'Subject:TANKING STATION CLEARED ON ',HOSTNAME),                             
+   #('Tanked messages for station ',$ASTN,,                                     
+      'exceeded COMS limit and station was cleared.',/,/,                       
+      'The station was connected from host ',$HOST,,                            
+      'with IP Address ',$IPADD,,'and PC usercode ',$PCUSER,'.',/,/,            
+      'Mainframe usercode : ',$MFUSER,/,                                        
+      'Mainframe accesscode : ',$ACCESS,/,                                      
+      'User Identity : ',$WHO,/,/,                                              
+      'Program(s) being run by this station prior to being cleared:',/,         
+      #CULPRITMIX,,$CULPRITNAME));                                              
+                                                                                
+%If there was an error sending the email, inform via waiting entry              
+IF #ML < 0 THEN                                                                 
+   BEGIN                                                                        
+      ODT(#('BEGIN JOB TANK_COMMAND/MAILERROR',';CLASS=9; STRING S; ',          
+          'S:=ACCEPT("MAIL OF TANK ERROR FAILED: ',MAILERROR(#ML),'");',        
+          'S:=ACCEPT("CLEARED STATION: ',$ASTN,'");'));                         
+   END                                                                          
+                                                                                

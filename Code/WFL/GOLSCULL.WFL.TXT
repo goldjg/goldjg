@@ -1,0 +1,105 @@
+BEGIN JOB GN/GOLSCULL(INTEGER SUSPDAYS OPTIONAL DEFAULT = 45,                   
+                      INTEGER DELDAYS  OPTIONAL DEFAULT = 90,                   
+                      INTEGER GRACEDAYS OPTIONAL DEFAULT = 2);                  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+%%                         GN/JOB/GOLSCULL                            %%        
+%%                         ===============                            %%        
+%%                                                                    %%        
+%% THIS JOB RUNS GN/P/GOLSCULL, WHICH IDENTIFIES ACCOUNTS TO BE  %%        
+%% SUSPENDED OR DELETED AND SUSPENDS/DELETES THEM AS APPROPRIATE.     %%        
+%%                                                                    %%        
+%% JOB TAKES THREE INTEGER PARAMETERS:-                               %%        
+%% SUSPDAYS : NUMBER OF DAYS SINCE LASTLOGON BEFORE USER SUSPENDED.   %%        
+%% DELDAYS  : NUMBER OF DAYS SINCE LASTLOGON BEFORE USER DELETED.     %%        
+%% GRACEDAYS: NUMBER OF DAYS ALLOWED BETWEEN ACCOUNT CREATION AND     %%        
+%%            FIRST LOGIN - DON'T CULL NEW ACCOUNTS.                  %%        
+%%                                                                    %%        
+%% DELDAYS *MUST* BE GREATER THAN SUSPDAYS OTHERWISE JOB WILL ABORT   %%        
+%% (GIVE USERS 2 STRIKES BEFORE ACCOUNT DELETION).                    %%        
+%%                                                                    %%        
+%% DEFAULT VALUES:-                                                   %%        
+%% SUSPDAYS = 45, DELDAYS = 90, GRACEDAYS = 2                         %%        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+%%                                                                    %%        
+%% VERSION 01  INITIAL IMPLEMENTATION           DEC 2009 GXG %%        
+%% VERSION 02  ADD GRACEDAYS FUNCTIONALITY      MAR 2012 GXG %%        
+%% VERSION 03  REPORT ENHANCEMENTS              FEB 2013 GXG %%        
+%%                                                                    %%        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+ $INCLUDE GN/INC/ABORTDISPLAY                                                   
+                                                                                
+ TASK GOLSCULL;                                                                 
+                                                                                
+ REAL USERCOUNT,                                                                
+      SUSPCOUNT,                                                                
+      DELCOUNT;                                                                 
+                                                                                
+ STRING USERS,                                                                  
+        SUSP,                                                                   
+        DEL,                                                                    
+        BODY,                                                                   
+        DD,                                                                     
+        MM,                                                                     
+        YYYY,                                                                   
+        DATE,                                                                   
+        SDAYS,                                                                  
+        DDAYS;                                                                  
+                                                                                
+IF SUSPDAYS GEQ DELDAYS THEN                                                    
+   ABORTIT("DELETE DAYS MUST BE GREATER THAN SUSPEND DAYS");                    
+                                                                                
+% COUNTS PASSED BY REFERENCE SO WE GET VALUES BACK FROM PROGRAM AT EOT          
+ RUN *GN/P/GOLSCULL(USERCOUNT REFERENCE,                                        
+                    SUSPCOUNT REFERENCE,                                        
+                    DELCOUNT REFERENCE,                                         
+                    SUSPDAYS,                                                   
+                    DELDAYS,                                                    
+                    GRACEDAYS)[GOLSCULL];                                       
+    OPTION = (FILES,DSED,ARRAYS,FAULT);                                         
+    FILE TASKFILE(USERBACKUPNAME=FALSE);                                        
+    FILE DELETES (TITLE=##REDACTED##,                              
+                  KIND=DISK,                                                    
+                  FILEKIND=DATA,                                                
+                  MAXRECSIZE=41,                                                
+                  BLOCKSIZE=41);                                                
+    FILE SUSPENDS (TITLE=##REDACTED##,                            
+                   KIND=DISK,                                                   
+                   FILEKIND=DATA,                                               
+                   MAXRECSIZE=41,                                               
+                   BLOCKSIZE=41);                                               
+    FILE ERRS (TITLE=##REDACTED##,                                    
+               KIND=DISK,                                                       
+               FILEKIND=DATA,                                                   
+               MAXRECSIZE=40,                                                   
+               BLOCKSIZE=40);                                                   
+    FILE SUMMARY (TITLE=##REDACTED##,                                      
+                  KIND=DISK,                                                    
+                  FILEKIND=DATA,                                                
+                  MAXRECSIZE=55,                                                
+                  BLOCKSIZE=55);                                                
+                                                                                
+% DETECT PROGRAM FAILURE AND PRODUCE PROGRAMDUMP/FAILURE NOTICE                 
+ IF GOLSCULL ISNT COMPLETEDOK THEN                                              
+    ABORTIT("GN/P/GOLSCULL FAILURE - INFORM ##REDACTED## TEAM");                        
+                                                                                
+% CONVERT PROG PARAM VALUES AT EOT TO STRINGS FOR DISPLAY                       
+ USERS:= STRING(USERCOUNT,*);                                                   
+ SUSP:= STRING(SUSPCOUNT,*);                                                    
+ DEL:= STRING(DELCOUNT,*);                                                      
+ SDAYS:= STRING(SUSPDAYS,*);                                                    
+ DDAYS:= STRING(DELDAYS,*);                                                     
+                                                                                
+% GET TODAY'S DATE AND CONVERT TO DISPLAY AS DD/MM/YYYY                         
+ DATE:= TIMEDATE(DDMMYYYY);                                                     
+ DD:= TAKE(DATE,2);                                                             
+ MM:= TAKE(DROP(DATE,2),2);                                                     
+ YYYY:= DROP(DATE,4);                                                           
+ DATE:= DD / MM / YYYY;                                                         
+                                                                                
+% RUN MAILER TO EMAIL OUTPUT FILES AND STATS                                    
+RUN *METALOGIC/MAILER("user@domain","CULL REPORT - " & DATE);         
+TASKSTRING = "<html><body><font face='Calibri'>~^SIG NONE";                     
+FILE INCLUDE = ##REDACTED##;                                               
+FILE ATTACHDIR = ##REDACTED##;                                             
+                                                                                
+END JOB                                                                         

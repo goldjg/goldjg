@@ -1,0 +1,116 @@
+$$ SET LIST ERRLIST STACK LINEINFO FORMAT NOXREFLIST LISTDOLLAR         
+$$ SET LEVEL 2                                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%% OBJECT/WHO                                                %%         
+%% ==================                                        %%         
+%% UTILITY PROGRAM CALLED BY U WHO <PARAM>                   %%         
+%% PROGRAM MUST BE PP'D WITH PU OR TASKING.                  %%         
+%%                                                           %%         
+%% FUNCTION: RETURNS IDENTITY OF ACCESSCODE PASSED IN        %%         
+%%                                                           %%         
+%% INPUT: ACCESSCODE TO BE INTERROGATED IN USERDATA          %%         
+%%                                                           %%         
+%% OUTPUTS                                                   %%         
+%% =======                                                   %%         
+%% DISPLAY FROM SUPERVISOR WHO MSG OPAL                      %%         
+%%                                                           %%         
+%% CALLS EXTERNALCOMMAND ENTRYPOINT IN SUPERVISOR TO PROCESS %%         
+%% SUPERVISOR CMDS ONLY ("TT" NOT REQUIRED. ODT CMDS NOT     %%         
+%% SUPPORTED.                                                %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                                                           %%         
+%% VERSION 01          INITIAL IMPLEMENTATION   APR 2012 GXG %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                        
+%% CALLSUPERVISOR PROCEDURE.                                            
+%% PARAM NAME MATCHES WFL STRING PASSED FROM CALLING WFL.               
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%               
+PROCEDURE CALLSUPERVISOR(INPUT);                                        
+REAL ARRAY INPUT[*];                                                    
+                                                                        
+BEGIN                                                                   
+                                                                        
+DEFINE REQID_LEN = 20#; % LENGTH OF REQUEST IDENTIFIER                  
+                                                                        
+TRUTHSET                                                                
+  NUMS   ("0123456789")                                                 
+ ,ALPHAS ("AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz")       
+ ,ALPHANUM  (ALPHAS OR NUMS)                                            
+ ,VALIDID ("PpTtXx")                                                    
+ ;                                                                      
+                                                                        
+%% DECLARE SUPERVISOR LIBRARY USING EXTERNALCOMMAND PROCEDURE           
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%           
+   LIBRARY SUP(LIBACCESS=BYTITLE,                                       
+                  TITLE="*METALOGIC/SUPERVISOR.");                      
+                                                                        
+      INTEGER PROCEDURE EXTERNALCOMMAND(INP,OUT);                       
+      ARRAY INP,OUT[0];                                                 
+   LIBRARY SUP;                                                         
+                                                                        
+   %% DEFINE REALS/ARRAYS REQUIRED FOR EXTERNALCOMMAND CALL             
+   %% DEFINE OUTPUT ARRAY WITH NO BOUNDS, EXTERNALCOMMAND               
+   %% PROCEDURE WILL RESIZE AS NEEDED.                                  
+   REAL EXTCMD;                                                         
+   ARRAY OUTPUT[0:0];                                                   
+   ARRAY CMDINP[0:0];                                                   
+   POINTER PSCAN;                                                       
+   INTEGER POS;                                                         
+                                                                        
+   %% USE ADDRESS EQUATION TO MAP REAL ARRAYS TO EBCDIC ARRAYS.         
+   EBCDIC ARRAY OUTPUTEX[0]=OUTPUT;                                     
+   EBCDIC ARRAY INPUTEX[0]=INPUT;                                       
+   EBCDIC STRING EREQ;                                                  
+                                                                        
+   REPLACE MYSELF.FAMILY BY ".";                                        
+   %% NOT ONLY MUST CODEFILE BE PPED WITH PU, CALLING USERCODE MUST     
+   %% BE PU OR SU SO FAKE IT BY CHANGING USERCODE ON THE FLY.           
+                                                                        
+   %% **************************************************************    
+   %% *** ONCE SUPERVISOR UPGRADED FROM 531.70 TO LATEST, CAN    ***    
+   %% *** AVOID THIS BY PPING CODEFILE WITH SECADMIN PRIVILEGE.  ***    
+   %% **************************************************************    
+   REPLACE MYSELF.USERCODE BY "##REDACTED##/##REDACTED##.";                
+                                                                        
+   %% CHECK INPUT IS ALPHANUMERIC                                       
+   %SCAN PSCAN:INPUTEX[0] FOR REQID_LEN WHILE IN ALPHANUM;              
+   %IF NOT PSCAN = 48"00" THEN                                          
+   %   IF NOT PSCAN IN ALPHANUM THEN                                    
+   %   BEGIN                                                            
+   %   DISPLAY("Non-Alphanumeric characters not supported");            
+   %   MYSELF.STATUS := VALUE(TERMINATED);                              
+   %   END;                                                             
+                                                                        
+   %% CHECK IT IS A VALID ACCESSCODE FORMAT                             
+   %PSCAN:=INPUTEX[0];                                                  
+   %IF NOT PSCAN = 48"00" THEN                                          
+   %   IF NOT PSCAN IN VALIDID THEN                                     
+   %   BEGIN                                                            
+   %   DISPLAY("Accesscodes must begin with P, T, or X");               
+   %   MYSELF.STATUS := VALUE(TERMINATED);                              
+   %   END;                                                             
+                                                                        
+   %SCAN PSCAN:INPUTEX[0] FOR REQID_LEN WHILE IN ALPHANUM;              
+   %POS:=OFFSET(PSCAN);                                                 
+   %IF NOT POS EQL REQID_LEN THEN                                       
+   %   BEGIN                                                            
+   %   DISPLAY("Accesscodes must be 8 characters in length");           
+   %   MYSELF.STATUS := VALUE(TERMINATED);                              
+   %   END;                                                             
+                                                                        
+   %% BUILD COMMAND                                                     
+   SCAN PSCAN:INPUTEX[0] FOR REQID_LEN WHILE NEQ 48"00";                
+   EREQ := STRING8(INPUTEX,OFFSET(PSCAN));                              
+   RESIZE (CMDINP,150,DISCARD);                                         
+   REPLACE CMDINP BY "FOR ##REDACTED## EV (USER:UPPER(IDENTITY) HDIS ",
+                     """,EREQ,""",")",                                  
+                     "[TITLE *SYSTEM/USERDATAFILE] DISP ",              
+                     "WHO_2[1]";                                        
+                                                                        
+   %%CALL SUPERVISOR LIBRARY TO PROCESS COMMAND                         
+   %%AND GET RESPONSE BACK.                                             
+   EXTCMD:=EXTERNALCOMMAND(CMDINP,OUTPUT);                              
+                                                                        
+   %DISPLAY THE OUTPUT FROM SUPERVISOR                                  
+   DISPLAY (OUTPUTEX);                                                  
+END.                                                                    

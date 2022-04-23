@@ -1,0 +1,40 @@
+BEGIN JOB GXG/BACSREPORT;                                                       
+      CLASS=0;                                                                  
+      BDNAME = PRINT/LOGGER;                                                    
+      JOBSUMMARY  = UNCONDITIONAL;                                              
+      JOBSUMMARYTITLE = PRINT/LOGGER/JOBSMMARY;                                 
+      TASK T;                                                                   
+SUBROUTINE LOGGER;                                                              
+BEGIN                                                                           
+   RUN *SYSTEM/LOGGER [T];                                                      
+       FAMILY DISK=##REDACTED## OTHERWISE DISK;                                   
+       FILE LINE (KIND=PRINTER);                                                
+       OPTIONS=(FAULT,DSED,FILES,ARRAYS);                                       
+DATA CARD                                                                       
+USE SUMLOG 123456                                                               
+REPORT                                                                          
+SOURCE FILE IS FILEIODATA                                                       
+INCLUDE IF EXTNAME = ##REDACTED##"                                      
+INCLUDE IF EXTNAME = "##REDACTED##"                                    
+INCLUDE IF EXTNAME = "##REDACTED##"                                        
+INCLUDE IF EXTNAME = "##REDACTED##"                                        
+INCLUDE IF EXTNAME = "##REDACTED##"                                     
+INCLUDE IF EXTNAME = "##REDACTED##"                                        
+INCLUDE IF EXTNAME = "##REDACTED##"                                     
+INCLUDE IF EXTNAME = "##REDACTED##"                                    
+INCLUDE IF EXTNAME = "##REDACTED##"                                   
+INCLUDE IF EXTNAME = "##REDACTED##"                                        
+OUTPUT ITEMS ARE MIXNO, INTNAME, EXTNAME, USE, KIND, FILEKIND,-                 
+RETENTION, IOTIME                                                               
+HEADING IS "FILE USAGE REPORT"                                                  
+END                                                                             
+?                                                                               
+   IF T ISNT COMPLETEDOK THEN ABORT ("LOGGER FAILED");                          
+   T(STATUS = NEVERUSED);                                                       
+END;                                                                            
+                                                                                
+                                                                                
+   LOGGER;                                                                      
+                                                                                
+                                                                                
+END JOB;                                                                        

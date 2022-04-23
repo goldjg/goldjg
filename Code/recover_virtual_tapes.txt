@@ -1,0 +1,113 @@
+#!/bin/bash
+#
+# Version 01 - ##REDACTED## - initial imp as part of ##REDACTED## - May ##REDACTED##
+#
+# fname is a file containing list of tape serial numbers to be recovered
+# from TSM
+#
+
+fname="drtapes"
+tsmcommand="sudo /opt/tivoli/tsm/client/ba/bin/dsmc retrieve"
+tsmoptions="-replace=all -optfile=/opt/tivoli/tsm/client/ba/bin/dsm.opt"
+
+while read line
+do
+  echo $line
+#
+# ##REDACTED## virtual tapes
+#
+  if   (( $line >= 510001 && $line <= 510100 )); then
+     $tsmcommand /VAULT10/510100_V10/$line $tsmoptions
+  elif (( $line >= 510101 && $line <= 510200 )); then
+     $tsmcommand /VAULT11/510200_V11/$line $tsmoptions
+  elif (( $line >= 510201 && $line <= 510300 )); then
+     $tsmcommand /VAULT12/510300_V12/$line $tsmoptions  
+  elif (( $line >= 510301 && $line <= 510400 )); then
+     $tsmcommand /VAULT13/510400_V13/$line $tsmoptions
+  elif (( $line >= 510401 && $line <= 510500 )); then
+     $tsmcommand /VAULT14/510500_V14/$line $tsmoptions
+  elif (( $line >= 510501 && $line <= 510600 )); then
+     $tsmcommand /VAULT10/510600_V10/$line $tsmoptions
+  elif (( $line >= 510601 && $line <= 510700 )); then
+     $tsmcommand /VAULT11/510700_V11/$line $tsmoptions
+  elif (( $line >= 510701 && $line <= 510800 )); then
+     $tsmcommand /VAULT12/510800_V12/$line $tsmoptions
+  elif (( $line >= 510801 && $line <= 510900 )); then
+     $tsmcommand /VAULT13/510900_V13/$line $tsmoptions
+  elif (( $line >= 510901 && $line <= 511000 )); then
+     $tsmcommand /VAULT14/511000_V14/$line $tsmoptions
+  elif (( $line >= 511001 && $line <= 511100 )); then
+     $tsmcommand /VAULT10/511100_V10/$line $tsmoptions
+  elif (( $line >= 511101 && $line <= 511200 )); then
+     $tsmcommand /VAULT11/511200_V11/$line $tsmoptions
+  elif (( $line >= 511201 && $line <= 511300 )); then
+     $tsmcommand /VAULT12/511300_V12/$line $tsmoptions
+  elif (( $line >= 511301 && $line <= 511400 )); then
+     $tsmcommand /VAULT13/511400_V13/$line $tsmoptions
+  elif (( $line >= 511401 && $line <= 511500 )); then
+     $tsmcommand /VAULT14/511500_V14/$line $tsmoptions
+  elif (( $line >= 511501 && $line <= 511600 )); then
+     $tsmcommand /VAULT11/511600_V11/$line $tsmoptions
+  elif (( $line >= 511601 && $line <= 511700 )); then
+     $tsmcommand /VAULT10/511700_V10/$line $tsmoptions
+  elif (( $line >= 511701 && $line <= 511800 )); then
+     $tsmcommand /VAULT11/511800_V11/$line $tsmoptions
+  elif (( $line >= 511801 && $line <= 511900 )); then
+     $tsmcommand /VAULT12/511900_V12/$line $tsmoptions
+  elif (( $line >= 511901 && $line <= 512000 )); then
+     $tsmcommand /VAULT13/512000_V13/$line $tsmoptions
+  elif (( $line >= 512001 && $line <= 512100 )); then
+     $tsmcommand /VAULT10/512100_V10/$line $tsmoptions
+#
+# ##REDACTED## virtual tapes
+#        
+  elif (( $line >= 520001 && $line <= 520100 )); then
+     $tsmcommand /VAULT10/520100_V10/$line $tsmoptions
+  elif (( $line >= 520101 && $line <= 520200 )); then
+     $tsmcommand /VAULT11/520200_V11/$line $tsmoptions
+  elif (( $line >= 520201 && $line <= 520300 )); then
+     $tsmcommand /VAULT12/520300_V12/$line $tsmoptions
+  elif (( $line >= 520301 && $line <= 520400 )); then
+     $tsmcommand /VAULT13/520400_V13/$line $tsmoptions
+  elif (( $line >= 520401 && $line <= 520500 )); then
+     $tsmcommand /VAULT14/520500_V14/$line $tsmoptions
+  elif (( $line >= 520501 && $line <= 520600 )); then
+     $tsmcommand /VAULT10/520600_V10/$line $tsmoptions
+#
+# ##REDACTED## virtual tapes
+#
+  elif (( $line >= 530001 && $line <= 530100 )); then
+     $tsmcommand /VAULT10/530100_V10/$line $tsmoptions
+  elif (( $line >= 530101 && $line <= 530200 )); then
+     $tsmcommand /VAULT11/530200_V11/$line $tsmoptions
+  elif (( $line >= 530201 && $line <= 530300 )); then
+     $tsmcommand /VAULT12/530300_V12/$line $tsmoptions
+  elif (( $line >= 530301 && $line <= 530400 )); then
+     $tsmcommand /VAULT13/530400_V13/$line $tsmoptions
+elif (( $line >= 530401 && $line <= 530500 )); then
+     $tsmcommand /VAULT14/530500_V14/$line $tsmoptions
+#
+# ##REDACTED## virtual tapes
+#
+  elif (( $line >= 540001 && $line <= 540100 )); then
+     $tsmcommand /VAULT11/540100_V11/$line $tsmoptions
+  elif (( $line >= 540101 && $line <= 540200 )); then
+     $tsmcommand /VAULT14/540200_V14/$line $tsmoptions
+  elif (( $line >= 540201 && $line <= 540300 )); then
+     $tsmcommand /VAULT10/540300_V10/$line $tsmoptions
+elif (( $line >= 540301 && $line <= 540400 )); then
+     $tsmcommand /VAULT14/540400_V14/$line $tsmoptions
+#
+# ##REDACTED## virtual tapes
+#
+  elif (( $line >= 550001 && $line <= 550100 )); then
+     $tsmcommand /VAULT11/550100_V11/$line $tsmoptions
+  elif (( $line >= 550101 && $line <= 550200 )); then
+     $tsmcommand /VAULT12/550200_V12/$line $tsmoptions
+#
+# ##REDACTED## virtual tapes
+#
+  elif (( $line >= 560001 && $line <= 560100 )); then
+     $tsmcommand /VAULT14/560100_V14/$line $tsmoptions
+  fi
+done < $fname 

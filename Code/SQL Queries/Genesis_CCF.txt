@@ -1,0 +1,9 @@
+select *
+from ##REDACTED##
+inner join ##REDACTED## on ##REDACTED## = ##REDACTED##
+inner join ##REDACTED## on ##REDACTED## = ##REDACTED##
+inner join ##REDACTED## on ##REDACTED## = ##REDACTED## and ##REDACTED## = ##REDACTED##
+left join ##REDACTED## on ##REDACTED## = ##REDACTED##
+where ##REDACTED##like '##REDACTED##%'
+or ##REDACTED## like '##REDACTED##%')
+and ##REDACTED## = '##REDACTED##'

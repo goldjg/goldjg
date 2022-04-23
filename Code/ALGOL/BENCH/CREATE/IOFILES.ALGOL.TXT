@@ -1,0 +1,181 @@
+                                                                        
+ $ SET LISTDOLLAR LIST ERRLIST LINEINFO STACK NOXREFLIST INSTALLATION 1 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%                                                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+BEGIN                                                                   
+   DEFINE                                                               
+          WORDS_PER_LINE    = 3000 #,                                   
+          WORDS_PER_SEGMENT = 30 #;                                     
+                                                                        
+   DEFINE CHECK_DRC(WHICH) =                                            
+        IF REAL(WRITE_RESULT).[26:10] EQL VALUE(FAMILYLIMITERR) OR      
+           REAL(WRITE_RESULT).[26:10] EQL VALUE(INTEGRALLIMITERR) THEN  
+         BEGIN                                                          
+           DRC_ERROR:=TRUE;                                             
+           IF WHICH EQL "MULTIPLE" THEN                                 
+             LINES:=(I-1) DIV 2; % If DRC error recalculate lines       
+         END                                                            
+         ELSE                                                           
+         BEGIN                   % Any other failure, Abort.            
+           DISPLAY("WRITE FAILURE ON BENCH/D/"!!WHICH!!" AT "           
+                                                         !!STRING(I,*));
+           MYSELF.STATUS := -1;                                         
+         END #;                                                         
+                                                                        
+   INTEGER I,LINES;                                                     
+                                                                        
+   BOOLEAN DRC_ERROR,                                                   
+           WRITE_RESULT;                                                
+                                                                        
+   POINTER P;                                                           
+                                                                        
+   ARRAY OUTARRAY[0:WORDS_PER_LINE-1],  % Output array                  
+         INFO[0:99],        % Getstatus information                     
+         FAMILYNAME[0:2],   % Holds family name                         
+         FAMILYSUB[0:19],   % Holds family substitution                 
+         FAMILYSTD[0:9];    % Holds family name in standard format      
+                                                                        
+   FILE DKFILE1(KIND=PACK,NEWFILE=TRUE,UNITS=WORDS,AREAS=500,           
+                AREASIZE=500,BLOCKSIZE=WORDS_PER_LINE,PROTECTION=SAVE,  
+                MAXRECSIZE=WORDS_PER_LINE,TITLE="BENCH/D/SINGLE.");     
+   FILE DKFILE2(KIND=PACK,NEWFILE=TRUE,UNITS=WORDS,AREAS=500,           
+                AREASIZE=1,BLOCKSIZE=WORDS_PER_LINE,PROTECTION=SAVE,    
+                MAXRECSIZE=WORDS_PER_LINE,TITLE="BENCH/D/MULTIPLE.");   
+                                                                        
+   INTEGER PROCEDURE CALC_NUM_LINES;                                    
+     % Procedure to calculate the number of lines to be written         
+   BEGIN                                                                
+     DEFINE TYPEF    = [7:8] #,                                         
+            SUBTYPEF = [15:8] #;                                        
+                                                                        
+     REAL MASK;                                                         
+                                                                        
+     INTEGER COUNT;                                                     
+                                                                        
+     BOOLEAN DTS,             % Result of displaytostandard call        
+             GS;              % result of getstatus call                
+                                                                        
+     POINTER FAM,STDF,FAMS;                                             
+                                                                        
+     FAM:=FAMILYNAME[0];                                                
+     FAMS:=FAMILYSUB[0];                                                
+     STDF:=FAMILYSTD[0];                                                
+                                                                        
+     REPLACE FAMS BY MYSELF.FAMILY;  % Obtain family statement          
+     SCAN FAMS:FAMS WHILE NEQ "=";   % and extract current family       
+     SCAN FAMS:FAMS UNTIL IN ALPHA;                                     
+     REPLACE FAM BY FAMS WHILE IN ALPHA,".";                            
+                                                                        
+                                     % Convert family to Standard form  
+     IF (DTS:=DISPLAYTOSTANDARD(FAM,STDF)) THEN                         
+     BEGIN                                                              
+       DISPLAY("DISPLAYTOSTANDARD FAILURE " CAT STRING(REAL(DTS),*));   
+       MYSELF.TASKVALUE:=99;                                            
+       MYSELF.STATUS:=-1;                                               
+     END;                                                               
+                                                                        
+     REPLACE POINTER(INFO[3]) BY STDF FOR FAMILYSTD[0].[47:8];          
+     INFO[0]:=3;                                                        
+                                                                        
+       % Use GETSTATUS to obtain available space on family (in segments)
+     IF (GS:=GETSTATUS(0 & 3 TYPEF & 6 SUBTYPEF,0,MASK,INFO)) THEN      
+     BEGIN                                                              
+       IF (REAL(GS).[0:1]=1) AND (REAL(GS).[11:08]=0) THEN              
+       BEGIN                                                            
+         FOR COUNT:=0 STEP 1 UNTIL 9 DO                                 
+           IF INFO[COUNT].[47:1]=1 THEN                                 
+             DISPLAY("GETSTATUS SOFT ERROR " CAT STRING(                
+                      INTEGER(INFO[COUNT].[46:8]),*))                   
+       END                                                              
+       ELSE                                                             
+         DISPLAY("GETSTATUS HARD ERROR " CAT STRING(REAL(GS).[11:8],*));
+                                                                        
+       MYSELF.TASKVALUE:=99;                                            
+       MYSELF.STATUS:=-1;                                               
+     END;                                                               
+                                                                        
+       % Calculate the number of lines which can be used for each       
+       % file (MAX = A quarter of the available disk)                   
+     CALC_NUM_LINES:=MIN((((INFO[1] * WORDS_PER_SEGMENT) DIV 4)         
+                     DIV WORDS_PER_LINE),500);                          
+   END CALC_NUM_LINES;                                                  
+                                                                        
+   BOOLEAN PROCEDURE CREATE_MULTIPLE(LINES);                            
+     % Creates the Multiple I/O file. Returns TRUE if it hit a DRC limit
+   INTEGER LINES;                                                       
+   BEGIN                                                                
+     REPLACE OUTARRAY[0] BY "IOIOIO" FOR WORDS_PER_LINE WORDS;          
+     P := OUTARRAY[0];                                                  
+     DRC_ERROR:=FALSE;                                                  
+     FOR I := 1 STEP 1 UNTIL LINES DO                                   
+       IF NOT DRC_ERROR THEN                                            
+         IF (WRITE_RESULT:=WRITE(DKFILE2,WORDS_PER_LINE,OUTARRAY)) THEN 
+                                                                        
+                                   % If write error, check for DRC limit
+           CHECK_DRC("MULTIPLE");                                       
+                                                                        
+     IF NOT DRC_ERROR THEN                                              
+       LOCK(DKFILE2)               % If no DRC error then save the file 
+     ELSE                          % Otherwise remove the file          
+       IF CLOSE(DKFILE2,PURGE) EQL 1 THEN ;                             
+                                                                        
+     CREATE_MULTIPLE:=DRC_ERROR;                                        
+   END CREATE_MULTIPLE;                                                 
+                                                                        
+   BOOLEAN PROCEDURE CREATE_SINGLE(LINES);                              
+     % Creates the Single I/O file. Returns TRUE if it hit a DRC limit  
+   INTEGER LINES;                                                       
+   BEGIN                                                                
+     REPLACE OUTARRAY[0] BY "IOIOIO" FOR WORDS_PER_LINE WORDS;          
+     DKFILE1.AREASIZE:=LINES;                                           
+     P := OUTARRAY[0];                                                  
+     DRC_ERROR:=FALSE;                                                  
+     FOR I := 1 STEP 1 UNTIL LINES DO                                   
+       IF NOT DRC_ERROR THEN                                            
+         IF (WRITE_RESULT:=WRITE(DKFILE1,WORDS_PER_LINE,OUTARRAY)) THEN 
+                                                                        
+                                   % If write error, check for DRC limit
+           CHECK_DRC("SINGLE");                                         
+                                                                        
+     IF NOT DRC_ERROR THEN                                              
+       LOCK(DKFILE1)               % If no DRC error then save the file 
+     ELSE                          % Otherwise remove the file          
+       IF CLOSE(DKFILE1,PURGE) EQL 1 THEN ;                             
+                                                                        
+     CREATE_SINGLE:=DRC_ERROR;                                          
+   END CREATE_SINGLE;                                                   
+                                                                        
+   LINES:=CALC_NUM_LINES;                                               
+                                                                        
+   IF LINES LEQ 0 THEN             % If lines Zero then not enough space
+   BEGIN                           % On pack to create Single record    
+     MYSELF.TASKVALUE:=99;         % files                              
+     DISPLAY("NOT ENOUGH SPACE TO CREATE ANY IO FILES");                
+     MYSELF.STATUS:=-1;                                                 
+   END;                                                                 
+                                                                        
+   DRC_ERROR:=TRUE;                                                     
+   WHILE DRC_ERROR DO                                                   
+   BEGIN                           % Create the Multiple I/O file       
+                                   % If DRC limit reached recalculate   
+                                   % lines and recreate file            
+     WHILE CREATE_MULTIPLE(LINES) DO ;                                  
+                                                                        
+     IF CREATE_SINGLE(LINES) THEN  % If Single I/O file hits DRC limit  
+     BEGIN                         % then recreate both file using half 
+       OPEN(DKFILE2);              % the No. of lines in the Multiple   
+       LINES:=DKFILE2.LASTRECORD DIV 2;                                 
+       CLOSE(DKFILE2,PURGE)                                             
+     END;                                                               
+                                                                        
+     IF LINES<=0 THEN              % If lines gets to Zero then cannot  
+     BEGIN                         % Create the files                   
+       DISPLAY("DRC LIMIT PREVENTING CREATION OF FILE");                
+       MYSELF.TASKVALUE:=99;                                            
+       MYSELF.STATUS:=-1;                                               
+     END;                                                               
+   END;                                                                 
+                                                                        
+   DISPLAY("===> CREATE IO FILES COMPLETED OK");                        
+END.                                                                    

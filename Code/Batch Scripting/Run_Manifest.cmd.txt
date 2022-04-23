@@ -1,0 +1,2 @@
+cd K:\CodeSnippets\PowerShell
+PowerShell -NoExit -NoProfile -ExecutionPolicy Bypass -Command ".\Batch_ThunderHead_To_XML_specv2.ps1 -I K:\RRD_Manifest\ThunderHead\In -O K:\RRD_Manifest\ThunderHead\Out -T -SD 17/03/15 -ST 11:00:00 -ED 18/03/15 -ET 10:59:59"

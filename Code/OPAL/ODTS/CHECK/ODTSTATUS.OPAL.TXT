@@ -1,0 +1,11 @@
+ TT DEFINE + ODTSEQUENCE CHECK_ODTSTATUS(PER):                                  
+                                                                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+%%      SCRIPT TO REPORT WHEN LIVE ODT'S                              %%        
+%%      (####) ARE NOT SCRATCH                                 %%        
+%%                                                                    %%        
+%%      VERSION 01 - #### - INITIAL IMPLEMENTATION  MAR '05 GXG   %%        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+#Rslt:=Mail(#("TO:####;Subject:SC ",Unitno,                   
+              " on ",Hostname," is not Scratch"),                               
+            "Please ready the unit and inform support");                         

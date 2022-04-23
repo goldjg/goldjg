@@ -1,0 +1,9 @@
+@echo off
+for /f %%i in ('powershell ^(get-date^).DayOfWeek') do set dow=%%i
+if %dow% EQU Monday set /A "daysback=3"
+if %dow% EQU Sunday set /A "daysback=2"
+if [%daysback%] EQU [] set /A "daysback=1"
+
+:display
+echo %daysback%
+ 

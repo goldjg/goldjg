@@ -1,0 +1,84 @@
+   DEFINE + SITUATION META_MAILLOG(MSG):                                        
+   MSGCAT=MSRDISP AND MSGNO=13 AND IDENTITY="MAILLIB"                           
+\                                                                               
+   DEFINE + ODTSEQUENCE META_MAILLOG(MSG):                                      
+   If Not LASTEVAL Then                                                         
+   Begin                                                                        
+     If Length(Putstr("Trans",Head(TEXT,"0123456789")))=5 Then                  
+     Begin                                                                      
+        If Getstr("Msg") Eql Empty Then                                         
+           Store("Msg",#("     ---- ",HOSTNAME," Mail Transmission Log ----",/, 
+                         "     ---- ",DatetoText(Today,DDMMYYYY)," ----",/));   
+        Store("Txt",Trim(Drop(TEXT,6)));                                        
+        Store("Inx",IndexOf(Getstr("Txt") Hdis                                  
+                    {"To:","Sent OK","ReSent OK","Attached","Included",         
+                     "Rejected","Message Q"}));                                 
+        Case Get("Inx") Of                                                      
+        Begin                                                                   
+        0: Store("Mail",Get("Mail")+1);                                         
+           Store("M_Rcv",&#(Time(MSGTIME),,Trim(TEXT),/));                      
+           If Getstr(Getstr("Trans")) Neq Empty Then                            
+           Begin                                                                
+              Store("M_Rcv",&#(Getstr(Getstr("Trans"))));                       
+              Store(Getstr("Trans"),Empty);                                     
+           End;                                                                 
+        1: Store("Sent",Get("Sent")+1);                                         
+        2: Store("Resent",Get("Resent")+1);                                     
+           Store("Sent",Get("Sent")+1);                                         
+        3: Store("Attached",Get("Attached")+1);                                 
+           Store(Getstr("Trans"),&#("  Att:",                                   
+                                    Decat(Text,"Attached ",1),/));              
+        4: Store("Included",Get("Included")+1);                                 
+           Store(Getstr("Trans"),&#("  Inc:",                                   
+                                    Decat(Text,"Included ",1),/));              
+        5: Store("Rejected",Get("Rejected")+1);                                 
+           Store("M_Reject",&#(Time(MSGTIME),,Trim(TEXT),/));                   
+        6: Store("Queued",Get("Queued")+1);                                     
+     Else: ;                                                                    
+        End;                                                                    
+     End                                                                        
+     Else                                                                       
+     If TEXT Hdis "Rejected" Then                                               
+     Begin                                                                      
+        Store("Rejected",Get("Rejected")+1);                                    
+     End                                                                        
+     Else                                                                       
+     If TEXT Hdis "ReSent OK " Then                                             
+     Begin                                                                      
+        Store("Resent",Get("Resent")+1);                                        
+        Store("Sent",Get("Sent")+1);                                            
+     End                                                                        
+     Else                                                                       
+     If TEXT Hdis "Message Queued" Then                                         
+     Begin                                                                      
+        Store("Queued",Get("Queued")+1);                                        
+     End;                                                                       
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      Store("Msg",&#(Get("Mail") 4," mail requests processed",/,                
+                     Get("Sent") 4," mail(s) Sent",/                            
+                     Get("Queued") 4," mail(s) Queued",/,                       
+                     Get("Resent") 4," mail(s) Re-sent ok",/                    
+                     If Put("Tmp",Get("Queued")-Get("Resent")) Gtr 0 Then       
+                        #(Get("Tmp") 4," queued mail(s) outstanding",/)         
+                     Else                                                       
+                        Empty,                                                  
+                     Get("Attached") 4," file attachment(s) processed",/,       
+                     Get("Included") 4," file include(s) processed",/,          
+                     " ",/,                                                     
+                     Get("Rejected") 4," mail(s) rejected or aborted",/));      
+      If Get("Rejected") Gtr 0 Then                                             
+         Store("Msg",&#(/,"     ---- Rejected emails ----",/,                   
+               Getstr("M_Reject")));                                            
+      Store("Msg",&#(/,"     ---- Mail listing ---- ",/,Getstr("M_Rcv"),/));    
+      If Put("Mres",Mail("To:####;Subject:"&HOSTNAME&                    
+                         " Daily Mail Log "&                                    
+                         DatetoText(Today,DDMMYYYY),Getstr("Msg"))) Lss 0 Then  
+         If Get("Mres") Eql -999 Then                                           
+            Display("Warning! Mail server unavailable:Report queued")           
+         Else                                                                   
+            Display("Error #",Get("Mres")," emailing report:",                  
+                    MAILERROR(Get("Mres")));                                    
+   End;                                                                         
+\                                                                               

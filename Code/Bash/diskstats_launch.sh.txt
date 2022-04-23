@@ -1,0 +1,20 @@
+#!/bin/bash
+############################################################################
+# Launch script for diskstats.sh                                           #
+# ------------------------------                                           #
+# Checks if there is a running process called diskstats.sh                 #
+# If there is, display a message to that effect and then finish.           #
+#                                                                          #
+# If it is not running, start it, through nohup (so it can't be            #
+# mistakenly killed e.g. by closing your session) and make it run          #
+# in the background (the '&' on the end of the command).                   #
+#                                                                          #
+# VERSION 01	Initial Implementation		GXG ##REDACTED## Feb 2012	   #
+############################################################################
+ps cax | grep diskstats.sh > /dev/null
+if [ $? -eq 0 ]; then
+  echo "Process is already running, nothing to start.."
+else
+  echo "Process is not running, starting it."
+  nohup ./diskstats.sh &
+fi

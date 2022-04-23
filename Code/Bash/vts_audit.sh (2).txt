@@ -1,0 +1,33 @@
+#!bin/bash
+
+# Adapted from gettapesizes.sh by ##REDACTED##
+# VTS Audit script, gets list of 5nnnnn tapes from VTS VAULTs in both
+# datacentres and compares their sizes to highlight potential problems		
+
+# Version 01 - ##REDACTED## - Initial imp                           Jul 11   GXG
+
+# set error handling
+set -e
+
+#Setup Variables
+DS=$(date +%Y%m%d)
+HN=`echo $(hostname) | awk -F'.' '{print $1}'`
+
+# set home dir for script
+cd /home/bill
+
+# list contents of each fault into it's own text file
+ls -alR /VAULT10 > v10.txt
+ls -alR /VAULT11 > v11.txt
+ls -alR /VAULT12 > v12.txt
+ls -alR /VAULT13 > v13.txt
+ls -alR /VAULT14 > v14.txt
+
+# merge all the vault listings into one file
+cat v10.txt v11.txt v12.txt v13.txt v14.txt > "$HN-full.txt"
+
+# pipe the contents of the merged file into grep
+# only lines beginning with "-" e.g. not a directory will be passed to
+# awk, which will print the 9th column (file name) and 5th column (size)
+# if the filename begins with 5, and put in an audit file
+cat "$HN-full.txt" | grep ^- | awk '{OFS=",";if ($9 ~ /^5/) print $9,$5}' > "$HN-Audit_$DS.txt"

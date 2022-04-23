@@ -1,0 +1,766 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+% This is a Metalogic provided/developed suite of scripts that are useful in  % 
+% performing menu/screen handling within OPAL scripts. Initial use is for the % 
+% BCV_MENU scripts.                                                           % 
+% ****************************************************************************% 
+% *** DO NOT MODIFY WITHOUT CONFIRMING COMPATIBILITY WITH ALL SCRIPTS THAT ***% 
+% *** CALL THESE SCRIPTS *****************************************************% 
+% ****************************************************************************% 
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~% 
+% VERSION 01 - INITIAL IMPLEMENTATION                  GXG AUG 2017% 
+%                                                                             % 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+%Version 27 August 2016 Better handling of long comand lists on screens less    
+%                  than 90 characters wide                                      
+   DEF + ODTS menu_getfield(MSG):                                               
+%param <var> <len> <modifier> like l3_act 6                                     
+% <var> must have a prefix                                                      
+% If <var> ends in ACT calls input function and handles spcfy on command list   
+% <modifier> B for boolean T for Trim U for upcase                              
+% Sets value of $<var> to next input handling short transmissions               
+Clear("GF_");                                                                   
+$GF_Colinx:=Trim(text);                                                         
+If $GF_var:=$GF_Colinx.Split(" ") HdIs "$" Then                                 
+   $GF_var:=Drop($GF_VAr,1);                                                    
+$GF_Len:=$GF_Colinx.Split(" ");                                                 
+$GF_Mod:=$GF_Colinx.SPlit(" ");                                                 
+If $GF_Rowinx:=$GF_Colinx.SPlit Neq empty Then                                  
+Begin                                                                           
+   #GF_Rowinx:=Decimal($GF_Rowinx);                                             
+   #GF_Colinx:=Decimal($GF_Colinx);                                             
+End;                                                                            
+$gf_prefix:=Decat($GF_var,"_",6);                                               
+$Gf_Input:=$GF_Prefix&"_Input";                                                 
+$GF_Old:= $GF_Prefix&"_OldInput";                                               
+$GF_Tmp:=$GF_Prefix&"_tmpInput";                                                
+$GF_CHARS:=$GF_Prefix&"_Chars";                                                 
+If Upper($Gf_Var) = Upper($GF_prefix&"ACT") Then %assumed first so need input   
+Begin                                                                           
+   $$GF_Input:=Input;                                                           
+   #$GF_Chars:=0;                                                               
+   $GF_Row:=$GF_Prefix&"_Row";                                                  
+   $GF_Col:=$GF_Prefix&"_Col";                                                  
+   If $$GF_Input HdIs "SPCFY" Then                                              
+   Begin                                                                        
+      $$GF_TMP:=Empty;                                                          
+      $$GF_Var:=$$GF_Input.Split(5);                                            
+      #$GF_Row:=Decimal($$Gf_Input.Split(3));                                   
+      #$GF_Col:=Decimal($$GF_Input.Split(3));                                   
+      $$GF_Input:=$$GF_OLD;                                                     
+      If #$GF_Row=#GF_RowInx Then %on command list                              
+      Begin                                                                     
+         $GF_CmdList:=$GF_Prefix&"CmdList";                                     
+         #GF_ColInx:=MIN(#$GF_Col-#GF_ColInx+1,                                 
+                         LENGTH($$GF_CmdLIST))+1;                               
+         WHILE #GF_ColInx.SUM(-1) GEQ 0 AND                                     
+               NOT TAKE(Trim($$GF_CmdLIST),#GF_ColINX) TLIS "," DO;             
+         $$GF_Var:=Upper(Head(DROP(Trim($$Gf_CmdLIST),#GF_ColINX),NOT ","));    
+      End;                                                                      
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      #$GF_Row:=#$GF_Col:=0;                                                    
+      $$GF_Var:=Upper(Trim($$GF_Input.Split(Decimal($GF_Len))));                
+      If $$GF_TMP:=$$Gf_Input= Empty Then %Dont keep action in oldinput         
+         $$GF_Input:=$$GF_Old;                                                  
+   End;                                                                         
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   If "U" Isin $GF_Mod Then                                                     
+      If "T" IsIn $GF_Mod Then                                                  
+         $$GF_Var:=Upper(Trim(                                                  
+             $$GF_Input.Split(#$GF_Chars.Accum(Decimal($GF_Len)))))             
+      Else                                                                      
+         $$GF_Var:=Upper($$GF_Input.Split(#$GF_Chars.Accum(Decimal($GF_Len))))  
+   Else If "T" IsIn $GF_Mod Then                                                
+      $$GF_Var:=Trim($$GF_Input.Split(#$GF_Chars.Accum(Decimal($GF_Len))))      
+   Else                                                                         
+      $$GF_Var:=$$GF_Input.Split(#$GF_Chars.Accum(Decimal($GF_Len)));           
+   If "B" IsIn $GF_MOD Then  %Boolean                                           
+     If Trim($$GF_Var) Neq Empty Then                                           
+        $$GF_VAR:="X"                                                           
+     Else                                                                       
+        $$GF_Var:=Empty;                                                        
+End;                                                                            
+If $$GF_Input=Empty And $$GF_Tmp Neq Empty Then                                 
+Begin                                                                           
+   $$GF_Input:=Drop($$GF_Old,#$GF_Chars);                                       
+   $$GF_Old:=Take($$GF_Tmp&Repeat(" ",#$GF_Chars),#$GF_Chars)&$$GF_Input;       
+   $$GF_Tmp:=Empty;                                                             
+End;                                                                            
+                                                                                
+\                                                                               
+   DEFINE + ODTSEQUENCE MENU_CMD_LIST(MSG)Version 27:                           
+%Expects a parameter in the form <CommandList><CommandNames>                    
+%<commandlist> is the name of a variable which holds a command list in the form 
+%expected by MENU_CMD_PARSE <commandNames> is the name of a variable used       
+%to return a wrapped list of commands to be displayed under the Action field.   
+%After processing the command list is upcased for use by MENU_CMD_PARSE         
+%if the CommandNames list is too long the the leading spaces are removed        
+%if stll too long then the overflow is put into the variable <CommandNames>CTD  
+$CmdNames:=Trim(Text);                                                          
+$CmdList:=$CmdNames.Split;                                                      
+$$CmdNames:=Empty;                                                              
+$Raw:=$$CmdList;                                                                
+$Line:=Empty;                                                                   
+#Over:=0;                                                                       
+While $Raw Neq Empty Do                                                         
+Begin                                                                           
+   $Tmp:=Head($Raw.Split, Not ":");                                             
+   If #over=0 And #extra:=(Length($Line)+Length($Tmp)+2)-Myself(Width)>0 Then   
+   Begin                                                                        
+      #over:=1;                                                                 
+      If #Extra < 7 Then                                                        
+         $Line:=Drop($Line,#Extra)&","&$Tmp                                     
+      Else                                                                      
+      Begin                                                                     
+         $$CmdNames:=$Line;                                                     
+         $Line :=Repeat(" ",7) & $Tmp                                           
+      End                                                                       
+   End                                                                          
+   Else                                                                         
+   If $Line = Empty Then                                                        
+      $Line:=Repeat(" ",7)& $Tmp                                                
+   Else                                                                         
+      $Line:=&","&$Tmp;                                                         
+End;                                                                            
+If $$CmdNames = Empty Then                                                      
+   $$CmdNames:=$Line                                                            
+Else                                                                            
+Begin                                                                           
+   $tmp:=$CmdNames&"CTD";                                                       
+   $$Tmp:=&$Line;                                                               
+End;                                                                            
+$$CmdList:=Upper($$CmdList);                                                    
+                                                                                
+\                                                                               
+   DEFINE + ODTSEQUENCE MENU_PARSE(MSG) Version 7:                              
+%expects a paramenter of <command>,<commandlist>                                
+%where <command is the name of a varible holding the command to be parsed and   
+%<commandlist> is the name of a variable holding a list where each element has  
+%the form:                                                                      
+%<command>:<action>  whre :<Action> is optional                                 
+%if :<Action> is present it is the name of an ODTS to be called.                
+%$MenuODTS is set to the name of an ODTS which has been called.                 
+%Error messages are returned in $Err                                            
+%If no action is specified or an error is found then $MenuODTS is set to Empty  
+$Commands:=Trim(text);                                                          
+$Cmd:=$Commands.Split;                                                          
+$MenuODTS:="ERROR";                                                             
+If $Cmd = Empty Then                                                            
+   $Err:="Programming error.  No action variable passed to Parse."              
+Else                                                                            
+If $Commands = Empty Then                                                       
+   $Err:="Programming error. No command list variable passed to PArse."         
+Else                                                                            
+If $$Commands=Empty Then                                                        
+   $Err:="Programming error. Command list passed to Parse is empty."            
+Else                                                                            
+If Trim($$Cmd) = Empty Then                                                     
+   $Err:="No action provided."                                                  
+Else                                                                            
+If Upper(Trim($$Cmd))={"REFRESH","EH"} Then                                     
+   $$CMD:="REFRESH"                                                             
+Else                                                                            
+If $MenuOdts:=$$Commands.Copy(Upper(Trim($$Cmd))&"=")=Empty Then                
+Begin                                                                           
+   $Err:="Invalid action " &$$Cmd;                                              
+   $MenuOdts:="ERROR";                                                          
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   $$Cmd:=$MenuOdts.Split(":");                                                 
+   If $MenuODts Neq Empty Then                                                  
+   Begin                                                                        
+      If Not $MenuOdts HdIs "*" And Not Defined("ODTS "&$MenuOdts) Then         
+      Begin                                                                     
+         $Err:=$$Cmd & " requires ODTS " &$MenuODts;                            
+         $MenuOdts:="ERROR";                                                    
+      End;                                                                      
+   End ;                                                                        
+End;                                                                            
+\                                                                               
+   DEFINE + ODTSEQUENCE MENU_SHOW(MSG)Version 26:                               
+%expects page heading in $PgHd and Column Headings In $Hd.                      
+%$ShowList should hold the lines to be displayed                                
+%$Hi should be set to change the highlight character                            
+If $Hi=Empty Then                                                               
+   $Hi:=#("#[SUB]");                                                            
+If $ErrHi=Empty Then                                                            
+   $ErrHi:=#("#[CAN]");                                                         
+#LPP:=Myself(Pagesize)-7;                                                       
+If #AltSt>0 Then                                                                
+Begin                                                                           
+   #St:=#AltSt Div #Lpp*#lpp+1;                                                 
+   #AltSt:=0;                                                                   
+End                                                                             
+Else                                                                            
+   #St:=1;                                                                      
+$PAGE:=Empty;                                                                   
+$Show_Act:=Empty;                                                               
+$ShowHlp:=Trim(Text);                                                           
+If Trim($HD) Neq Empty Then                                                     
+Begin                                                                           
+   $Hd:= #($Hi,$HD,"#[ETB]");                                                   
+   $Pad:=" ";                                                                   
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   $HD:=" ";                                                                    
+   $Pad:=Empty;                                                                 
+End;                                                                            
+If $ShowHlp HdIs "Help" Then                                                    
+   $Show_Commands:="HOme,Return,Next,+,Previous,-,Quit"                         
+Else                                                                            
+Begin                                                                           
+   $Show_Commands:="Help:Menu_ShowHLP,HOme,Return,Next,+,Previous,-,Quit";      
+   While $Tmp:=$Menu_Extra.Split Neq Empty Do                                   
+      $Show_commands.Insert($tmp&":*"&$Tmp);                                    
+End;                                                                            
+Call DO "MENU_CMD_LIST" "Show_Commands,Show_Cmdlist";                           
+$Err:=$SecErr;                                                                  
+While True Do                                                                   
+Begin                                                                           
+   #ST:=ABS(#ST);                                                               
+   #Line:=0;                                                                    
+   #LM:=Max(1,#Lpp+#ST);                                                        
+   If $Err=Empty Then                                                           
+   Begin                                                                        
+      $Page:=Empty;                                                             
+      #Line:=#ST-1;                                                             
+      WHILE #Line.Sum(1) < #LM AND  $ShowList NEQ Empty Do                      
+      If $TmpL:=$ShowList.Copy(#Line,/) NEQ Empty Then                          
+      Begin                                                                     
+         If Length($TmpL)>1 And $TmpL TlIs " " Then                             
+         Begin                                                                  
+            $TmpL:=Trim($TmpL,Right); %trim trailing spaces                     
+            If $TmpL=Empty Then $TmpL:=" ";                                     
+         End;                                                                   
+         $Page.Insert($TmpL,/);                                                 
+      End;                                                                      
+      If #Line leq #LM AND $TmpL=Empty Then                                     
+      Begin                                                                     
+         If $ShowHlp HdIs "Help" Then                                           
+            $Err:="                     End of Help"                            
+         Else                                                                   
+            $ERR:="                     End of List";                           
+         If #ST > #Lpp Then                                                     
+            $Show_Act:="Previous"                                               
+         Else                                                                   
+            $Show_Act:="Return";                                                
+      End                                                                       
+      Else                                                                      
+      Begin                                                                     
+         $ERR:="                Continued";                                     
+         If $Show_Act=Empty Or $Show_Act="PREVIOUS" And #St=1 Then              
+            $Show_Act:="Next";                                                  
+      End;                                                                      
+   End;                                                                         
+   If $Menu_Err Neq Empty Then                                                  
+   Begin                                                                        
+      $Err:=$Menu_Err;                                                          
+      $Menu_Err:=Empty;                                                         
+   End;                                                                         
+   Show("#[FF]",                                                                
+     "Page ",STRING8(1+ABS(#ST) DIV #LPP,2),                                    
+      Repeat(" ",Max(1,(Myself(Width)-9-Length($PgHd))Div 2)),$PgHd,/,          
+     " ",/,                                                                     
+     "Action#[US]",$Show_Act 10,"#[RS]",/,                                      
+     $Hi,$Show_Cmdlist,/,,/,                                                    
+     $HD,/,                                                                     
+     $Page,/,$ErrHi,$Err);                                                      
+   Call Do "Menu_GetField" "Show_Act 10 UT 4,10";  %sets up #Show_Row and _Col  
+   $ERR:=Empty;                                                                 
+   If $Show_Act HdIs "SPCFY" Then                                               
+   Begin                                                                        
+      $Show_Act:="RETURN";                                                      
+      #SPCFY_Item:=Max(#St,1)+#Show__Row-7;                                     
+   End                                                                          
+   Else                                                                         
+      #SPCFY_Item:=0;                                                           
+   Call Do "MENU_PARSE" "Show_Act,Show_Commands";                               
+   If $MenuOdts Neq Empty Then                                                  
+   Begin                                                                        
+      If $MENUODTS HdIs "*" Then                                                
+      Begin                                                                     
+         $Err:=Drop($MenuODts,1);                                               
+         Exit;                                                                  
+      ENd                                                                       
+      Else                                                                      
+      If $MenuODTS Neq "ERROR" Then                                             
+         Call Do $MenuODts;                                                     
+      If $Err="HOME" Then Exit;                                                 
+   End                                                                          
+   Else                                                                         
+   Case $Show_Act OF                                                            
+   Begin                                                                        
+Else: $Err:="Bad case returned:"& $Show_Act;                                    
+"REFRESH":;                                                                     
+"HOME":                                                                         
+      $Err:="HOME";                                                             
+      Exit;                                                                     
+"RETURN":                                                                       
+      Exit;                                                                     
+"QUIT":                                                                         
+      Show(" #[FF]");                                                           
+      $Err:="QUIT";                                                             
+      Exit;                                                                     
+"+":"NEXT":                                                                     
+      If $TmpL = Empty Then                                                     
+         $ERR:="Already at the End"                                             
+      Else                                                                      
+         #ST:=#ST+#LPP;                                                         
+"-":"PREVIOUS":                                                                 
+      If #ST = {0,1} Then                                                       
+         $ERR:="Already at the start"                                           
+       Else                                                                     
+         #ST:=Max(1,ABS(#ST)-#LPP);                                             
+   End;                                                                         
+End                                                                             
+\                                                                               
+   DEFINE + ODTSEQUENCE MENU_Confirm:                                           
+%Expects message to be shown in $MCMSG                                          
+%If Not "," Isin Myself(action) Then                                            
+%   Abort("This ODTS is a subroutine and cannot be started with a TT DO");      
+$Conf_Cmds:="Ok,Cancel";                                                        
+Call DO "MENU_CMD_LIST" "Conf_Cmds,Conf_CmdList";                               
+While True Do                                                                   
+Begin                                                                           
+   SHOW("#[FF]"," " 18,"Confirmation Required",/,                               
+     " " ,/,                                                                    
+     "ACTION #[US]",$Conf_Act 6,"#[RS]",/,                                      
+          $Hi,$Conf_CmdList,/,,/,                                               
+          $HI,$MCMsg,/,,/,                                                      
+     $ErrHi,$Err,"#[ESC]W");                                                    
+   Call Do "Menu_GetField" "Conf_Act 6 UT 4,10";                                
+   $ERR:=Empty;                                                                 
+   Call Do "MENU_PARSE" "Conf_Act,Conf_Cmds";                                   
+   If $MenuOdts Neq Empty Then                                                  
+   Begin                                                                        
+      If $MenuODTS Neq "ERROR" Then                                             
+         Call Do $MenuODts;                                                     
+   End                                                                          
+   Else                                                                         
+   Case $Conf_Act Of                                                            
+   Begin                                                                        
+Else: $Err:="Bad case returned:"& $Conf_Act;                                    
+"OK":"CANCEL":                                                                  
+      Exit;                                                                     
+   End;                                                                         
+End;                                                                            
+\                                                                               
+   DEFINE + ODTSEQUENCE MENU_SHOWHLP:                                           
+  $Hd:="";                                                                      
+  If $ShowHlp = Empty Then                                                      
+  Begin                                                                         
+     $PgHd:="Show Page Help";                                                   
+     $Para1:="This screen is used by other screens to display lists of data.";  
+  End                                                                           
+  Else                                                                          
+  Begin                                                                         
+     $PgHd:=$ShowHlp.Split(/);                                                  
+     $Para1:=$ShowHlp;                                                          
+  End;                                                                          
+                                                                                
+  $MN_SaveList:=$ShowList;                                                      
+  $Mn_Show_Commands:=$Show_Commands;                                            
+  $MN_Show_Cmdlist:=$Show_Cmdlist;                                              
+  $ShowList:= #($para1,/,                                                       
+  "The actions allowed are listed under the Action field.  The letters in",/,   
+  "upper case are the minimum abreviations for the action.",/,                  
+  "Details:",/,,/,                                                              
+  "HOme",/,                                                                     
+  "   Returns to the main menu screen.",/,,/,                                   
+  "Return",/,                                                                   
+  "   Return to the main menu screen.",/,,/,                                    
+  "Next",/,                                                                     
+  "   If there is more data to be viewed this shows the next page.",/,,/,       
+  "Previous",/,                                                                 
+  "   Shows the previous page of data.",/,,/,                                   
+  "Quit",/,                                                                     
+  "   Clears the screen and quits the ODTS.");                                  
+Call DO "Menu_Show" "Help";                                                     
+$ShowList:=$Mn_SaveList;                                                        
+$Show_Commands:=$Mn_Show_Commands;                                              
+$Show_Cmdlist:=$MN_Show_Cmdlist;                                                
+                                                                                
+\                                                                               
+  DEF + ODTS MENU_GetDate(Msg):                                                 
+$ValidDays:="SUNDAY,MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY,SATURDAY";         
+$GD_DayDate:=Trim(text);                                                        
+If "/" isin $GD_dayDate Then                                                    
+Begin                                                                           
+     If #Date:=Julian($GD_DayDate) < 0 Then                                     
+        $Err:="Bad Date:"&$GD_dayDate                                           
+     Else                                                                       
+     If #Date=#Today Then                                                       
+        $DayName:="TODAY"                                                       
+     Else                                                                       
+        $DayName:=DayName(#Date);                                               
+End                                                                             
+Else                                                                            
+BEGIN                                                                           
+   If $GD_DayDate = "TODAY" Then                                                
+   Begin                                                                        
+      #Date:=#TODAY;                                                            
+      $DayNAme:="TODAY";                                                        
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      If Length($GD_DayDAte) =3 Then                                            
+      BEGIN                                                                     
+         If $DayName:=$ValidDays.Copy($GD_DayDate&"=") = Empty Then             
+            $Err:="Bad Day:"&$DayDAte                                           
+      END                                                                       
+      ELSE                                                                      
+         IF NOT $ValidDAYS.INCLUDES($DAYNAME:=$GD_DAYDATE) THEN                 
+            $Err:="BAD DAY:"&$DAYNAME;                                          
+      If $Err=Empty Then                                                        
+      Begin                                                                     
+         #DAY:=INDEXOF ($DAYNAME=#{$ValidDAYS})+1;                              
+         #DATE:=NEWDATE(#TODAY,IF #DAY <= #DAYINWEEK THEN                       
+                                 #DAY+7-#DAYINWEEK                              
+                               ELSE                                             
+                                 #DAY-#DAYINWEEK);                              
+      End;                                                                      
+   End;                                                                         
+END;                                                                            
+\                                                                               
+DEF + ODTS MENU_GETLOGSKIP(msg)Version 11:                                      
+Clear("GLS_");                                                                  
+#GLS_ToTime:=#Gls_FromTime:=-1; %Indicates not specified                        
+#GLS_Now:=TimeOfDay div 60;                                                     
+#Gls_Today:=TSToday;                                                            
+#Gls_Defrange:=24*60; %24 hours                                                 
+$Err:=Empty;                                                                    
+$Gls_opt:=Upper(Trim(Text));                                                    
+If $gls_Var:=$Gls_Opt.Split(";") =Empty Then                                    
+Begin                                                                           
+   $Err:=Myself(action)&":No parameter passed";                                 
+   Exit;                                                                        
+End;                                                                            
+#GLS_F:=If $Gls_Opt="F" Then 1 else 0;                                          
+If $Gls_Pre:=$Gls_Var.Split("_")=Empty Or $Gls_Var=Empty Then                   
+Begin                                                                           
+   $Err:=Myself(action)&":No '_' in parameter";                                 
+   Exit;                                                                        
+End;                                                                            
+$GLS_Pre:=&"_";                                                                 
+$GLS_Var:=$Gls_Pre&$Gls_var;                                                    
+$Gls_EV:=$Gls_Pre&"EV";                                                         
+$Gls_NextEv:=$Gls_Pre&"NextEv";                                                 
+$$Gls_ev:=Empty;                                                                
+If $GLS_Param:=Trim($$Gls_var)=Empty Then                                       
+Begin                                                                           
+   $Err:=Myself(action)&":$"&$Gls_Var&" is empty";                              
+   Exit;                                                                        
+End;                                                                            
+If $Gls_param HdIs "-" Then                                                     
+Begin                                                                           
+   $Gls_Tok:="TO";                                                              
+   $Gls_param:=Trim(Drop($Gls_param,1));                                        
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   $Gls_tok:=Head($GLS_Param,Not " -");                                         
+   $GLS_Param:=Trim(Tail($gls_param,Not " -"));                                 
+End;                                                                            
+If Upper($Gls_tok)={"SKIP","FOR"} Then                                          
+Begin                                                                           
+   Do Begin                                                                     
+      $Gls_SkipFor:="GLS_"&$Gls_Tok;                                            
+      If $$GLS_SkipFor:=Head($Gls_Param,"0123456789") = Empty Then              
+      Begin                                                                     
+         $Err:=$Gls_Tok&" must be followed by a number";                        
+         Exit;                                                                  
+      End;                                                                      
+      #$Gls_SkipFor:=Decimal($$Gls_SkipFor);                                    
+      If $GLS_Param:=Trim(Tail($GLS_param,"0123456789"))=Empty Then             
+      Begin                                                                     
+         $GLS_Tok:="Minutes";                                                   
+         #$Gls_SkipFor:=#$Gls_SkipFor*60;                                       
+      End                                                                       
+      Else                                                                      
+      Case $Gls_Tok:=Upper($GLS_Param.SPlit(" ")) Of                            
+      Begin                                                                     
+      "MIN":"MINS":"MINUTE":"MINUTES":                                          
+      ;                                                                         
+      "HOUR":"HOURS":                                                           
+         #$Gls_SkipFor:=#$GLS_SkipFor*60;                                       
+      "DAY":"DAYS":                                                             
+         #GLS_Skip:= #GLS_SKIP*60*24;                                           
+      "FOR":"SKIP":                                                             
+         #$Gls_SkipFor:=#$Gls_SkipFor*60;                                       
+      Else:                                                                     
+         $Err:="Minutes, Hours or Days expected:"&$Gls_Tok;                     
+         Exit;                                                                  
+      End; %case                                                                
+      If Upper($Gls_Tok) Neq {"SKIP","FOR"} Then                                
+      Begin                                                                     
+         $Gls_tok:=Upper(Head($GLS_Param,Not " "));                             
+         $GLS_Param:=Trim(Tail($gls_param,Not " "));                            
+      End;                                                                      
+      If $Gls_Tok Neq Empty Then                                                
+        If $Gls_Tok ="FOR" Then                                                 
+        Begin                                                                   
+           If #GLS_For > 0 Then                                                 
+              $Err:="Only one FOR allowed:";                                    
+        ENd                                                                     
+        Else                                                                    
+        If $Gls_Tok ="SKIP" Then                                                
+        Begin                                                                   
+           If #Gls_Skip > 0 Then                                                
+              $Err:="Only one SKIP allowed:"                                    
+        End                                                                     
+        Else                                                                    
+           $Err:="Invalid Token:";                                              
+        If $Err Neq Empty Then                                                  
+        Begin                                                                   
+           $Err:=&$Gls_Tok&" "&$Gls_param;                                      
+           Exit;                                                                
+        End;                                                                    
+   End Until $GLS_Param=Empty;                                                  
+   #Gls_FromTime:=#Gls_Now-#Gls_Skip;                                           
+   #Gls_ToTime:=#Gls_FromTime-(If #Gls_For=0 Then #Gls_DefRange else #Gls_For); 
+   #Gls_From:=NewDate(#Gls_Today,#Gls_FromTime Div (24*60)                      
+                                 -(If #Gls_FromTime <0 Then 1 else 0));         
+   If #Gls_Tmp:=#Gls_FromTIme Mod (24*60) < 0 Then #Gls_Tmp:=#Gls_Tmp+(24*60);  
+   #Gls_FromTime:=(#Gls_Tmp Div 60)*100+#Gls_Tmp Mod 60;                        
+   #Gls_To:=NewDate(#Gls_Today,#Gls_ToTime Div (24*60)                          
+                               -(if #Gls_ToTime < 0 Then 1 else 0));            
+   If #Gls_Tmp:=#Gls_ToTIme Mod (24*60) < 0 Then #Gls_Tmp:=#Gls_Tmp+(24*60);    
+   #Gls_ToTime:=(#Gls_Tmp Div 60)*100+#Gls_Tmp Mod 60;                          
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   While $Gls_Tok Neq Empty Do                                                  
+   Begin                                                                        
+      If "/" Isin $Gls_Tok Then %date                                           
+      Begin                                                                     
+         If #Gls_Tmp:=Julian($Gls_Tok) < 0 Then                                 
+         Begin                                                                  
+            $Err:="Bad date:"&$Gls_Tok;                                         
+            Exit;                                                               
+         End;                                                                   
+         If #Gls_dates.Sum(1) > 2 Then                                          
+         Begin                                                                  
+            $Err:="Only two dates may be specified"&$Gls_Tok;                   
+            Exit;                                                               
+         End;                                                                   
+         If #Gls_Tmp < 2000001 Then                                             
+            #Gls_Tmp.Sum(200000);                                               
+         If #Gls_Dates=1 Then                                                   
+            #Gls_From:=#Gls_Tmp                                                 
+         Else                                                                   
+            #Gls_To:=#Gls_tmp;                                                  
+      End                                                                       
+      Else If Upper($Gls_Tok)="TO" Then                                         
+      Begin                                                                     
+         If #Gls_ToCnt.Sum(1) >1 Then                                           
+         Begin                                                                  
+            $Err:="Only one TO allowed";                                        
+            Exit;                                                               
+         End;                                                                   
+         If #Gls_Dates>1 Then                                                   
+         Begin                                                                  
+            $Err:="TO date already be specified:"&$Gls_Tok&" "&$Gls_param;      
+            Exit;                                                               
+         End;                                                                   
+         If #Gls_Times >  1 Then                                                
+         Begin                                                                  
+            $Err:="TO time already be specified:"&$Gls_Tok&" "&$Gls_param;      
+            Exit;                                                               
+         End;                                                                   
+         If #Gls_Dates = 0 Then                                                 
+         Begin                                                                  
+            #Gls_dates:=1;                                                      
+         End;                                                                   
+         If #Gls_Times=0 Then                                                   
+         Begin                                                                  
+            #Gls_Times:=1;                                                      
+         End;                                                                   
+      End                                                                       
+      Else                                                                      
+      Begin  %must be time                                                      
+         If ":" IsIn $Gls_tok Then                                              
+         Begin                                                                  
+            If Head($Gls_Tmp:=Trim(Head($Gls_Tok,Not ":")),"0123456789") Neq    
+                                                                     $Gls_Tmp   
+            Or $Gls_Tmp=Empty Or #Gls_Hr:=Decimal($Gls_Tmp) >23 Then            
+            Begin                                                               
+               $Err:="Bad Hour:"&$Gls_Tok;                                      
+               Exit;                                                            
+            End;                                                                
+            If Head($Gls_Tmp:=Trim(Decat($Gls_tok,":",1)),"0123456789") Neq     
+                                                                     $Gls_Tmp   
+            or $Gls_tmp=Empty Or #Gls_Min:=Decimal($Gls_Tmp) > 59 Then          
+            Begin                                                               
+               $Err:="Bad Minute:"&$Gls_Tok;                                    
+               Exit;                                                            
+            End;                                                                
+         End                                                                    
+         Else                                                                   
+         Begin   %time with no colon                                            
+            If Head($Gls_tok,"0123456789") Neq $Gls_Tok Then                    
+            Begin                                                               
+               $Err:="Bad Time:"&$Gls_Tok;                                      
+               Exit;                                                            
+            End;                                                                
+            If #Gls_Hr:=Decimal($Gls_tok) Div 100 > 23 Then                     
+            Begin                                                               
+               $Err:="Bad Hour:"&$Gls_Tok;                                      
+               Exit;                                                            
+            End;                                                                
+            If #Gls_Min:=Decimal($Gls_tok) Mod 100 > 59 Then                    
+            Begin                                                               
+               $Err:="Bad Minute:"&$Gls_Tok;                                    
+               Exit;                                                            
+            End;                                                                
+         End;                                                                   
+         If #Gls_times.Sum(1) > 2 Then                                          
+            If #Gls_Min:=Decimal($Gls_tok) Mod 100 > 23 Then                    
+            Begin                                                               
+               $Err:="Two times already specified:"&$Gls_Tok;                   
+               Exit;                                                            
+            End;                                                                
+         If #Gls_Times=1 Then                                                   
+            #Gls_FromTime:=#Gls_Hr*60+#Gls_Min                                  
+         Else                                                                   
+            #Gls_ToTime:=#Gls_Hr*60+#Gls_Min;                                   
+      End;                                                                      
+      If $Gls_param HdIs "-" Then                                               
+      Begin                                                                     
+         $Gls_Tok:="TO";                                                        
+         $Gls_param:=Trim(Drop($Gls_param,1));                                  
+      End                                                                       
+      Else                                                                      
+      Begin                                                                     
+         $Gls_tok:=Head($GLS_Param,Not " -");                                   
+         $GLS_Param:=Trim(Tail($gls_param,Not " -"));                           
+      End;                                                                      
+   End;  %loop                                                                  
+   If #Gls_FromTime=-1 Then                                                     
+      If #Gls_F=0 Then                                                          
+         #Gls_FromTime:=#Gls_Now                                                
+      Else                                                                      
+         #Gls_FromTime:=0;                                                      
+   If #Gls_From=0 Then                                                          
+   Begin                                                                        
+      If #Gls_FromTime > #Gls_Now Then                                          
+         #Gls_From:=NewDAte(#Gls_Today,-1)                                      
+      Else                                                                      
+         #Gls_from:=#Gls_Today;                                                 
+   End;                                                                         
+   If #Gls_ToTime=-1 And #Gls_To=0 Then                                         
+   Begin                                                                        
+      If #Gls_F=0 Then                                                          
+      Begin                                                                     
+         #Gls_Days:=#Gls_DefRange Div(60*24);                                   
+         If #Gls_Mins:=#Gls_DefRange Mod(60*24) > #Gls_FromTime Then            
+         Begin                                                                  
+            #GLS_Days.Sum(1);                                                   
+            #Gls_Mins:=#GLS_Mins-(60*24);                                       
+         End;                                                                   
+         #GLS_ToTime:=#Gls_FromTime-#Gls_Mins;                                  
+         #GLs_To:=Newdate(#Gls_From,-#Gls_Days);                                
+      End                                                                       
+      Else                                                                      
+      Begin                                                                     
+         #GLS_To:=#GLS_TODAY;                                                   
+         #GLS_ToTime:=#GLS_NOW;                                                 
+      End;                                                                      
+                                                                                
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      If #Gls_ToTime=-1 Then                                                    
+         #Gls_ToTime:=(If #Gls_F=0 Then #Gls_Now Else 0)                        
+      Else                                                                      
+      If #Gls_To=0 Then                                                         
+         If #Gls_F=0 ANd #Gls_ToTime > #Gls_FromTIme Then                       
+            #Gls_To:=NewDate(#Gls_From,-1)                                      
+         Else                                                                   
+            #Gls_To:=#Gls_From;                                                 
+   End;                                                                         
+   #GLS_FromTime:=#Gls_FromTime Div 60*100+#GLS_FromTime Mod 60;                
+   #GLS_ToTime:=#Gls_ToTime Div 60*100+#GLS_ToTime Mod 60;                      
+End;                                                                            
+                                                                                
+If #Gls_From > #Gls_To                                                          
+   Or #Gls_From = #Gls_To and #Gls_FromTime > #Gls_ToTime  Then %swap           
+Begin                                                                           
+   #Gls_tmp:=#Gls_From;                                                         
+   #Gls_From:=#Gls_To;                                                          
+   #Gls_To:=#Gls_Tmp;                                                           
+   #Gls_tmp:=#Gls_FromTime;                                                     
+   #Gls_FromTime:=#Gls_ToTime;                                                  
+   #Gls_ToTime:=#Gls_Tmp;                                                       
+End;                                                                            
+If #Gls_FromTime=0 Then                                                         
+Begin                                                                           
+   #Gls_NextTime:=2359;                                                         
+   #Gls_Next:=Newdate(#Gls_From,-1);                                            
+End                                                                             
+Else                                                                            
+Begin                                                                           
+   #Gls_NextTime:=(#Gls_FromTime Div 100)*60+#Gls_FromTime Mod 100-1;           
+   #GLS_NextTime:=#Gls_NextTime Div 60*100+#GLS_NextTime Mod 60;                
+   #Gls_Next:=#Gls_From;                                                        
+End;                                                                            
+$$Gls_EV:=#(#Gls_FromTime,,DateToText(#Gls_From,Default)," - "                  
+            #Gls_ToTime,,DateToText(#Gls_To,Default));                          
+$$Gls_NextEV:=#(#Gls_NextTime,,DateToText(NewDate(#Gls_Next,-1),Default)," - "  
+            #Gls_NextTime,,DateToText(#Gls_Next,Default));                      
+\                                                                               
+DEF + ODTS MENU_PADHEADING(MSG)Version 7:                                       
+$SH:=Upper(Trim(Text))&"ScreenHead";                                            
+If $ErrHi Neq EMpty Then                                                        
+   $$SH:=#($ErrHi,$$Sh,"#[etb]");                                               
+$$SH:=#("#[FF]",                                                                
+   Repeat(" ",(MySelf(width)-Length($$SH))Div 2),$$SH);                         
+   \                                                                            
+DEF + ODTS MENU_WRAP(MSG) Version 17:                                           
+%Expects the name of a variable as a parameter                                  
+%the variable should host text to be wrapped to the terminal width              
+%lines will be split on space comma or period.                                  
+%an optional heading followed by a colon is allowed and the wrapped txt will    
+%be indented under that.                                                        
+%the final number of lines is returned in a numeric varialbe of the same name   
+$Wrap_VAr:=Trim(Text);                                                          
+If Length($$Wrap_VAr) < Myself(width)-1 Then                                    
+Begin                                                                           
+   #$wrap_Var:=1;                                                               
+   Exit;                                                                        
+End;                                                                            
+$Wrap_New:=Empty;                                                               
+If ":" IsIn $$Wrap_var Then                                                     
+   #Wrap_Indent:=Length($Wrap_Pre:=$$Wrap_VAr.Split(":")&":")                   
+Else $Wrap_Pre:=Empty;                                                          
+#Wrap_Width:=Myself(width)-1-#Wrap_Indent;                                      
+While Length($$Wrap_Var) > #Wrap_Width Do                                       
+Begin                                                                           
+   #Wrap_inx:=0;                                                                
+   $Wrap_tmp:=$$Wrap_var.Split(#Wrap_width);                                    
+   While #Wrap_inx.SUm(1) < #Wrap_width and                                     
+         Not Take($Wrap_Tmp,-#Wrap_Inx) HdIs {" ",".",","} Do;                  
+   If #Wrap_inx < #Wrap_width Then %found a delimiter                           
+   Begin                                                                        
+      $Wrap_New.Insert($Wrap_Pre&Drop($Wrap_Tmp,-#Wrap_inx+1),/);               
+      $$Wrap_Var:=Take($Wrap_Tmp,-#Wrap_inx+1)&$$Wrap_VAr;                      
+      #$Wrap_Var.Sum(1);                                                        
+      $Wrap_Pre:=Repeat(" ",#Wrap_Indent);                                      
+   End                                                                          
+   Else                                                                         
+   Begin                                                                        
+      $Wrap_New.Insert($Wrap_Pre&$Wrap_Tmp,/);                                  
+      #$Wrap_Var.Sum(1);                                                        
+   End;                                                                         
+End;                                                                            
+$Wrap_New.Insert($Wrap_Pre&$$Wrap_var,/);                                       
+#$Wrap_Var.Sum(1);                                                              
+$$Wrap_Var:=$Wrap_New;                                                          
+$Wrap_New:=$Wrap_Tmp:=EMpty;                                                    
+\                                                                               
+                                                                                
+                                                                                

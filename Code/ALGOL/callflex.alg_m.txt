@@ -1,0 +1,40 @@
+Begin                                                                   00001000          
+  Procedure Flex(P);                                                    00002000          
+  Array P[*];                                                           00003000          
+  External;                                                             00004000          
+Define UDErrorF     = [7:7]#; %USERDATA ERROR NUMBER                    00005000          
+Boolean Procedure AssumeUsercode(sUsercode,Tsk);                        00006000          
+%         -------------------------                                     0000700039.390.42 
+String sUsercode;                                                       00008000          
+Task Tsk;                                                               00009000          
+Begin                                                                   00010000          
+   Real UDR;                                                            00011000          
+   Integer Sz;                                                          00012000          
+   Ebcdic Array eUsercode[0:(Sz:=Length(sUsercode))+5];                 00013000          
+   Replace eUsercode By (Sz+4).[7:48] For 1,48"0001",                   00014000          
+                         Sz.[7:48] For 1,                               00015000          
+                         sUsercode,48"00";                              00016000          
+   %LOCATOR word needs bit 2 For passing on of SYSADMIN and SYSTEMUSER  00017000          
+   UDR:= UserData(4"43",Tsk,7,0,eUsercode);                             00018000          
+   If Boolean(UDR) Then                                                 00019000          
+   Begin                                                                00020000          
+      Ebcdic Array Buff[0:131];                                         00021000          
+      Pointer P;                                                        00022000          
+      Replace P:Buff BY "WARNING ASSUMeUsercode ERROR ",                00023000          
+                      UDR.UDERRORF For * DIGITS," USER =",              00024000          
+                      eUsercode[4] For Real(eUsercode[3],1);            00025000          
+      Write(Myself.TaskFILE,Offset(P),Buff);                            00026000          
+      AssumeUsercode:=True;                                             00027000          
+   End;                                                                 00028000          
+END AssumeUsercode;                                                     00029000          
+Task T;                                                                 00030000          
+Array Tmp[0:100];                                                       00031000          
+Replace T.Name BY "*OBJECT/Flex.";                                      00032000          
+If AssumeUsercode("##REDACTED##",T) Then                               00033000          
+Begin                                                                   00034000          
+   DIsplay("AssumeUsercode failed :see Taskfile");                      00035000          
+   Myself.Status:=Value(Terminated);                                    00036000          
+End;                                                                    00037000          
+Replace Pointer(Tmp) BY "DO (TEST)DO/TEST",48"00";                      00038000          
+Call Flex(Tmp)[T];                                                      00039000          
+END.                                                                    00040000          

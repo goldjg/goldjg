@@ -1,0 +1,21 @@
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\EOMLogger.exe
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\EOMLogger.pdb
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\EOMLogger.xml
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\eomlogging.dll
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\Interface.dll
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\UserFacts.dll
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\eomlogging.xml
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\bin\Interface.xml
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\ResolveAssemblyReference.cache
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.Resources.resources
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\GenerateResource.read.1.tlog
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\GenerateResource.write.1.tlog
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.exe
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.xml
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.pdb
+P:\teamdirs\teamv3\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.exe
+P:\teamdirs\teamv3\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.xml
+P:\teamdirs\teamv3\EOMLogger\EOMLogger\obj\x86\Debug\EOMLogger.pdb
+K:\GG For Sharing\Code\CodeSnippets\vb\EOMLogger\EOMLogger 0.1\EOMLogger\obj\x86\Debug\EOMLogger.exe
+K:\GG For Sharing\Code\CodeSnippets\vb\EOMLogger\EOMLogger 0.1\EOMLogger\obj\x86\Debug\EOMLogger.xml
+K:\GG For Sharing\Code\CodeSnippets\vb\EOMLogger\EOMLogger 0.1\EOMLogger\obj\x86\Debug\EOMLogger.pdb

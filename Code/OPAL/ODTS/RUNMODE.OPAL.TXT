@@ -1,0 +1,46 @@
+DEFINE + ODTSEQUENCE CHECK_RUNMODE(MESSAGE):                                    
+%%                                                                              
+%% When driver Service Mode switch changes to "not servicing" -                 
+%% if this falls within normal servicing period then issue                      
+%% warning                                                                      
+%%                                                                              
+%% WHEN CHECK_RUNMODE DO CHECK_RUNMODE                                          
+%%                                                                              
+%% Version  1 - - Initial Version.     Nov '04, .                    
+%% Version  2 - - Amend finish times   Jun '04, GXG.                   
+                                                                                
+  STORE("JOBINFO", STRING(JOBNUMBER,4) );                                       
+                                                                                
+  IF COUNT(MX:JOBNUMBER=DECIMAL(GETSTR("JOBINFO"))  AND                         
+                     STORE("JNAME",NAME) = ""  ) > 0 THEN                       
+                                                                                
+  BEGIN %% Active                                                               
+       IF GETSTR("JNAME") = "GN/DRIVER"  THEN                                   
+                                                                                
+       BEGIN %% It's a Driver Job                                               
+            STORE("MT", DECIMAL(DECAT(DECAT(TIME(TIMEOFDAY),                    
+                                          ":",5),":",5)));                      
+                                                                                
+            IF DAYINWEEK > 1 AND DAYINWEEK < 7 THEN                             
+               STORE("ET",220000)  %% Weekday                                   
+            ELSE                                                                
+               STORE("ET",160000); %% Weekend                                   
+                                                                                
+            IF GET("MT") > 070000 AND                                           
+               GET("MT") < GET("ET") THEN                                       
+                                                                                
+            BEGIN  %% SLA Period?                                               
+               If COUNT(MX=W:NAME="DRIVER/MODE/ALERT/"                          
+                             & GETSTR("JOBINFO") ) Eql 0 Then                   
+               BEGIN                                                            
+                 ODT("BEGIN JOB DRIVER/MODE/ALERT/" &                           
+                       GETSTR("JOBINFO") & ";                                   
+                       DISPLAY ACCEPT(""","DRIVER",,                         
+                      "Job ",JOBNUMBER,,                                        
+                      "Check Run Mode => ",TEXT, """);END JOB")                 
+               END                                                              
+            END   %% SLA Period?                                                
+        END   %% It's a Driver Job                                              
+   END    %% Active                                                             
+  ELSE                                                                          
+        DISPLAY (GETSTR("JOBINFO") & " has gone !!");                           

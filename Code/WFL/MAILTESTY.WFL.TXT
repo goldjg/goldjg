@@ -1,0 +1,12 @@
+ BEGIN JOB GXG/MAILTESTY;                                                       
+RUN *METALOGIC/MAILER("user@domain",                                            
+         "Subject");                              
+         FILE REPLY(NOTE="user@domain");                       
+         FILE FROM(NOTE="user@domain");                          
+         FILE CC(NOTE="user@domain");                                           
+         FILE INCLUDE(KIND=READER);                                             
+         DATA INCLUDE                                                           
+         This is some body text.                
+         This is some more body text.                             
+?                                                                               
+END JOB.                                                                        

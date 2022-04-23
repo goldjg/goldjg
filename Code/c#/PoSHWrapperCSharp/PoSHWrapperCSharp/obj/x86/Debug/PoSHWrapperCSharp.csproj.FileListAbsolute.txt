@@ -1,0 +1,10 @@
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSHWrapperCSharp\PoSHWrapperCSharp\bin\Debug\PoSHWrapperCSharp.exe
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSHWrapperCSharp\PoSHWrapperCSharp\bin\Debug\PoSHWrapperCSharp.pdb
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSHWrapperCSharp\PoSHWrapperCSharp\obj\x86\Debug\ResolveAssemblyReference.cache
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSHWrapperCSharp\PoSHWrapperCSharp\obj\x86\Debug\PoSHWrapperCSharp.exe
+\\lgrdcppdt39\m61889\visual studio 2010\Projects\PoSHWrapperCSharp\PoSHWrapperCSharp\obj\x86\Debug\PoSHWrapperCSharp.pdb
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSHWrapperCSharp\PoSHWrapperCSharp\obj\x86\Debug\PoSHWrapperCSharp.exe
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSHWrapperCSharp\PoSHWrapperCSharp\obj\x86\Debug\PoSHWrapperCSharp.pdb
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSHWrapperCSharp\PoSHWrapperCSharp\bin\Debug\PoSHWrapperCSharp.exe
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSHWrapperCSharp\PoSHWrapperCSharp\bin\Debug\PoSHWrapperCSharp.pdb
+K:\GG For Sharing\Code\CodeSnippets\c#\PoSHWrapperCSharp\PoSHWrapperCSharp\obj\x86\Debug\PoSHWrapperCSharp.csprojResolveAssemblyReference.cache

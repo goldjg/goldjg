@@ -1,0 +1,111 @@
+                                                                        
+ $ SET LISTDOLLAR LIST ERRLIST LINEINFO STACK NOXREFLIST                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%  THIS PROGRAM ACCESSES MEMORY AFTER A LARGE ARRAY HAS BEEN DECLARED   
+%  AND TOUCHED. IT WILL ACCESS AND CHANGE ARRAY UNTIL HOWLONG SECS      
+%  HAVE EXPIRED.                                                        
+%                                                                       
+%  N.B. THIS PROGRAM CAN SERIOUSLY DEGRADE THE SYSTEM                   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+PROCEDURE ACCESSMEMORY(HOWLONG);                                        
+INTEGER HOWLONG;                                                        
+BEGIN                                                                   
+   TASK MEMORYTASK;                                                     
+   EVENT START,STOP;                                                    
+   EBCDIC ARRAY TASK_NAME[0:47];                                        
+                                                                        
+PROCEDURE ACCESS_MEMORY(START,STOP);                                    
+  % Procedure which is processed of to access memory                    
+EVENT START,STOP;                                                       
+BEGIN                                                                   
+   DEFINE TYPE = V1.[4:5] #,         % SYSTEMSTATUS defines             
+          SUBTYPE = V1.[12:8] #,                                        
+          AVAILMEM = SYSTEM_STAT[9] #;                                  
+                                                                        
+   DEFINE                                                               
+     SAY = REPLACE OUTARRAY[0] BY#,                                     
+     CLEAROUTARRAY = REPLACE OUTARRAY[0] BY " " FOR 132#;               
+                                                                        
+   ARRAY MEMORY[0:1023,0:1023],      % Array used to access memory      
+         SYSTEM_STAT[0:100];         % SYSTEMSTATUS info                
+   INTEGER CURRENTROW,ROWTOHIT,LAST,HITS,FAC;                           
+   EBCDIC ARRAY OUTARRAY[0:131];                                        
+   FILE REPORT(KIND=PRINTER);                                           
+   REAL TIME7,PTSTART,PTSTOP,IOSTART,IOSTOP,ETSTART,ETSTOP,V1,V2;       
+   STRING OUT_STRING;                                                   
+                                                                        
+   TYPE:=2;                          % Set up SYSTEMSTATUS variables to 
+   SUBTYPE:=0;                       % obtain avilable memory           
+   IF SYSTEMSTATUS(SYSTEM_STAT,V1,V2) THEN                              
+   BEGIN                             % If SYSTEMSTATUS failure abort    
+      OUT_STRING:="SYSTEMSTATUS FAILURE. ABORTING ACCESSMEMORY TEST";   
+      MYSELF.STATUS:=-1;                                                
+   END;                                                                 
+                                     % Resize array to use available    
+                                     % memory                           
+   RESIZE(MEMORY[0,*],AVAILMEM MOD 1024,DISCARD);                       
+                                                                        
+   LAST := AVAILMEM MOD 1024;        % Touch each row to grab memory    
+   FOR CURRENTROW := 0 STEP 1 UNTIL 1023 DO                             
+     REPLACE MEMORY[CURRENTROW,0] BY "BENCH " FOR LAST WORDS;           
+   DISPLAY("====> MEMORY TOUCHED NOW HIT IT RANDOMLY");                 
+   ROWTOHIT := TIME(7);                                                 
+   FAC := SIZE(MEMORY);                                                 
+   WAIT(START);                      % Wait until start                 
+   ETSTART := TIME(14);              % Note Start times                 
+   IOSTART := TIME(13);                                                 
+   PTSTART := TIME(12);                                                 
+   WHILE NOT HAPPENED(STOP) DO       % Calculate a random row and touch 
+   BEGIN                             % it until stop                    
+      ROWTOHIT := MIN(FAC-1,RANDOM(ROWTOHIT)*(FAC-1));                  
+      MEMORY[ROWTOHIT,LAST-1] := "HITHIT";                              
+      HITS := * + 1;                                                    
+   END;                                                                 
+   PTSTOP := TIME(12);               % Note stop times                  
+   IOSTOP := TIME(13);                                                  
+   ETSTOP := TIME(14);                                                  
+   CLEAROUTARRAY;                    % Write results to report          
+   SAY "=== A C C E S S  M E M O R Y ==="," " FOR 10,"[ON ",            
+       MYSELF.HOSTNAME,"]";                                             
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   TIME7 := TIME(7);                                                    
+   SAY STRING(TIME7.[23:6],*),":",STRING(TIME7.[17:6],*),":",           
+       STRING(TIME7.[11:6],*),"   ",                                    
+       STRING(TIME7.[29:6],*),"/",STRING(TIME7.[35:6],*),"/",           
+       DROP(STRING(TIME7.[47:12],*),2);                                 
+   WRITE(REPORT[SPACE 4],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "ELAPSED TIME   = ",                                             
+        STRING((ETSTOP - ETSTART) * 2.4@-6,*)," SECONDS";               
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "PROCESSOR TIME = ",                                             
+        STRING((PTSTOP - PTSTART) * 2.4@-6,*)," SECONDS";               
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "I/O TIME       = ",                                             
+        STRING((IOSTOP-IOSTART) * 2.4@-6,*)," SECONDS";                 
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "ACCESSED MEMORY RANDOMLY ", STRING(HITS,*)," TIMES";            
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   LOCK(REPORT);                                                        
+END  O F  A C C E S S   M E M O R Y;                                    
+                                                                        
+   REPLACE TASK_NAME BY "BENCH/ACCESS/MEMORY.";                         
+   REPLACE MEMORYTASK.NAME BY TASK_NAME;                                
+   MEMORYTASK.OPTIONS := MYSELF.OPTIONS;                                
+                                                                        
+                                     % Process off memory task          
+   PROCESS ACCESS_MEMORY(START,STOP)[MEMORYTASK];                       
+                                     % Wait until the process has begun 
+   WHILE MEMORYTASK.STATUS < 0 DO WAITANDRESET(MYSELF.EXCEPTIONEVENT);  
+   DISPLAY("====> ACCESS MEMORY STARTING");                             
+   CAUSE(START);                     % Start memory test                
+   WHEN(HOWLONG);                    % wait for specified time          
+   CAUSE(STOP);                      % Stop memory test                 
+                                                                        
+                                     % Wait for process to finish       
+   WHILE MEMORYTASK.STATUS > 0 DO WAITANDRESET(MYSELF.EXCEPTIONEVENT);  
+END;                                                                    

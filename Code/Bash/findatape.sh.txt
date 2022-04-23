@@ -1,0 +1,2 @@
+#!/bin/bash
+tree -fiFP $1 --noreport /VAULT1*|grep '\_.*[^\/]$'

@@ -1,0 +1,7 @@
+@TITLE=DEV FTP Test
+@ECHO OFF
+CLS
+
+FTP -s:POSTIMP.ftp <servername>
+
+PAUSE

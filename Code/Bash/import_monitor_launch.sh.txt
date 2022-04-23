@@ -1,0 +1,11 @@
+#!/bin/bash
+############################################################################
+#                                                                          #
+############################################################################
+ps cax | grep import_monitor.sh > /dev/null
+if [ $? -eq 0 ]; then
+  echo "Process is already running, nothing to start.."
+else
+  echo "Process is not running, starting it."
+  nohup ./import_monitor.sh &
+fi

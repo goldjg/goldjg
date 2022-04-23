@@ -1,0 +1,34 @@
+@TITLE=Looking up DNS records in Live environment...
+@echo off
+
+set server=
+set address=
+set name=
+
+if exist DNSList.csv del DNSList.csv
+echo Date , DNS Server , Hostname , IP address>>DNSList.csv
+::          list of name servers
+for %%i in (1.2.3.4
+            1.2.3.1
+            4.3.2.1      ) do (
+::            list of sites  
+for %%j in     (10.9.8.7
+		7.8.9.10	) do (
+
+    set server=
+    set address=
+    set name=
+    
+    for /f "tokens=1*" %%k in ('nslookup %%j %%i 2^> nul') do (
+      if [%%k]==[Server:] set server=%%l
+      if [%%k]==[Address:] set address=%%l
+      if [%%k]==[Addresses:] set address=%%l
+      if [%%k]==[Name:] set name=%%l)
+    if not defined name set address=Not Found
+    if not defined name set name=%%j
+    call echo %date% , %%server%% , %%name%% , %%address%%>>DNSList.csv
+  )
+) 
+echo.
+echo Lookup complete. For results, see DNSList.csv in same path as script
+pause

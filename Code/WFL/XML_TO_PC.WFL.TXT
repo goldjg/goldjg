@@ -1,0 +1,9 @@
+BEGIN JOB XML_TO_PC(STRING PASS);                                               
+RUN SYSTEM/NXSERVICES/PCDRIVER(                                                 
+"\\##REDACTED##" &                                                      
+"[CREDENTIALS=user/" & PASS & "," &                                           
+"USERDOMAIN=##REDACTED##]" &                                                      
+"REMOVE TEST.XML;" &                                                            
+"BINARYDATATOPC " &                                                             
+ "TEST-XML ON ##REDACTED## TEST.XML;");                                                 
+END JOB                                                                         

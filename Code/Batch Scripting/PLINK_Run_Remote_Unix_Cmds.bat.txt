@@ -1,0 +1,5 @@
+Microsoft Windows [Version 5.2.3790]
+(C) Copyright 1985-2003 Microsoft Corp.
+
+C:\Documents and Settings\##REDACTED##>"C:\Program Files\Putty\PLINK" -SSH <IP> -l <USER> -i "C:\##REDACTED##.PPK" /usr/symcli/bin/symrdf -sid ### -f
+ /##REDACTED##.map -rdfg # query

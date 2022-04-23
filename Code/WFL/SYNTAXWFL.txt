@@ -1,0 +1,7 @@
+BEGIN JOB GXG/SYNTAXWFL;                                                        
+TASK T;                                                                         
+RUN GN/P/SYNTAXWFL("GXG/SNTX.")[T];                                             
+TASKVALUE=1;                                                                    
+                                                                                
+DISPLAY(STRING(T(TASKVALUE),*));                                                
+END JOB.                                                                        

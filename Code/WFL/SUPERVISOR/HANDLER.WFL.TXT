@@ -1,0 +1,242 @@
+BEGIN JOB GN/SUPERVISOR/HANDLER(STRING INPUT,                                   
+                                STRING MAIL1,                                   
+                                STRING MAIL2 OPTIONAL,                          
+                                STRING MAIL3 OPTIONAL,                          
+                                STRING SUBJ  OPTIONAL);                         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                   		 SUPERVISOR/HANDLER                       %%         
+%%                   		 ==================                       %%         
+%%                                                                   %%         
+%% THIS JOB RUNS SUPERVISOR/HANDLER, WHICH PASSES COMMANDS TO   %%         
+%% SUPERVISOR AND EMAILS COMMAND/RESPONSE.                           %%         
+%%                                                                   %%         
+%% JOB TAKES FOUR STRING PARAMETERS:-                                %%         
+%% INPUT : COMMAND YOU WANT SUPERVISOR TO PROCESS        - REQUIRED  %%         
+%% MAIL1 : EMAIL ADDRESS TO EMAIL WITH THE CMD RESPONSE  - REQUIRED  %%         
+%% MAIL2 : ADDITIONAL EMAIL RECIPIENT                    - OPTIONAL  %%         
+%% MAIL3 : ADDITIONAL EMAIL RECIPIENT                    - OPTIONAL  %%         
+%% SUBJ  : EMAIL SUBJECT                                 - OPTIONAL  %%         
+%%         (DEFAULT = "SUPERVISOR COMMAND PROCESSED")                %%         
+%%                                                                   %%         
+%% NOTE : JOB WILL ONLY PROCESS SUPERVISOR CMDS, NOT ODT CMDS        %%         
+%%                                                                   %%         
+%% EMAIL ADDRESSES MUST BE IN <FIRSTNAME>.<LASTNAME> OR              %%         
+%% <FIRSTNAME> <LASTNAME> FORMAT (SPACES CONVERTED TO PERIODS)       %%         
+%%                                                                   %%         
+%% EMAIL DOMAIN @DOMAIN IS ASSUMED, OTHER DOMAINS IGNORED. %%         
+%% INVALID CHARACTERS  ,()[]\/;:<>'" ARE REJECTED PER RFC3696.       %%         
+%%                                                                   %%         
+%% ERRORS IN THE FIRST MAIL ADDRESS WILL CAUSE JOB TO ABORT,         %%         
+%% ERRORS IN ADDITIONAL ADDRESSES WILL CAUSE THEM TO BE SKIPPED.     %%         
+%%                                                                   %%         
+%% VALID STARTS:                                                     %%         
+%% =============                                                     %%         
+%% START SUPERVISOR/HANDLER("WS","##REDACTED##")               %%         
+%%                                                                   %%         
+%% START SUPERVISOR/HANDLER("WS","##REDACTED##",,,"TEST")      %%         
+%%                                                                   %%         
+%% START SUPERVISOR/HANDLER("MAIL LOG ALL BACK 1 DAYS",       %%         
+%%                                 "##REDACTED##",                    %%         
+%%                                 "##REDACTED##")         %%         
+%%                                                                   %%         
+%% START SUPERVISOR/HANDLER                                   %%         
+%% ("FOR ##REDACTED## FOR ##REDACTED## DO ##REDACTED##",  %%         
+%%                          "##REDACTED##",                           %%         
+%%                          "##REDACTED##",                %%         
+%%                          "##REDACTED##")                          %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%                                                                   %%         
+%% VERSION 01 ##REDACTED## INITIAL IMPLEMENTATION       FEB 2010 GXG %%         
+%%                                                                   %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+ $INCLUDE ##REDACTED##;                                                  
+ $INCLUDE ##REDACTED##;                                                 
+                                                                                
+TASK SUPHANDLER;                                                                
+                                                                                
+STRING EMAIL,                                                                   
+       MAILTO1,                                                                 
+       MAILTO2,                                                                 
+       MAILTO3,                                                                 
+       SUBJECT;                                                                 
+                                                                                
+BOOLEAN INVALID;                                                                
+                                                                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                     
+%% DEFINE SCANMAIL SUBROUTINE TO SCAN MAIL ADDRESSES FOR %%                     
+%% RFC3696 COMPLIANCE.                                   %%                     
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%                     
+SUBROUTINE SCANMAIL(STRING INSTR, BOOLEAN INVALID);                             
+BEGIN                                                                           
+   STRING NEWSTR, %% ALL LEGAL CHARS COPIED TO HERE                             
+   PTR,           %% BUFFER FOR STORING CURRENT CHARACTER BEING SCANNED         
+   SCAN,          %% BUFFER FOR SCANNING OF PERIODS IN ADDRESS                  
+   REASON;        %% STORE ERROR REASON                                         
+                                                                                
+   %% LOOP THROUGH EACH CHARACTER IN EMAIL ADDRESS                              
+   WHILE LENGTH(INSTR) GTR 0 DO                                                 
+      BEGIN                                                                     
+      %% MOVE LEFTMOST CHAR INTO PTR STRNG TO INSPECT                           
+      PTR := TAKE(INSTR,1);                                                     
+      CASE PTR OF                                                               
+         BEGIN                                                                  
+         (" "): PTR := "."; %CONVERT SPACE TO PERIOD                            
+         (","): INVALID := TRUE; %MULTI ADDRESS IN SINGLE PARAM, ABORT.         
+         ("("): INVALID := TRUE; %INVALID CHAR                                  
+         (")"): INVALID := TRUE; %INVALID CHAR                                  
+         ("["): INVALID := TRUE; %INVALID CHAR                                  
+         ("]"): INVALID := TRUE; %INVALID CHAR                                  
+         ("\"): INVALID := TRUE; %INVALID CHAR                                  
+         ("/"): INVALID := TRUE; %INVALID CHAR                                  
+         (";"): INVALID := TRUE; %INVALID CHAR                                  
+         (":"): INVALID := TRUE; %INVALID CHAR                                  
+         ("<"): INVALID := TRUE; %INVALID CHAR                                  
+         (">"): INVALID := TRUE; %INVALID CHAR                                  
+         ("'"): INVALID := TRUE; %INVALID CHAR                                  
+         (""""): INVALID := TRUE; %INVALID CHAR - DOUBLE QUOTE                  
+         ("@"): INVALID := TRUE; %INVALID CHAR, @DOMAIN ASSUMED       
+         ELSE: ;                                                                
+         END;                                                                   
+                                                                                
+      %% IF INVALID CHARACTERS DETECTED, DISPLAY ERROR AND EXIT ROUTINE         
+      IF INVALID THEN                                                           
+      BEGIN                                                                     
+         REASON := "INVALID CHARACTER(S) IN EMAIL ADDRESS";                     
+         DISPLAY REASON;                                                        
+         GO TO ENDSUB;                                                          
+      END;                                                                      
+                                                                                
+      %% APPEND INSPECTED CHAR INTO NEWSTR                                      
+      NEWSTR := NEWSTR & PTR;                                                   
+                                                                                
+      %% DROP CHAR JUST INSPECTED SO NEXT LOOP WILL READ NEXT CHAR              
+      INSTR := DROP(INSTR,1);                                                   
+                                                                                
+      IF PTR = "." THEN                                                         
+      BEGIN                                                                     
+         %% SCAN FOR PERIOD AT START OR END OF LOCALPART (BEFORE @) - RFC3696   
+         IF LENGTH(NEWSTR) = 1 OR LENGTH(INSTR) = 0 THEN                        
+         BEGIN                                                                  
+            %%IF FOUND, FLAG ADDRESS AS INVALID                                 
+            INVALID:= TRUE;                                                     
+                                                                                
+            %% DISPLAY ERROR MESSAGE                                            
+            REASON:= "PERIOD NOT ALLOWED AT START/END OF ADDRESS";              
+            DISPLAY REASON;                                                     
+                                                                                
+            %% EXIT SUBROUTINE WITHOUT FURTHER SCANNING                         
+            GO TO ENDSUB;                                                       
+         END;                                                                   
+                                                                                
+         %% SCAN FOR DOUBLE PERIOD IN LOCALPART (BEFORE @) - RFC3696            
+         IF TAKE(DROP(NEWSTR, LENGTH(NEWSTR)-2), 2) = ".." THEN                 
+         BEGIN                                                                  
+            %% IF FOUND, FLAG ADDRESS AS INVALID                                
+            INVALID:= TRUE;                                                     
+                                                                                
+            %% DISPLAY ERROR MESSAGE                                            
+            REASON:= "DOUBLE PERIOD NOT ALLOWED IN ADDRESS";                    
+            DISPLAY REASON;                                                     
+                                                                                
+            %% EXIT SUBROUTINE WITHOUT FURTHER SCANNING                         
+            GO TO ENDSUB;                                                       
+         END;                                                                   
+                                                                                
+      END;                                                                      
+                                                                                
+END;                                                                            
+                                                                                
+%% ONCE ALL CHARS CHECKED FOR ALL CASES, UPDATE INPUT PARAM                     
+INSTR := NEWSTR;                                                                
+                                                                                
+ENDSUB:                                                                         
+END SCANMAIL;                                                                   
+                                                                                
+ON RESTART, GO STARTUP;                                                         
+STARTUP:                                                                        
+                                                                                
+WFLATTS;                                                                        
+                                                                                
+%% MOVE MAIL PARAM CONTENTS INTO NEW STRINGS                                    
+%% SO THEY CAN BE PASSED BY VALUE INTO SCANMAIL                                 
+MAILTO1 := MAIL1;                                                               
+MAILTO2 := MAIL2;                                                               
+MAILTO3 := MAIL3;                                                               
+                                                                                
+%% SETUP MAIL SUBJECT USING EITHER PARAM OR DEFAULT                             
+IF SUBJ NEQ "" THEN                                                             
+   SUBJECT:= SUBJ;                                                              
+                                                                                
+IF SUBJ = "" THEN                                                               
+   SUBJECT:= "SUPERVISOR COMMAND PROCESSED";                                    
+                                                                                
+%% SCAN FIRST MAIL PARAM FOR VALIDITY                                           
+SCANMAIL (MAILTO1,INVALID);                                                     
+                                                                                
+%% IF INVALID FLAG SET IN SCANMAIL ABORT JOB,                                   
+%% FIRST MAIL PARAM MUST BE VALID                                               
+IF INVALID THEN                                                                 
+   ABORTIT("INVALID EMAIL ADDRESS FORMAT IN 2ND PARAM, JOB ABORTED");           
+                                                                                
+%% IF 2ND MAIL PARAM PASSED INTO JOB RUN IT THROUGH SCANMAIL                    
+IF MAILTO2 NEQ "" THEN                                                          
+   BEGIN                                                                        
+   SCANMAIL (MAILTO2,INVALID);                                                  
+   IF INVALID THEN                                                              
+      BEGIN                                                                     
+                                                                                
+      %% IF MAIL PARAM INVALID, SET STRING VALUE TO NULL                        
+      %% SO IT IS SKIPPED FROM MAIL ADDRESSES PASSED TO SUPHANDLER PROG         
+      MAILTO2 := "";                                                            
+                                                                                
+      %% RESET INVALID FLAG FOR NEXT RUN OF SCANMAIL                            
+      INVALID := FALSE;                                                         
+                                                                                
+      %% DISPLAY ERROR MESSAGE TO USER INDICATING WHICH MAIL PARAM SKIPPED      
+      DISPLAY "EMAIL FORMAT IN 3RD PARAM INVALID, ADDRESS SKIPPED";             
+      END;                                                                      
+   ELSE                                                                         
+                                                                                
+   %% IF INVALID FLAG WASN'T SET, PREFIX STRING WITH COMMA                      
+   %% FOR STRING CONCATENATION LATER                                            
+   MAILTO2 := "," & MAILTO2;                                                    
+   END;                                                                         
+                                                                                
+%% IF 3RD MAIL PARAM PASSED INTO JOB RUN IT THROUGH SCANMAIL                    
+IF MAILTO3 NEQ "" THEN                                                          
+   BEGIN                                                                        
+   SCANMAIL (MAILTO3,INVALID);                                                  
+   IF INVALID THEN                                                              
+      BEGIN                                                                     
+                                                                                
+      %% IF MAIL PARAM INVALID, SET STRING VALUE TO NULL                        
+      %% SO IT IS SKIPPED FROM MAIL ADDRESSES PASSED TO SUPHANDLER PROG         
+      MAILTO3 := "";                                                            
+                                                                                
+      %% RESET INVALID FLAG                                                     
+      INVALID := FALSE;                                                         
+                                                                                
+      %% DISPLAY ERROR MESSAGE TO USER INDICATING WHICH MAIL PARAM SKIPPED      
+      DISPLAY "EMAIL FORMAT IN 4TH PARAM INVALID, ADDRESS SKIPPED";             
+      END;                                                                      
+   ELSE                                                                         
+                                                                                
+   %% IF INVALID FLAG WASN'T SET, PREFIX STRING WITH COMMA                      
+   %% FOR STRING CONCATENATION LATER                                            
+   MAILTO3 := "," & MAILTO3;                                                    
+   END;                                                                         
+                                                                                
+%% BUILD FINAL ADDRESS LIST FOR PASSING TO SUPHANDLER PROG                      
+EMAIL := MAILTO1 & MAILTO2 & MAILTO3;                                           
+                                                                                
+%% RUN SUPHANDLER PROGRAM PASSING IN SUPERVISOR COMMAND                         
+%% FROM INPUT PARAM,VALIDATED EMAIL ADDRESS(ES) & EMAIL SUBJECT                 
+RUN SUPERVISOR/HANDLER(INPUT,EMAIL,SUBJECT)[SUPHANDLER];                  
+    OPTION = (FILES,DSED,ARRAYS,FAULT);                                         
+    FILE TASKFILE (USERBACKUPNAME=FALSE);                                       
+                                                                                
+%%DETECT PROGRAM FAILURE AND PRODUCE PROGRAMDUMP/FAILURE NOTICE                 
+ IF SUPHANDLER ISNT COMPLETEDOK THEN                                            
+    ABORTIT("SUPERVISOR/HANDLER FAILURE - ALERT SUPPORT");       
+                                                                                
+END JOB                                                                         

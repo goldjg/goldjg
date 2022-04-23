@@ -1,0 +1,281 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+% GN/JOB/PCDRIVER                                                      %        
+% ---------------                                                      %        
+% UTILITY WFL TO BUILD VALID SYNTAX FOR *SYSTEM/NXSERVICES/PCDRIVER    %        
+% AND RUN IT. MUST BE RUN FROM PRIVILEGED USER AS PCDRIVER IS PRIVATE  %        
+%                                                                      %        
+% PCDRIVER ALLOWS THE DIRECT READ/WRITE OF FILES ON REMOTE FILE SHARES %        
+% BY MCP APPLICATIONS AND ALSO ALLOWS THE RUNNING OF WINDOWS COMMANDS  %        
+% ON REMOTE SYSTEMS. THIS WFL ONLY SUPPORTS FILE TRANSFER FUNCTIONS.   %        
+%                                                                      %        
+% THIS UTILITY ALSO ONLY SUPPORTS CONNECTION TO FILE SHARES (PCDRIVER  %        
+% CAN ALSO CONNECT TO SYSTEMS WITHOUT A SHARE IF LAUNCHER.EXE IS       %        
+% RUNNING ON THE REMOTE SYSTEM AND LISTENING).                         %        
+% FOR MORE PCDRIVER INFO, SEE SYSTEM SOFTWARE UTILITIES OPS MANUAL.    %        
+%                                                                      %        
+% REQUIRED PARAMETERS:                                                 %        
+% * TYPE - DATA TRANSFER TYPE (TEXT or BINARY)                         %        
+% * DIRECTION - TRANSFER FROM OR TO MAINFRAME (F or T)                 %        
+% * PATH - UNC PATH TO \\SERVER\SHARE\DIRECTORY                        %        
+% * PCUSERCODE - USERCODE TO LOGIN TO SHARE (CASE SENSITIVE)           %        
+% * PCPASSWORD - PASSWORD FOR SHARE LOGIN (CASE SENSITIVE)             %        
+% * MCPFILETITLE - TITLE OF MCP FILE e.g. FILE1 or FILE\1              %        
+% * PCFILE - FILENAME OF PCFILE (CANNOT INCLUDE DIRECTORY NAME)        %        
+%                                                                      %        
+% OPTIONAL PARAMETERS FOR ALL TRANSFERS:                               %        
+% * DOMAIN - DOMAIN USER BELONGS TO (PRODUCTION or PRE-RELEASE)        %        
+%            DEFAULT = PRODUCTION                                      %        
+% * MCPFILEUSER - USERCODE OF MCP FILE IF NOT THE RUNNING USERCODE     %        
+% * MCPFILEPACK - PACK LOCATION FOR MCP FILE IF NOT USER DEFAULT       %        
+% * OVERWRITE - OVERWRITE PC FILE FOR TRANSFERS TO PC (TRUE or FALSE)  %        
+%               DEFAULT = FALSE                                        %        
+%                                                                      %        
+% OPTIONAL PARAMETERS FOR TEXT TRANSFERS:                              %        
+% * KEEPSEQNO - SHOULD MCP SEQUENCE NUMBERS BE RETAINED (TRUE or FALSE)%        
+%               DEFAULT = FALSE                                        %        
+% * FKIND - MCP FILEKIND FOR TRANSFERS TO MCP. DEFAULT = SEQDATA.      %        
+% * FBLOCKING - RECORDS PER BLOCK FOR FILE TRANSFER TO MCP.            %        
+% * FUNITS - UNIT OF MEASUREMENT FOR MCP FILE ATTRIBUTES               %        
+%            (CHARACTERS or WORDS)                                     %        
+% * FAREA - AREASIZE FOR MCP FILE IN BYTES                             %        
+% * FRECS - CONTROLS SCANNING PC FILES FOR CRLF OR USING IMPLICIT      %        
+%           MCP FILEKIND/SEQUENCE NUMBER SETTINGS. (CRLF=DEFAULT)      %        
+% * FTRUNCATE - LINE WRAPPING OPTIONS FOR TRANSFER TO PC.              %        
+%               (TRUNCATE or FOLD or WRAP or ERROR - TRUNCATE=DEFAULT) %        
+% * TRANSLATE - SPECIFIES WHETHER FILE FROM PC SHOULD BE TRANSLATED    %        
+%               FROM ASCII TO EBCDIC. (DEFAULT = TRUE).                %        
+% * TRIM - CONTROLS WHETHER MCP FILE RECORDS HAVE TRAILING BLANKS      %        
+%          REMOVED ON TRANSFER TO PC. (DEFAULT=TRUE).                  %        
+%                                                                      %        
+% EXAMPLE START:                                                       %        
+% ST GN/JOB/PCDRIVER("BINARY",                                         %        
+%                    "F",                                              %        
+%                    "\\##REDACTED##",,    %        
+%                    "user",                                         %        
+%                    "pass",                                       %        
+%                    "TEST-XML",,,"Test-File.xml")                     %        
+%                                                                      %        
+% Would copy TEST-XML file as Test-File.xml from MCP to the PCDRIVER   %        
+% share on ##REDACTED##, logging in as #REDACTED# and would be a BINARY%        
+% transfer.                                                            %        
+%                                                                      %        
+%ST GN/JOB/PCDRIVER("TEXT",                                            %        
+%                   "T",                                               %        
+%                   "\\##REDACTED##",,     %        
+%                   "user",                                          %        
+%                   "pass",                                        %        
+%                   "TEST8XML",,,"Test-File.xml",                      %        
+%                   FKIND:="DATA 150",                                 %        
+%                   FUNITS:="WORDS")                                   %        
+%                                                                      %        
+% Would copy Test-File.xml as TEST89XML from the ##REDACTED## share on %        
+% ##REDACTED##, logging in as ##REDACTED# and would be a TEXT transfer.%        
+% MCP file would have a FILEKIND of DATA and record length of 150 words%        
+%**********************************************************************%        
+% VERSION 01    INITIAL IMPLEMENTATION          CHG12345 GXG MAR 2013  %        
+%                                                                      %        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%        
+BEGIN JOB GN/PCDRIVER(STRING TYPE,                                              
+                 STRING DIRECTION,                                              
+                 STRING PATH,                                                   
+                 STRING DOMAIN OPTIONAL DEFAULT="##REDACTED##",                   
+                 STRING PCUSERCODE,                                             
+                 STRING PCPASSWORD NOLIST,                                      
+                 STRING MCPFILETITLE,                                           
+                 STRING MCPFILEUSER OPTIONAL,                                   
+                 STRING MCPFILEPACK OPTIONAL,                                   
+                 STRING PCFILE,                                                 
+                 BOOLEAN OVERWRITE OPTIONAL,                                    
+                 BOOLEAN KEEPSEQNO OPTIONAL,                                    
+                 STRING FKIND OPTIONAL,                                         
+                 INTEGER FBLOCKING OPTIONAL,                                    
+                 STRING FUNITS OPTIONAL,                                        
+                 INTEGER FAREA OPTIONAL,                                        
+                 STRING FRECS OPTIONAL,                                         
+                 STRING FTRUNCATE OPTIONAL,                                     
+                 BOOLEAN TRANSLATE OPTIONAL DEFAULT=TRUE,                       
+                 BOOLEAN TRIM OPTIONAL DEFAULT=TRUE);                           
+                                                                                
+STRING JOBNUM,JOBNAME,MFFILE,SCANCHAR,TEMP,TEMPPATH,AUTHSTRING,CMDSTR,          
+       TEXTOPTS,PARAMS,PARAMS4DISPLAY,AUTH4DISPLAY,MASKEDPASS;                  
+                                                                                
+SUBROUTINE DISPLAYIT(STRING INPUTSTR);                                          
+BEGIN                                                                           
+DISPLAY(INPUTSTR);                                                              
+GO FIN;                                                                         
+END DISPLAYIT;                                                                  
+                                                                                
+SUBROUTINE MASKIT(STRING PASS);                                                 
+BEGIN                                                                           
+STRING NEWPASS;                                                                 
+WHILE LENGTH(NEWPASS) LSS LENGTH(PASS) DO                                       
+   BEGIN                                                                        
+   NEWPASS := NEWPASS & "*";                                                    
+   END;                                                                         
+PASS := NEWPASS;                                                                
+END MASKIT;                                                                     
+                                                                                
+%Validate TYPE parameter input, quit if incorrect                               
+IF NOT (TYPE = "BINARY" OR                                                      
+        TYPE = "TEXT") THEN                                                     
+   DISPLAYIT("Invalid TYPE - must be TEXT or BINARY");                          
+                                                                                
+% Validate DIRECTION parameter input, quit if incorrect                         
+IF NOT (DIRECTION = "F" OR                                                      
+        DIRECTION = "T") THEN                                                   
+   DISPLAYIT("Invalid DIRECTION - must be F or T");                             
+                                                                                
+%Validate format of PATH parameter input, quit if incorrect                     
+TEMPPATH := PATH;                                                               
+IF TAKE(PATH,2) = "\\" THEN                                                     
+   IF NOT (DROP(TAKE(TEMPPATH,3),2)) = "\" THEN                                 
+   BEGIN                                                                        
+      WHILE LENGTH(TEMPPATH) GTR 0 DO                                           
+        BEGIN                                                                   
+           SCANCHAR := TAKE(TEMPPATH,1);                                        
+           IF SCANCHAR = "\" THEN                                               
+              TEMP := TEMP & SCANCHAR;                                          
+           TEMPPATH := DROP(TEMPPATH,1);                                        
+        END;                                                                    
+      IF NOT LENGTH(TEMP) GEQ 3 THEN                                            
+         DISPLAYIT("PATH should be in format \\SERVER\SHARE");                  
+   END;                                                                         
+   IF NOT (TAKE(PATH,2) = "\\") THEN                                            
+      DISPLAYIT("PATH should be in format \\SERVER\SHARE");                     
+                                                                                
+% Validate DOMAIN parameter input, quit if incorrect                            
+IF NOT (DOMAIN = "##REDACTED##" OR                                                
+        DOMAIN = "##REDACTED##") THEN                                            
+   DISPLAYIT("DOMAIN must be ##REDACTED##or ##REDACTED##");                       
+                                                                                
+%Set MFFILE content depending upon combination of TITLE/PACK/USER given         
+IF (LENGTH(MCPFILEUSER) = 0) AND (LENGTH(MCPFILEPACK) = 0) THEN                 
+        MFFILE := MCPFILETITLE;                                                 
+IF (LENGTH(MCPFILEUSER) = 0) AND (LENGTH(MCPFILEPACK) GTR 0) THEN               
+        MFFILE := MCPFILETITLE ON MCPFILEPACK;                                  
+IF (LENGTH(MCPFILEUSER) GTR 0) AND (LENGTH(MCPFILEPACK) = 0) THEN               
+        MFFILE := "(" & MCPFILEUSER & ")" & MCPFILETITLE;                       
+IF (LENGTH(MCPFILEUSER) GTR 0) AND (LENGTH(MCPFILEPACK) GTR 0) THEN             
+        MFFILE := "(" & MCPFILEUSER & ")" & MCPFILETITLE ON MCPFILEPACK;        
+                                                                                
+%Build authorisation string from params                                         
+AUTHSTRING := "[CREDENTIALS=" & PCUSERCODE & "/" & PCPASSWORD &                 
+              ",USERDOMAIN=" & DOMAIN & "]";                                    
+                                                                                
+%create masked version of password (all chars replaced by *)                    
+MASKEDPASS := PCPASSWORD;                                                       
+MASKIT(MASKEDPASS);                                                             
+                                                                                
+%build authorisation string for display with masked password                    
+AUTH4DISPLAY := "[CREDENTIALS=" & PCUSERCODE & "/" & MASKEDPASS &               
+              ",USERDOMAIN=" & DOMAIN & "]";                                    
+                                                                                
+%If OVERWRITE=TRUE, add REMOVE of PC file to start of command string            
+IF (OVERWRITE AND DIRECTION = "F") THEN                                         
+   CMDSTR := "REMOVE " & PCFILE & ";";                                          
+                                                                                
+%Validate optional params/build cmd string for TEXTDATATOPC transfers           
+IF (TYPE = "TEXT" AND DIRECTION = "F") THEN                                     
+   BEGIN                                                                        
+      CMDSTR := CMDSTR & "TEXTDATATOPC ";                                       
+      IF KEEPSEQNO THEN TEXTOPTS := TEXTOPTS &                                  
+         "SEQUENCENUMBERSONPC=TRUE";                                            
+      IF NOT TRIM THEN                                                          
+         IF LENGTH(TEXTOPTS) GTR 0 THEN                                         
+            TEXTOPTS := TEXTOPTS & ",TRIMBLANKS=FALSE";                         
+         ELSE                                                                   
+            TEXTOPTS := TEXTOPTS & "TRIMBLANKS=FALSE";                          
+   END;                                                                         
+                                                                                
+%Validate optional params/build cmd string for TEXTDATAFROMPC transfers         
+IF (TYPE = "TEXT" AND DIRECTION = "T") THEN                                     
+   BEGIN                                                                        
+      CMDSTR := CMDSTR & "TEXTDATAFROMPC ";                                     
+      IF KEEPSEQNO THEN TEXTOPTS := TEXTOPTS &                                  
+         "SEQUENCENUMBERSONPC=TRUE";                                            
+      IF LENGTH(FKIND) GTR 0 THEN                                               
+         IF LENGTH(TEXTOPTS) GTR 0 THEN                                         
+            TEXTOPTS := TEXTOPTS & ",FILEKIND=" & FKIND;                        
+         ELSE                                                                   
+            TEXTOPTS := TEXTOPTS & "FILEKIND=" & FKIND;                         
+      IF FBLOCKING GTR 0 THEN                                                   
+         IF LENGTH(TEXTOPTS) GTR 0 THEN                                         
+            TEXTOPTS := TEXTOPTS & ",BLOCKING=" & STRING(FBLOCKING,*);          
+         ELSE                                                                   
+            TEXTOPTS := TEXTOPTS & "BLOCKING=" & STRING(FBLOCKING,*);           
+      IF LENGTH(FUNITS) GTR 0 THEN                                              
+         BEGIN                                                                  
+            IF NOT (FUNITS = "CHARACTERS" OR FUNITS = "WORDS") THEN             
+               DISPLAYIT("FUNITS must be CHARACTERS or WORDS");                 
+            IF LENGTH(TEXTOPTS) GTR 0 THEN                                      
+               TEXTOPTS := TEXTOPTS & ",UNITS=" & FUNITS;                       
+            ELSE                                                                
+               TEXTOPTS := TEXTOPTS & "UNITS=" & FUNITS;                        
+         END;                                                                   
+      IF FAREA GTR 0 THEN                                                       
+         IF LENGTH(TEXTOPTS) GTR 0 THEN                                         
+            TEXTOPTS := TEXTOPTS & ",AREABYTES=" & STRING(FAREA,*);             
+         ELSE                                                                   
+            TEXTOPTS := TEXTOPTS & "AREABYTES=" & STRING(FAREA,*);              
+      IF LENGTH(FRECS) GTR 0 THEN                                               
+         BEGIN                                                                  
+            IF NOT (FRECS = "CRLF" OR FUNITS = "IMPLICIT") THEN                 
+               DISPLAYIT("FRECS must be CRLF or IMPLICIT");                     
+            IF LENGTH(TEXTOPTS) GTR 0 THEN                                      
+               TEXTOPTS := TEXTOPTS & ",RECORDS=" & FRECS;                      
+            ELSE                                                                
+               TEXTOPTS := TEXTOPTS & "RECORDS=" & FRECS;                       
+         END;                                                                   
+      IF LENGTH(FTRUNCATE) GTR 0 THEN                                           
+         BEGIN                                                                  
+            IF NOT (FTRUNCATE = "TRUNCATE" OR FTRUNCATE = "FOLD" OR             
+                    FTRUNCATE = "WRAP" OR FTRUNCATE = "ERROR") THEN             
+             DISPLAYIT("FTRUNCATE must be TRUNCATE,FOLD,WRAP or ERROR");        
+            IF LENGTH(TEXTOPTS) GTR 0 THEN                                      
+               TEXTOPTS := TEXTOPTS & ",OVERFLOW=" & FTRUNCATE;                 
+            ELSE                                                                
+               TEXTOPTS := TEXTOPTS & "OVERFLOW=" & FTRUNCATE;                  
+         END;                                                                   
+      IF NOT TRANSLATE THEN                                                     
+         IF LENGTH(TEXTOPTS) GTR 0 THEN                                         
+            TEXTOPTS := TEXTOPTS & ",TRANSLATE=FALSE";                          
+         ELSE                                                                   
+            TEXTOPTS := TEXTOPTS & "TRANSLATE=FALSE";                           
+   END;                                                                         
+                                                                                
+%Validate optional params/build cmd string for BINARYDATATOPC transfers         
+IF (TYPE = "BINARY" AND DIRECTION = "F") THEN                                   
+   BEGIN                                                                        
+      CMDSTR := CMDSTR & "BINARYDATATOPC ";                                     
+      IF KEEPSEQNO THEN TEXTOPTS := TEXTOPTS &                                  
+         "SEQUENCENUMBERSONPC=TRUE";                                            
+   END;                                                                         
+                                                                                
+%Validate optional params/build cmd string for BINARYDATAFROMPC xfers           
+IF (TYPE = "BINARY" AND DIRECTION = "T") THEN                                   
+   BEGIN                                                                        
+      CMDSTR := CMDSTR & "BINARYDATAFROMPC ";                                   
+      IF KEEPSEQNO THEN TEXTOPTS := TEXTOPTS &                                  
+         "SEQUENCENUMBERSONPC=TRUE";                                            
+   END;                                                                         
+                                                                                
+%Build param string for PCDRIVER running, including any text options            
+%Also build display version with password masked.                               
+IF (TYPE = "TEXT" AND LENGTH(TEXTOPTS) GTR 0) THEN                              
+   BEGIN                                                                        
+   PARAMS := PATH & AUTHSTRING & CMDSTR & "[" & TEXTOPTS & "]" &                
+             MFFILE & " " & PCFILE & ";";                                       
+   PARAMS4DISPLAY := PATH & AUTH4DISPLAY & CMDSTR & "[" & TEXTOPTS & "]"        
+             & MFFILE & " " & PCFILE & ";";                                     
+   END;                                                                         
+ELSE                                                                            
+   BEGIN                                                                        
+   PARAMS := PATH & AUTHSTRING & CMDSTR & MFFILE & " " & PCFILE & ";";          
+   PARAMS4DISPLAY := PATH & AUTH4DISPLAY & CMDSTR & MFFILE & " " &              
+                     PCFILE & ";";                                              
+   END;                                                                         
+ DISPLAY("PCDRIVER INPUT STRING: " & PARAMS4DISPLAY);                           
+RUN *SYSTEM/NXSERVICES/PCDRIVER(PARAMS);                                        
+                                                                                
+FIN:                                                                            
+END JOB                                                                         

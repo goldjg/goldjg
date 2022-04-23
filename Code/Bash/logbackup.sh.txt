@@ -1,0 +1,45 @@
+#!/bin/bash 
+# logbackup.sh bash script to zip up all vts logs modified more than 24 hours prior to runtime and transfer them off the server then tidy up the archive
+# version 01 - Initial Implementation    ##REDACTED## Graham Gold 13/07/11	
+# version 02 - Repoint FTP to ##REDACTED## Graham Gold 03/04/13
+# version 03 - Repoint FTP to ##REDACTED## ##REDACTED## 13/01/14
+
+#set error handling
+set -e
+
+#set home dir
+cd /home/bill
+
+#setup filename variable
+ZIPFN="$(hostname)_logs_$(date +%Y%m%d).zip"
+
+# create the archive using find to generate file list for zip command
+find /usr/local/tape/log -type f -name "*" -mtime +1 -print0 | xargs -0 zip $ZIPFN -q -@
+
+#set up variables for ftp
+HOST=##REDACTED##
+#lookup the ip address of the hostname using dig command because 
+# ftp itself takes 15 seconds or so to do the lookup?!?!
+# pass dig output to grep, pass only lines with IN to awk and print the 5th 
+# field of both line, then grep that output to show only the line beginning 
+# with a number (phew!)
+IP=$(dig $HOST|grep "IN"|awk '{print $5}'|grep ^[0-9])
+USER=##REDACTED##
+PASS=##REDACTED## 
+
+# issue FTP ftp command with the -inv switches.  -i turns off interactive prompting. -n Restrains FTP from attempting the auto-login feature. -v enables verbose and progress.  
+ftp -inv $IP << EOF 
+user $USER $PASS 
+bin
+cd /VTS_IN
+put $ZIPFN
+quit 
+EOF
+
+### Find out if ftp backup failed or not ###
+if [ "$?" = 0 ]; then
+ echo "$(date +%Y%m%d_%H%M%S): $(hostname) backup successful, $ZIPFN transferred and local copy removed." >> logbackup.log
+ rm -f $ZIPFN
+else
+ echo "$(date +%Y%m%d_%H%M%S): $(hostname) backup failed, $ZIPFN not transferred  due to FTP Error $?  - file not removed." >> logbackup.log
+fi

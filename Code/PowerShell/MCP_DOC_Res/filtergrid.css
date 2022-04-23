@@ -1,0 +1,54 @@
+/*====================================================
+	- HTML Table Filter Generator v1.6 
+	elements and classes
+	- edit classes below to change filter grid style
+=====================================================*/
+
+.fltrow{ /* filter grid row appearance */
+	height:30px;
+	background-color:#A991C7;
+}
+.btnflt{ /* button appearance */
+	font-size:14px;
+	margin:0 1px 0 1px; padding:0 1px 0 1px; 
+	text-decoration:none;text-align:center;color:#3AB54C;
+	background-color:#E8E8E8;
+}
+.flt{ /* filter (input) appearance */
+	background-color:#f4f4f4; border:1px inset #ccc; 
+	margin:0; width:100%;
+}
+.flt_s{ /* small filter (input) appearance */
+	background-color:#A991C7; border:1px inset #ccc; 
+	margin:0; width:80%;
+}
+.inf{ /* div containing left, middle and right divs */
+	clear:both; width:80%; height:20px; 
+	background:#4C2180; font-size:14px;color:#FFFFFF; 
+	margin:0; padding:1px 1px 1px 1px; 
+	border:1px solid #ccc;
+}
+.ldiv{ /* left div */
+	float:left; width:30%; position:inherit; 
+}
+.mdiv{ /* middle div */
+	float:left; width:30%; position:inherit; text-align:center; 
+}
+.rdiv{ /* right div */
+	float:right; width:30%; position:inherit; text-align:right; 
+}
+.loader{ /* loader appearance */
+	position:absolute; padding: 15px 0 15px 0;
+	margin-top:7%; width:200px; left:40%; 
+	z-index:1000; font-size:14px; font-weight:bold;
+	border:1px solid #666; background:#A991C7; 
+	text-align:center; vertical-align:middle;
+}
+div.mdiv select{ height:20px; }/*paging drop-down list*/
+div.inf a{ color:#FF0303; }/*link appearence in .inf div*/
+div.inf a:visited{ color:#FF0303; }/*link appearence in .inf div*/
+div.inf a:hover{ text-decoration:none;color:#FF0303 }/*link appearence in .inf div*/
+.tot{ font-weight:bold; }/*rows counter*/
+.even{ background-color:#fff; }/*row bg alternating color*/
+.odd{ background-color:#f4f4f4; }/*row bg alternating color*/
+

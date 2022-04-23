@@ -1,0 +1,59 @@
+<html>
+
+<head>
+<title>NX/WebStation for Java</title>
+</head>
+
+<body BGCOLOR="#000000" topmargin="0">
+
+<p><br>
+<applet code="Station.class" name="Station"
+archive="stationSigned.jar"
+width="850" height="1000">
+  <param name="RegularTextColor" value="white">
+  <param name="ReverseTextColor" value="red">
+  <param name="BlinkTextColor" value="red">
+  <param name="ReverseBlinkColor" value="red">
+  <param name="UnderlineTextColor" value="white">
+  <param name="BrightTextColor" value="white">
+  <param name="BrightTextStyle" value="italic">
+  <param name="ControlTextFontFace" value="Dialog">
+  <param name="ControlTextSize" value="12">
+  <param name="ControlForegroundColor" value="black">
+  <param name="ControlBackgroundColor" value="white">
+  <param name="BackgroundColor" value="black">
+  <param name="BackgroundImage" value="conf.gif">
+  <param name="BackgroundImageAlignment" value="centered">
+  <param name="Port" value="23">
+  <param name="NumberOfPages" value="5">
+  <PARAM NAME="AltDelimeter" VALUE="true">
+	<PARAM NAME="AltRS" VALUE="]">
+	<PARAM NAME="AltUS" VALUE="[">
+<param name="Server" value="SERVERNAME">
+<!param name=InitialWindow value=MARC>
+<param name=cabbase value="stationsigned.cab">
+<!param name=CheckBoxCheckedChar value="X">
+<!param name=CheckBoxUncheckedChar value=" ">
+<param name=RegularTextSize value=16>
+<!param name=UnderlineTextStyle value="plain">
+<!param name=InitialDataMsg value="">
+<!param name=KeyboardCRCausesLF value=false>
+<!param name=DC1Function value="StayInRcv">
+<!param name=DC2Function value="TogglesForms">
+<!param name=CRInterpretation value="CRLF">
+<!param name=LFInterpretation value="LF">
+<!param name=SOHClearsScreen value=false>
+<!param name=SOHExitsForms value=true>
+<!param name=LinesPerPage value=24>
+<!param name=CharsPerLine value=80>
+<!param name=MaxOutput value=3000>
+<!param name=MaxInput value=3000>
+<!param name=LineAtATimeXmit value=false>
+<!param name=MobileHomeEnabled value=true>
+<!param name=SpcfyKeySendsHex value=false>
+<!param name=ControlCharacter value="?">
+<!param name=Trace value=false>
+</applet>
+</p>
+</body>
+</html>

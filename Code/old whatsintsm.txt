@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Version 01 - ##REDACTED## - initial imp as part of ##REDACTED## May 08.  ##REDACTED##
+#
+cd /opt/tivoli/tsm/client/ba/bin
+#
+sudo ./dsmc query archive "/VAULT10/510100_V10/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT11/510200_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT12/510300_V12/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT13/510400_V13/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/510500_V14/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT10/510600_V10/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT11/510700_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT12/510800_V12/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT13/510900_V13/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/511000_V14/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT10/511100_V10/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT11/511200_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT12/511300_V12/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT13/511400_V13/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/511500_V14/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT10/520100_V10/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT11/520200_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT12/520300_V12/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT13/520400_V13/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/520500_V14/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT10/520600_V10/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT10/530100_V10/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT11/530200_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT12/530300_V12/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT13/530400_V13/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/530500_V14/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT11/540100_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/540200_V14/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT10/540300_V10/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT14/540400_V14/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT11/550100_V11/*" -optfile=dsm.opt
+sudo ./dsmc query archive "/VAULT12/550200_V12/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT14/560100_V14/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT13/570100_V13/*" -optfile=dsm.opt
+#
+sudo ./dsmc query archive "/VAULT12/580100_V12/*" -optfile=dsm.opt

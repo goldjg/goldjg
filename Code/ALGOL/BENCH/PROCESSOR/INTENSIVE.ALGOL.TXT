@@ -1,0 +1,96 @@
+ $ SET LISTDOLLAR  LIST ERRLIST LINEINFO STACK NOXREFLIST               
+PROCEDURE INTENSIVE(HOWLONG,CPURETURN);                                 
+INTEGER HOWLONG;                                                        
+REAL CPURETURN;                                                         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% THIS PROGRAM CAUSES HIGH PROCESSOR UTILIZATION FOR HOWLONG SECS.      
+%                                                                       
+% N.B. THIS PROGRAM CAUSES SERIOUS SYSTEM DEGRADATION.                  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+BEGIN                                                                   
+   DEFINE TICKS = 2.4@-6 #;                                             
+                                                                        
+   TASK PROCTASK;                                                       
+   EVENT START,STOP;                 % Events to start and stop calcs   
+   INTEGER LOOP;                     % Counts calculation loops         
+   REAL PTSTART,PTSTOP;              % Processor time counters          
+   EBCDIC ARRAY TASK_NAME[0:47];     % Holds the name of the process    
+                                                                        
+PROCEDURE CALCULATIONS(START,STOP);                                     
+  % Procedure to be processed of to perform calculations                
+EVENT START,STOP;                                                       
+BEGIN                                                                   
+   REAL ETSTART,ETSTOP,IOSTART,IOSTOP,A,B,C,TIME7;                      
+   EBCDIC ARRAY OUTARRAY[0:131];                                        
+   FILE REPORT(KIND=PRINTER);                                           
+                                                                        
+   DEFINE                                                               
+      SAY = REPLACE OUTARRAY[0] BY#,                                    
+      CLEAROUTARRAY = REPLACE OUTARRAY[0] BY " " FOR 132#;              
+                                                                        
+   A := 10000000;                    % Initialise calculation variables 
+   B := 65000;                                                          
+   C := 3450;                                                           
+   WAIT(START);                      % Wait for start event             
+   ETSTART := TIME(14);              % Note initial times               
+   IOSTART := TIME(13);                                                 
+   PTSTART := TIME(12);                                                 
+   WHILE NOT HAPPENED(STOP) DO       % Perform calculations until stop  
+   BEGIN                             % event                            
+ $ SET CODE                                                             
+      A := A / MAX((B * C),250);                                        
+      B := SCALERIGHT(A,5);                                             
+      C := SCALELEFT(B,5);                                              
+      A := A * 100000.4567;                                             
+      LOOP := * + 1                  % Note the number of calc loops    
+ $ RESET CODE                                                           
+   END;                                                                 
+   PTSTOP := TIME(12);               % Note the final times             
+   IOSTOP := TIME(13);                                                  
+   ETSTOP := TIME(14);                                                  
+   CLEAROUTARRAY;                    % Write the results to a report    
+   SAY "=== P R O C E S S O R  I N T E N S I V E ==="," " FOR 10,       
+       "[ON ",MYSELF.HOSTNAME,"]";                                      
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   TIME7 := TIME(7);                                                    
+   SAY STRING(TIME7.[23:6],*),":",STRING(TIME7.[17:6],*),":",           
+       STRING(TIME7.[11:6],*),"    ",                                   
+       STRING(TIME7.[29:6],*),"/",STRING(TIME7.[35:6],*),"/",           
+       DROP(STRING(TIME7.[47:12],*),2);                                 
+   WRITE(REPORT[SPACE 4],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "ELAPSED TIME     = ",                                           
+        STRING((ETSTOP-ETSTART) * TICKS,*)," SECONDS";                  
+   WRITE(REPORT[SPACE 2 ],132,OUTARRAY[0]);                             
+   CLEAROUTARRAY;                                                       
+   SAY "PROCESSOR TIME   = ",                                           
+        STRING((ETSTOP-ETSTART) * TICKS,*)," SECONDS";                  
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "I/O TIME         = ",                                           
+        STRING((IOSTOP-IOSTART) * TICKS,*)," SECONDS";                  
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   CLEAROUTARRAY;                                                       
+   SAY "PERFORMED ",STRING(LOOP,*)," CALCULATIONS";                     
+   WRITE(REPORT[SPACE 2],132,OUTARRAY[0]);                              
+   LOCK(REPORT);                                                        
+END;                                                                    
+                                     % Set task name                    
+   REPLACE TASK_NAME BY "BENCH/PROCESSOR/INTENSIVE.";                   
+   REPLACE PROCTASK.NAME BY TASK_NAME;                                  
+   PROCTASK.OPTIONS := MYSELF.OPTIONS;                                  
+                                     % Process off calculation process  
+   PROCESS CALCULATIONS(START,STOP)[PROCTASK];                          
+                                     % Wait until process has started   
+   WHILE PROCTASK.STATUS < 0 DO WAITANDRESET(MYSELF.EXCEPTIONEVENT);    
+   CAUSE(START);                     % Start calculations               
+   WHEN(HOWLONG);                    % Wait for specified time          
+   CAUSE(STOP);                      % Stop calculations                
+                                                                        
+                                     % Wait until process has stopped   
+   WHILE PROCTASK.STATUS > 0 DO WAITANDRESET(MYSELF.EXCEPTIONEVENT);    
+                                                                        
+                                     % Return comparison figure         
+   CPURETURN:=(LOOP*6)/((PTSTOP-PTSTART)*TICKS);                        
+END.                                                                    

@@ -1,0 +1,12 @@
+ TT DEFINE + SITUATION CHECK_ODTSTATUS(PER=SC):                                 
+                                                                                
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+%%      SITUATION TO CHECK STATUS OF ODT'S(SC'S) AND RUN             %%         
+%%      CHECK_ODTSTATUS ODT SEQUENCE WHEN LIVE ODT'S                 %%         
+%%      (##REDACTED##) ARE NOT SCRATCH.                               %%         
+%%                                                                   %%         
+%%      VERSION 01 - - INITIAL IMPLEMENTATION  MAR '05 GXG  %%         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+UNITNO={123,456,789} AND (NOT SCRATCH OR SAVED)                                 
+\                                                                               

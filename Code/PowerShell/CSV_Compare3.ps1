@@ -1,0 +1,125 @@
+$RecordsDeleted = @{}; $RecordsAdded = @{}
+$csv1 = Import-csv .\IBM_Relationships.csv
+$csv2 = Import-csv .\GG2.CSV
+$flds = ($csv1[0].psobject.properties | %{$_.Name} )
+$flds2 = ($csv2[0].psobject.properties | %{$_.Name} )
+
+$Key = $flds[0]
+
+$NewFields = Compare-Object $flds $flds2 -passthru | Where-Object {$_.SideIndicator -eq "=>"}
+$NumNewFields = $NewFields | Measure-Object | Select -Expand Count
+
+$DelFields = Compare-Object $flds $flds2 -passthru | Where-Object {$_.SideIndicator -eq "<="}
+$NumDelFields = $DelFields | Measure-Object | Select -Expand Count
+
+# First, compare the data only comparing key fields, noting records that only 
+# appear in the first file (aka deleted) or only in file 2 (added).
+Compare-Object $csv1 $csv2 -Property $Key -PassThru | %{
+    $item = $_ 
+    # save the current record in $item as the switch command will overwrite $_   
+    # The SideIndicator tells us whether these records are added or missing.
+    switch ($_.SideIndicator) {
+        '<=' { # These records are missing - save the keys values for comparison later
+            $RecordsDeleted[ $item.id ] = 1
+            break
+        }        
+        '=>' {  # These records have been added - save the keys values for comparison later
+            $RecordsAdded[ $item.id ] = 1
+            break
+        }
+    }
+}
+        
+# Next, define a calculated property that is used in the next Compare test to 
+# note whether a record has been Added, Deleted or has a difference.  If the data is only 
+# found in one file (i.e. the key is only in one file) it's reported as a Deleted or Added 
+# record, respectively.  However, if the key is in both but noted as a difference record,
+# we identify it as such.
+
+$CompResult = @{
+    Label="Reconciliation_Result";  
+    Expression={ $item = $_
+            Switch ($_.SideIndicator) {
+            '<=' { if ( $RecordsDeleted.ContainsKey( $item.$Key ) ) {
+                    "Deleted" # Return "Deleted" as the compare result                        
+                 } else {
+                    "Changed/Baseline"
+                 }
+              }                 
+             '=>' { if ( $RecordsAdded.ContainsKey( $item.$Key ) ) {
+                    "Added"   # Compare result is "Added"
+                 } else {
+                    "Changed/Current"
+                 }
+              }
+           }
+        }
+     }
+
+$RsltGrid = Compare-Object $csv1 $csv2 -Property $flds -PassThru |
+Sort-Object -Property @{ Expression = {$_.$Key + $_.SideIndicator }} |                  
+Select-Object -Property $CompResult,*   
+ 
+$RsltGrid | Select * -ExcludeProperty SideIndicator | Export-CSV -notype .\Compare.CSV
+
+$Deleted = $RsltGrid | Where-Object { $_.Reconciliation_Result -Match "Deleted" } | Measure-Object | Select -Expand Count
+$Added = $RsltGrid | Where-Object { $_.Reconciliation_Result -Match "Added" } | Measure-Object | Select -Expand Count
+$Changed = $RsltGrid | Where-Object { $_.Reconciliation_Result -Match "Changed/Baseline" } | Measure-Object | Select -Expand Count
+$BaseTotal = $csv1 | Select -Property $Key | Measure-Object | Select -Expand Count
+$NewTotal = $csv2 | Select -Property $Key | Measure-Object | Select -Expand Count
+
+$Report = ("<H2>CMDB Reconciliation Report</H2>" + 
+           ($BaseTotal -as [string]) + "`tCIs in Baseline<BR>" +
+           ($NewTotal -as [string]) + "`tCIs in database extract<BR><BR>" +
+           ($Added -as [string]) + "`tCIs added since last baseline taken<BR>" +
+           ($Deleted -as [string]) + "`tCIs deleted since last baseline taken<BR>" +
+           ($Changed -as [string]) + "`tCIs amended since last baseline taken<BR><BR>")
+
+If ($NumNewFields -gt 0) {
+    $warning = ('<font color="red" <B>' + ($NumNewFields -as [string]) + "`tAttribute(s) added to DB query since last baseline taken.<BR>" + 
+                 "Please re-baseline to ensure accurate reconciliation.<BR>" + 
+                 "New attributes are :<BR>" + ($NewFields|out-string) + "</B></font><BR><BR>")}
+                 
+If ($NumDelFields -gt 0) {
+    $Warning =  ('<font color="red" <B>' + ($NumDelFields -as [string]) + "`tAttribute(s) removed from DB query since last baseline taken.<BR>" + 
+                 "Please re-baseline to ensure accurate reconciliation.<BR>" + 
+                 "Deleted attributes are :<BR>" + ($DelFields|out-string) + "<B></font><BR><BR>")}
+
+$head = "<style>"
+$head = $head + "TABLE{border-width: 1px;border-style: solid;border-color: black;border-collapse: collapse;}"
+$head = $head + "TH{border-width: 1px;padding: 5px;border-style: solid;border-color: black;background-color:PaleGoldenrod}"
+$head = $head + "TD{border-width: 1px;padding: 5px;border-style: solid;border-color: black}"
+$head = $head + "</style>"
+
+If (($Deleted -gt 0) -or ($Added -gt 0) -or ($Changed -gt 0)) { 
+    $RsltGrid | Select * -ExcludeProperty SideIndicator | 
+    ConvertTo-HTML -title "Reconciliation Report" -head $head -body ('<font face="Calibri">' + $Report + $Warning) -post ('
+    <B><P>Generated by <font color="Light Blue">CMDB_Tools</font> on <font color="Purple">' + (hostname) + "</font> - 
+    " + (get-date -uformat %c) + "</P></B><BR></font>") > Reconcile.htm
+    } else {
+    ConvertTo-HTML -title "Reconciliation Report" -head $head -body ('<font face="Calibri">' + $Report + $Warning) -post ('
+    <B><P>Generated by <font color="Light Blue">CMDB_Tools</font> on <font color="Purple">' + (hostname) + "</font> - 
+    " + (get-date -uformat %c) + "</P></B><BR></font>") > Reconcile.htm
+    }    
+
+$body = “Reconcile.htm”
+$attname = "Compare.CSV"
+
+#Invoke-Item $Body
+
+#Send-MailMessage -To "##REDACTED##" -Subject "Reconciliation Report" -Body (gc $body|out-string) -SmtpServer "##REDACTED##" -From "CMDB_Tools@domain" -BodyAsHtml -Encoding ([System.Text.Encoding]::ASCII)
+        
+$smtpServer = “smtp.pru.local”
+
+$msg = new-object Net.Mail.MailMessage
+$att = new-object Net.Mail.Attachment($attname)
+$smtp = new-object Net.Mail.SmtpClient($smtpServer)
+
+$msg.From = “CMDB_Tools@domain”
+$msg.To.Add(”##REDACTED##”)
+$msg.Subject = “Reconciliation Report”
+$msg.IsBodyHTML = $True
+$msg.Body = (gc $body|out-string)
+$msg.Attachments.Add($att)
+
+$smtp.Send($msg)

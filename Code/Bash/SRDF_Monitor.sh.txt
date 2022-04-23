@@ -1,0 +1,129 @@
+#!bin/bash
+#
+# -------------------
+# |unisys_monitor.sh|
+# -------------------
+#
+# Health check script to monitor and report on the health of the EMC VMAX and # the Unisys SRDF groups' replication status & email the status to ##REDACTED## and ##REDACTED##.
+#
+# Version 01 - ##REDACTED## - Initial Implementation             01 May 2019 GXG
+
+# set error handling
+#set -e
+
+#setup variables
+basepath="/opt/salasemc"
+scriptpath="/opt/salasemc/scripts"
+PROD_map="_config_Prod_Unisys_VMAX.map"
+DEV_map="_config_Prod_Unisys_VMAX.map"
+drPROD_map="_config_DR_Prod_Unisys_VMAX.map"
+drDEV_map="_config_DR_Dev_Unisys_VMAX.map"
+dc1_sid="##REDACTED##"
+dc3_sid="##REDACTED##"
+
+#Find out where we are running
+HN=`echo $(hostname) | awk -F'.' '{print $1}'`
+
+#Find out what our local array is
+local_sid=`symcfg list|grep Local | awk '{print $1}'` remote_sid=`symcfg list|grep Remote | awk '{print $1}'`
+
+if [ $local_sid == $dc1_sid ]; then
+ location='DC1'
+else
+ location='DC3'
+fi
+
+echo "Script is running on server $HN in $location."
+echo "Local Array ID: $local_sid"
+echo "Remote Array ID: $remote_sid" 
+
+#Set SRDF mapping direction for commands if [ $location == 'DC1' ]; then  direction='RDC1TO3'
+else
+ direction='RDC3TO1'
+fi
+
+echo "Mapping Direction: $direction" 
+
+#Check SRDF Replication State
+echo "Checking PROD Replication Status"
+PROD_REP_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${PROD_map} -rdfg # verify -synchronized) PROD_REP_STATE=$?
+echo $PROD_REP_STATE
+echo "Checking DEV Replication Status"
+DEV_REP_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${DEV_map} -rdfg # verify -synchronized) DEV_REP_STATE=$?
+echo $DEV_REP_STATE
+echo "Checking DRPROD Replication Status"
+DRPROD_REP_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${drPROD_map} -rdfg # verify -synchronized) DRPROD_REP_STATE=$?
+echo $DRPROD_REP_STATE
+echo "Checking DRDEV Replication Status"
+DRDEV_REP_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${drDEV_map} -rdfg # verify -synchronized) DRDEV_REP_STATE=$?
+echo $DRDEV_REP_STATE
+
+#Check SRDF Sync Mode
+echo "Checking PROD SRDF Sync Mode"
+PROD_SYNC_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${PROD_map} -rdfg # verify -synchronous) PROD_SYNC_STATE=$?
+echo $PROD_SYNC_STATE
+echo "Checking DEV SRDF Sync Mode"
+DEV_SYNC_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${DEV_map} -rdfg # verify -synchronous) DEV_SYNC_STATE=$?
+echo $DEV_SYNC_STATE
+echo "Checking DRPROD SRDF Sync Mode"
+DRPROD_SYNC_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${drPROD_map} -rdfg # verify -synchronous) DRPROD_SYNC_STATE=$?
+echo $DRPROD_SYNC_STATE
+echo "Checking DRDEV SRDF Sync Mode"
+DRDEV_SYNC_SRDF=$(symrdf -sid ${local_sid} -f ${basepath}/${direction}${drDEV_map} -rdfg # verify -synchronous) DRDEV_SYNC_STATE=$?
+echo $DRPROD_SYNC_STATE
+
+#Check SRDF Links
+echo "Checking SRDF Replication Link Status"
+SRDF_LINK_STATE=$(symsan list -sid ${local_sid} -sanrdf -dir ALL) echo "${SRDF_LINK_STATE}"
+echo "processing response..."
+DIR_8F_STATE=`echo ${SRDF_LINK_STATE}|grep '8F'|awk '{print $2}'|cut -c 2` PORT_8F_STATE=`echo ${SRDF_LINK_STATE}|grep '8F'|awk '{print $3}'` LINK_8F_STATE=`echo ${SRDF_LINK_STATE}|grep '8F'|awk '{print $4}'` DIR_9F_STATE=`echo ${SRDF_LINK_STATE}|grep '9F'|awk '{print $2}'|cut -c 2` PORT_9F_STATE=`echo ${SRDF_LINK_STATE}|grep '9F'|awk '{print $3}'` LINK_9F_STATE=`echo ${SRDF_LINK_STATE}|grep '9F'|awk '{print $4}'`
+
+#Base information gathered - now to evaluate overall state let "SRDF_REP_STATE = $PROD_REP_STATE + $DEV_REP_STATE + $DRPROD_REP_STATE + $DRDEV_REP_STATE"
+echo "Overall Replication State = ${SRDF_REP_STATE}"
+if [ $SRDF_REP_STATE == 0 ]; then
+  echo "All Hosts : Replication in Sync"
+else
+  if [ $PROD_REP_STATE != 0 ]; then
+    echo -e "PROD STATUS\n============${PROD_REP_SRDF}\n"
+  fi
+  if [ $DEV_REP_STATE != 0 ]; then
+    echo -e "DEV STATUS\n===========${DEV_REP_SRDF}\n"
+  fi
+  if [ $DRPROD_REP_STATE != 0 ]; then
+    echo -e "DRPROD STATUS\n==============${DRPROD_REP_SRDF}\n"
+  fi
+  if [ $DRDEV_REP_STATE != 0 ]; then
+    echo -e "DRDEV STATUS\n=============${DRDEV_REP_SRDF}\n"
+  fi
+fi
+
+let "SRDF_SYNC_STATE = $PROD_SYNC_STATE + $DEV_SYNC_STATE + $DRPROD_SYNC_STATE + $DRDEV_SYNC_STATE"
+echo "Overall Replication Sync Mode State = ${SRDF_SYNC_STATE}"
+if [ $SRDF_SYNC_STATE == 0 ]; then
+  echo "All Hosts : Replication Mode - Synchronous"
+else
+  if [ $PROD_SYNC_STATE != 0 ]; then
+    echo -e "PROD STATUS\n============${PROD_SYNC_SRDF}\n"
+  fi
+  if [ $DEV_SYNC_STATE != 0 ]; then
+    echo -e "DEV STATUS\n===========${DEV_SYNC_SRDF}\n"
+  fi
+  if [ $DRPROD_SYNC_STATE != 0 ]; then
+    echo -e "DRPROD STATUS\n==============${DRPROD_SYNC_SRDF}\n"
+  fi
+  if [ $DRDEV_SYNC_STATE != 0 ]; then
+    echo -e "DRDEV STATUS\n=============${DRDEV_SYNC_SRDF}\n"
+  fi
+fi
+
+
+
+
+
+
+
+
+
+
+
+

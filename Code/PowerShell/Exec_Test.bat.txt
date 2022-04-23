@@ -1,0 +1,11 @@
+echo "*** Running Email Extract Script ***"
+
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '##REDACTED##.ps1'"
+
+echo "*** Running HTML to Excel Conversion and prefill script ***"
+
+PowerShell -NoProfile -ExecutionPolicy Bypass -Command "& '\##REDACTED##.ps1'"
+
+echo "*** All done! ***"
+
+pause

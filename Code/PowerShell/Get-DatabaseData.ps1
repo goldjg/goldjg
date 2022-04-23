@@ -1,0 +1,1 @@
+Get-DatabaseData -verbose -connectionString "Server=srv\instance,port; Database=name; UID=user; PWD=pass" -isSQLServer -queryfile \\##REDACTED##\"Test.sql"

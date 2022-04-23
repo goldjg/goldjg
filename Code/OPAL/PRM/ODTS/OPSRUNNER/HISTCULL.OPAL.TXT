@@ -1,0 +1,325 @@
+TT DEFINE + ODTS OPS_RUNNER_CULL(MSG):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_RUNNER_HIST ODTSEQUENCE TO ANALYSE OPSRUNNER HISTORY FILE AND        %%  
+%% REPORT ON FILES COPIED MORE THAN x DAYS AGO AND OPTIONALLY DUMP TO TAPE  %%  
+%% THEN REMOVE IF STILL RESIDENT.                                           %%  
+%%                                                                          %%  
+%% MUST RUN UNDER ##REDACTED##.                                               %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION                  JAN '10 GXG  %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+                                                                                
+%% CHECK PARAM WAS SUPPLIED, QUIT IF NOT                                        
+IF TEXT = EMPTY THEN                                                            
+   BEGIN                                                                        
+   SHOW ("Parameters Required");                                                
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% PARSE PARAMS                                                                 
+$PARAMS:=UPPER(TRIM(TEXT));                                                     
+                                                                                
+%% COUNT COMMAS/PARAMS                                                          
+$TMP:=$PARAMS;                                                                  
+WHILE $TMP2:=$TMP.SPLIT(",") NEQ EMPTY DO                                       
+      #NUMPARAM:=#NUMPARAM+1;                                                   
+                                                                                
+%#NUMPARAM:=#NUMPARAM + 1;                                                      
+                                                                                
+IF #NUMPARAM LSS 2 THEN                                                         
+   BEGIN                                                                        
+   SHOW ("Only 1 parameter supplied, 2 are required");                          
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+IF #NUMPARAM GTR 2 THEN                                                         
+   BEGIN                                                                        
+   SHOW ("More than 2 parameters supplied, only two are required");             
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+$RUNTYPE:=$PARAMS.SPLIT(",");                                                   
+#AGE_DAYS:=DECIMAL($PARAMS);                                                    
+                                                                                
+%%GET LOG FAMILY                                                                
+$LOGFAM:=DLLOG;                                                                 
+                                                                                
+%%GET BACKUP FAMILY                                                             
+$BACKUP:=DLBACKUP;                                                              
+%%SETUP AUDIT FILE TITLE                                                        
+$AUDTITLE:=#("*CULL/AUDIT/",TIMEDATE(YYYYMMDDHHMMSS),,             
+   "ON",,$BACKUP);                                                              
+$AUDLOG:=#("TITLE=",$AUDTITLE,", FILEKIND=SEQDATA,FILESTRUCTURE=STREAM");       
+                                                                                
+                                                                                
+IF NOT ($RUNTYPE NISI {"PRINTONLY","UPDATE"}) THEN                              
+   BEGIN                                                                        
+   SHOW ("Invalid report type");                                                
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+IF #AGE_DAYS LEQ 7 THEN                                                         
+   BEGIN                                                                        
+   SHOW (#("Invalid age specification (",#AGE_DAYS,") - must be > 7"));         
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+$STATUS:=(#("Report Type = ",$RUNTYPE));                                        
+DISPLAY($STATUS);                                                               
+$WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));                  
+                                                                                
+$STATUS:=(#("Age Days = ",#AGE_DAYS));                                          
+DISPLAY($STATUS);                                                               
+$WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));                  
+                                                                                
+$STATUS:=(#("Analyzing files copied more than ",#AGE_DAYS," days ago"));        
+DISPLAY($STATUS);                                                               
+$WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));                  
+                                                                                
+%% SETUP HISTFILES                                                              
+$HISTFILE:=#("*OPSRUNNER/HISTORY",,"ON",,$LOGFAM);                              
+$HISTBACKUP:=#("*OPSRUNNER/HISTORY/OLD",,"ON",,$LOGFAM);                        
+$HISTNEW:=#("*OPSRUNNER/HISTORY/NEW",,"ON",,$LOGFAM);                           
+                                                                                
+%% CHECK THAT HISTFILE IS RESIDENT, QUIT IF NOT                                 
+IF NOT $HISTFILE.PD(RESIDENT) THEN                                              
+   BEGIN                                                                        
+   $STATUS:=(#("Opsrunner history file not found, quitting"));                  
+   DISPLAY($STATUS);                                                            
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));               
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% REMOVE REPORT FILES FROM PREVIOUS RUNS                                       
+$STATUS:=(#("Removing report files from previous runs"));                       
+DISPLAY($STATUS);                                                               
+$WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));                  
+                                                                                
+#TIDYUP1:=WFL("REMOVE *OPSRUNNER/REPORT/= FROM "&$LOGFAM,"OPSCULL_TIDYUP1");    
+IF #TIDYUP1 > 0 THEN                                                            
+   BEGIN                                                                        
+   ON JOBMESSAGE DO                                                             
+      BEGIN                                                                     
+      IF JOBMSGTYPE = WFLMSG THEN                                               
+         BEGIN                                                                  
+         $STATUS:=(JOBTEXT);                                                    
+         DISPLAY($STATUS);                                                      
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));         
+         END;                                                                   
+      END;                                                                      
+   END;                                                                         
+                                                                                
+If #TIDYUP1 < 0 Then                                                            
+Begin                                                                           
+   Case Abs(#TIDYUP1) Of                                                        
+   Begin                                                                        
+      1:$Err:="BADWFL:Various; particularly START of illegal file";             
+      2:$Err:="NOFILE:START of non-resident JOBSYMABOL file";                   
+      3:$Err:="NOTIMP: Not available on pre-48.1 MCP";                          
+      4:$Err:="NOENTP: Missing MAGUS support";                                  
+      5:$Err:="PRGFLT: Internal Metalogic fault";                               
+      6:$Err:="BADFOR: Bad FOR modifier (usercode/accesscode/charge)";          
+      7:$Err:="EMPTYID: User supplied an empty id string parameter";            
+      8:$Err:="DUPID: Id parameter already being used";                         
+      9:$Err:="LONGID: Id parameter exceeds 17 characters";                     
+   Else:$Err:=#("Unknown Error ",#Rem)                                          
+   End;                                                                         
+END;                                                                            
+                                                                                
+#TIDYUP2:=WFL("REMOVE *OPSRUNNER/HISTORY/NEW FROM "&$LOGFAM,"OPSCULL_TIDYUP2"); 
+IF #TIDYUP2 > 0 THEN                                                            
+   BEGIN                                                                        
+   ON JOBMESSAGE DO                                                             
+      BEGIN                                                                     
+      IF JOBMSGTYPE = WFLMSG THEN                                               
+         BEGIN                                                                  
+         $STATUS:=(JOBTEXT);                                                    
+         DISPLAY($STATUS);                                                      
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));         
+         END;                                                                   
+      END;                                                                      
+   END;                                                                         
+                                                                                
+If #TIDYUP2 < 0 Then                                                            
+Begin                                                                           
+   Case Abs(#TIDYUP2) Of                                                        
+   Begin                                                                        
+      1:$Err:="BADWFL:Various; particularly START of illegal file";             
+      2:$Err:="NOFILE:START of non-resident JOBSYMABOL file";                   
+      3:$Err:="NOTIMP: Not available on pre-48.1 MCP";                          
+      4:$Err:="NOENTP: Missing MAGUS support";                                  
+      5:$Err:="PRGFLT: Internal Metalogic fault";                               
+      6:$Err:="BADFOR: Bad FOR modifier (usercode/accesscode/charge)";          
+      7:$Err:="EMPTYID: User supplied an empty id string parameter";            
+      8:$Err:="DUPID: Id parameter already being used";                         
+      9:$Err:="LONGID: Id parameter exceeds 17 characters";                     
+   Else:$Err:=#("Unknown Error ",#Rem)                                          
+   End;                                                                         
+END;                                                                            
+                                                                                
+                                                                                
+%% READ HISTORY FILE INTO $PG VARIABLE                                          
+$PG:=$$HISTFILE.READ(NOSEQ);                                                    
+                                                                                
+%% PARSE EACH LINE AND PUT MATCHING FILES IN NEW VARIABLE(S)                    
+                                                                                
+WHILE $Z:=$PG.SPLIT(/) NEQ EMPTY DO                                             
+   BEGIN                                                                        
+   $FILEDATE:=$Z.COPY(1);                                                       
+   $YYYY:=$FILEDATE.SPLIT(4);                                                   
+   $MM:=$FILEDATE.SPLIT(2);                                                     
+   $DD:=$FILEDATE.SPLIT(2);                                                     
+   #JDATE:=JULIAN($DD&"/"&$MM&"/"&$YYYY);                                       
+   IF DAYS(#JDATE,TODAY) GTR #AGE_DAYS THEN                                     
+      BEGIN                                                                     
+      $OVERDUE.INSERT($Z,/);                                                    
+      $TITLE:=DECAT($Z.COPY(2)," ",4);                                          
+      $FAM:=$Z.COPY(3);                                                         
+      IF NOT $FAMILIES.INCLUDES($FAM) THEN                                      
+         $FAMILIES.INSERT($FAM);                                                
+      $$FAM.INSERT(#($TITLE,","),/);                                            
+      END                                                                       
+   ELSE                                                                         
+      %% NOT OVERDUE SO WRITE IN VARIABLE USED TO CREATE NEW HISTORY FILE       
+      BEGIN                                                                     
+      $NEW.INSERT($Z,/);                                                        
+      END;                                                                      
+   END;                                                                         
+                                                                                
+%% NOW THAT ANALYSIS IS DONE, WRITE OUT THE NEW HISTORY FILE AND REPORTS        
+                                                                                
+$NEWHIST:=#("TITLE=",$HISTNEW,",FILEKIND=SEQDATA,FILESTRUCTURE=STREAM");        
+$NEWHISTREPORT:=$$NEWHIST.WRITE($NEW);                                          
+$STATUS:=("NewHist:" & $NEWHISTREPORT);                                         
+DISPLAY($STATUS);                                                               
+$WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));                  
+                                                                                
+                                                                                
+$TMPFAMILIES:=$FAMILIES;                                                        
+                                                                                
+WHILE $F:=$FAMILIES.SPLIT NEQ EMPTY DO                                          
+BEGIN                                                                           
+   $REPORTFILE:=#("TITLE=*OPSRUNNER/REPORT/",$F,,"ON",,$LOGFAM,                 
+      ",FILEKIND=SEQDATA,FILESTRUCTURE=STREAM");                                
+   $WRITEREPORT:=$$REPORTFILE.WRITE(DROP($$F,-1));                              
+   $STATUS:=("REPORTFILE " & $F & ":" & $WRITEREPORT);                          
+   DISPLAY($STATUS);                                                            
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));               
+END;                                                                            
+                                                                                
+%% IF RUNNING IN UPDATE MODE, REMOVE THE FILES, LOG THE REMOVE JOBS             
+IF $RUNTYPE EQL "UPDATE" THEN                                                   
+   BEGIN                                                                        
+   WHILE $G:=$TMPFAMILIES.SPLIT NEQ EMPTY DO                                    
+   BEGIN                                                                        
+                                                                                
+   %%CHECK FAMILY ONLINE                                                        
+   $PACKCHECK:=KEYIN(#('DU ON ',$G));                                           
+                                                                                
+   IF $PACKCHECK INCL "NOT ONLINE" THEN                                         
+      BEGIN                                                                     
+      $STATUS:=("Family " & $G & " not online so skipping");                    
+      DISPLAY($STATUS);                                                         
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));            
+      END                                                                       
+   ELSE                                                                         
+      BEGIN                                                                     
+      #LOOPCNT:=#LOOPCNT + 1;                                                   
+      %% BUILD REMOVE STATEMENT INTO VARIABLE                                   
+      %% USE WFL FUNCTION TO PERFORM THE REMOVE AND TRACK IT                    
+       $STATUS:=("Running WFL to remove files from " & $G);                     
+       DISPLAY($STATUS);                                                        
+       $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY)," - ",$STATUS));           
+       Call DO "OPS_RUNNER_WFL" $G;  %Sets #Rem  and $Err                       
+       If #Rem > 0 Then                                                         
+         %% NEGATIVE RETURN CODE FROM WFL FUNCTION = ERROR, POSITIVE = JOBNO    
+         %% IF POSITIVE THEN WFL FUNCTION RUNNING.                              
+         BEGIN                                                                  
+         ON JOBMESSAGE DO                                                       
+            BEGIN                                                               
+                                                                                
+            %% IF A MESSAGE IS DISPLAYED BY WFL FUNCTION, SHOW IT ON SCREEN     
+            IF JOBMSGTYPE = WFLMSG AND JOBTEXT INCL "REMOVED" THEN              
+               BEGIN                                                            
+               $STATUS:= (JOBTEXT);                                             
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+               END                                                              
+                                                                                
+            %% IF EOJ RECORD, CHECK IF DSED AND DISPLAY ERROR                   
+            %% OR IF OK, DISPLAY SUCCESS MSG                                    
+            ELSE                                                                
+               IF JOBMSGTYPE = WFLEOJ THEN                                      
+               BEGIN                                                            
+               $REMERR:=WFLEOJREASON(#("OPSCULL_",#LOOPCNT));                   
+               CASE $REMERR OF                                                  
+                  BEGIN                                                         
+                  "BADEOJ":  %%REMOVE FAILED                                    
+                     #REMRSLT:=1;                                               
+                  "GOODEOJ": %%REMOVE SUCCESSFUL                                
+                     #REMRSLT:=2;                                               
+                  ELSE:                                                         
+                     $STATUS:=(#("DEBUG: ",$REMERR));                           
+                     DISPLAY($STATUS);                                          
+                     $WRITETOLOG:=$$AUDLOG.WRITE(#(TIME(TIMEOFDAY),             
+                        " - ",$STATUS));                                        
+                  END;                                                          
+               IF $REMERR INCL "DS" THEN                                        
+                  #REMRSLT:=1; %% IF COPY FAILS, FLAG AS SUCH                   
+               END;                                                             
+            END;                                                                
+                                                                                
+         END                                                                    
+      ELSE                                                                      
+         %% IF -VE RETURN CODE, WFL FUNCTION FAILED, DISPLAY ERROR              
+         BEGIN                                                                  
+         DISPLAY (#("Remoev job ",#LOOPCNT," failed: ",$ERR,,#REM));            
+         END;                                                                   
+      END;                                                                      
+   END;                                                                         
+                                                                                
+   END;                                                                         
+                                                                                
+%% EMAIL THE OVERDUE FILES, NEW HISTORY FILE AND AUDIT LOG                      
+#ML:=MAIL(#('To:GRAHAM.GOLD;',                                                  
+   'Subject:Opsrunner History files due for deletion - older than '             
+      ,#AGE_DAYS,,'days'),                                                      
+   #("^ATTACH *OPSRUNNER/REPORT/= ON ",$LOGFAM,/,                               
+      "^ATTACH ",$AUDTITLE,/,                                                   
+      "^ATTACH ",$HISTNEW));                                                    
+IF #ML < 0 THEN                                                                 
+   BEGIN                                                                        
+   ODT(#('BEGIN JOB OPSRUNNER/MAILERROR',';CLASS=9; STRING S; ',                
+       'S:=ACCEPT("Mail of histfile failed: ',MAILERROR(#ML),'");'));           
+   END;                                                                         
+\                                                                               
+DEF + ODTS OPS_RUNNER_WFL(MSG):                                                 
+$Fam:=TRIM(TEXT);                                                               
+$TmpList:=$$Fam;                                                                
+$TMPWfl:=Empty;                                                                 
+While $TmpFile:=$TmpList.SPlit(/) Neq Empty DO                                  
+   $TmpWfl:=&$TmpFile;                                                          
+If $TmpWfl TlIs "," Then                                                        
+   $TmpWfl:=Drop($TmpWfl,-1);                                                   
+#Rem:=WFL("REMOVE "&$TmpWfl&" FROM "&$Fam,#("OPSCULL_",#LOOPCNT));              
+If #Rem < 0 Then                                                                
+Begin                                                                           
+   Case Abs(#Rem) Of                                                            
+   Begin                                                                        
+      1:$Err:="BADWFL:Various; particularly START of illegal file";             
+      2:$Err:="NOFILE:START of non-resident JOBSYMABOL file";                   
+      3:$Err:="NOTIMP: Not available on pre-48.1 MCP";                          
+      4:$Err:="NOENTP: Missing MAGUS support";                                  
+      5:$Err:="PRGFLT: Internal Metalogic fault";                               
+      6:$Err:="BADFOR: Bad FOR modifier (usercode/accesscode/charge)";          
+      7:$Err:="EMPTYID: User supplied an empty id string parameter";            
+      8:$Err:="DUPID: Id parameter already being used";                         
+      9:$Err:="LONGID: Id parameter exceeds 17 characters";                     
+   Else:$Err:=#("Unknown Error ",#Rem)                                          
+   End;                                                                         
+End;                                                                            
+                                                                                
+\                                                                               
+                                                                                

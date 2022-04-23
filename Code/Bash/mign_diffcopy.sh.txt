@@ -1,0 +1,71 @@
+#!/bin/bash
+# Migration script - get ##REDACTED## file list, generate local copy then
+#  generate diff list and copy the tapes that are different from ##REDACTED##
+# Author: Graham Gold
+# Version: 0.1
+# Date Modified: 23/07/2013
+# Parameters: One of the following 3 must be supplied-
+# 	diffonly - only generate diff, don't copy files
+# 	copyonly - only copy files from diff list
+#	diffandcopy - diff and copy
+if [ "$1" == "diffonly" ]||[ "$1" == "diffandcopy" ]; then
+	echo "--------> Performing diff <--------"
+	
+	#Remove files from previous runs
+	echo "Tidying up diff files from previous run"
+	rm vts1a_alltapes_detail.txt
+	rm lgrdcpvtsa_alltapes.txt
+	rm lgrdcpvtsa_alltapes_detail.txt
+	rm dc1_diffs.txt
+
+	# Copy tape details file from ##REDACTED##
+	echo "Copying tape details file from ##REDACTED##"
+	scp ##REDACTED##:/home/bill/##REDACTED##_alltapes_detail.txt /home/bill
+
+	#Getting local tape list
+	echo "Getting local tape list"
+	find /VAULT1* -type f > ##REDACTED##_alltapes.txt
+
+	#Getting tape details
+	echo "Getting Tape Details"
+	while read line; do ls -l $line >> ##REDACTED##_alltapes_detail.txt;done < /home/bill/##REDACTED##_alltapes.txt
+
+	#Generating diff report
+	echo "Generating diff report - /home/bill/dc1_diffs.txt"
+	diff ##REDACTED##_alltapes_detail.txt ##REDACTED##_alltapes_detail.txt > dc1_diffs.txt
+	fi
+
+if [ "$1" == "copyonly" ]||[ "$1" == "diffandcopy" ]; then
+	echo "--------> Performing Copy <--------"
+	
+	#Removing copy list from previous run
+	echo "Removing copy list from previous run"
+	rm files_to_copy.txt
+
+        #Generating list of files to be copied
+	# Pipe diff report through:
+	#    grep to match only lines that don't have the word "lock"
+	#    grep to match only lines not beginning with a hyphen
+	#    awk to grab only the tape path/name (10th field)
+	#    uniq to remove duplicates
+	#    sed to delete blank lines (contains only 1 or more spaces)
+        echo "Generating list of files to be copied - /home/bill/files_to_copy.txt"
+        cat dc1_diffs.txt | grep -v lock| grep -v ^- | awk '{print $10}' | uniq |  sed '/^ *$/d' > files_to_copy.txt
+
+	#Display files to copy
+	echo "Files to copy: `(wc -l files_to_copy.txt | awk '{print $1}')`"
+	
+	#Copy files in /home/bill/files_to_copy.txt to new server
+	echo "Copying files in /home/bill/files_to_copy.txt from ##REDACTED##"
+	while read line; do mkdir -p $(dirname "$line");scp -rp bill@##REDACTED##:"$line" "$line";done < /home/bill/files_to_copy.txt
+	fi
+
+if [ "$1" != "copyonly" ]; then
+	if [ "$1" != "diffandcopy" ]; then
+		if [ "$1" != "diffonly" ]; then
+        		echo "Please provide one of the following parameters:"
+			echo "[diffonly] [copyonly] [diffandcopy]"
+        	fi
+	fi
+fi
+

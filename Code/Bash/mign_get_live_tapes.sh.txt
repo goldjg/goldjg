@@ -1,0 +1,20 @@
+#!/bin/bash
+# Part of VTS Migration 2013 - get properties of all live tapes on ##REDACTED##
+# Author: Graham Gold
+# Version: 0.1
+# Date Modified: 23/07/2013
+# *** MUST BE RUN ON ##REDACTED## AND BEFORE PARTNER SCRIPT ON ##REDACTED## ***
+
+#remove files from previous run
+echo "Removing files from previous run"
+rm vts1a_alltapes.txt
+rm vts1a_alltapes_detail.txt
+
+#get full path/name of every tape and store in text file
+echo "Getting local tape list"
+find /VAULT1* -type f > ##REDACTED##_alltapes.txt
+
+#process the file created above, for each tape, ls -l to get the properties
+# and write to new file
+echo "Getting Tape Details"
+while read line; do ls -l $line >> ##REDACTED##_alltapes_detail.txt;done < /home/bill/##REDACTED##_alltapes.txt

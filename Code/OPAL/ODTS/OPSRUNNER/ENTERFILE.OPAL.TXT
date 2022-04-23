@@ -1,0 +1,740 @@
+TT DEFINE * ODTSEQUENCE OPS_SCANDIR(PD):                                        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_SCANDIR ODTSEQUENCE TO SCAN FOR OPSRUNNER REQUEST FILES USING INPUT  %%  
+%%                                                                          %%  
+%% FROM CALLING ODTSEQUENCE                                                 %%  
+%%                                                                          %%  
+%% CALLED BY ODTSEQUENCE OPS_FINDREQ                                        %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION                 NOV '10 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+$FILELIST.INSERT(TITLE);                                                        
+\                                                                               
+TT DEFINE * ODTSEQUENCE OPS_FINDREQ(MSG):                                       
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_FINDREQ ODTSEQUENCE TO FIND OPSRUNNER REQUEST FILES THAT EITHER      %%  
+%% MATCH OR ARE PREFIXED WITH THE PARAMETER PASSED IN THEN LAUNCHES         %%  
+%% OPS_RUNNER ODTSEQUENCE FOR EACH FILE FOUND                               %%  
+%% E.G. WILL LOOK FOR AND PROCESS *PRM/D/OPSRUNNER/<PARAM>= ON ####     %%  
+%%                                                                          %%  
+%% MUST RUN UNDER PRIVUSER AND IS CALLED BY OS/P/PROCESSRUNNER            %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION                 NOV '10 GXG    %%  
+%% VERSION 02 CHANGE REQUEST FILE FAMILY TO ##REDACTED## JUN'11 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+                                                                                
+%% CHECK PARAM WAS SUPPLIED, QUIT IF NOT                                        
+IF TEXT = EMPTY THEN                                                            
+   BEGIN                                                                        
+   SHOW ("OPSRUNNER REQUEST IDENTIFIER MUST BE SUPPLIED");                      
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% CHECK OPAL RUNNING UNDER PRIVUSER, QUIT IF NOT                             
+IF WHENID(USER) NEQ "PRIVUSER" THEN                                           
+   BEGIN                                                                        
+   SHOW ("MUST BE RUN UNDER PRIVUSER");                                       
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% SETUP EMPTY FILELIST VARIABLE                                                
+$FILELIST:=EMPTY;                                                               
+                                                                                
+%% RUN DIRECTORY SCAN LOOKING FOR FILES WITH INPUT PARAM IN THE LAST NODE       
+TT(#("DO OPS_SCANDIR *PRM/D/OPSRUNNER/",UPPER(TRIM(TEXT)),                      
+   "= ON LIVEPACK:FAST"));                                                      
+                                                                                
+%% CHECK IF AT LEAST ONE FILE FOUND, QUIT IF NONE FOUND                         
+IF $FILELIST = EMPTY THEN                                                       
+   BEGIN                                                                        
+   SHOW ("NO REQUEST FILE(S) FOUND");                                           
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% SCAN EACH FILE IN LIST, EXTRACT LAST NODE THEN INITIATE PROCESSING OF FILE   
+WHILE $SCAN:=$FILELIST.SPLIT NEQ EMPTY DO                                       
+   BEGIN                                                                        
+   %% SCAN FOR LAST NODE OF FILENAME                                            
+   $REQ := $SCAN.SPLIT(" ");                                                    
+   $REQ := DROP($REQ,17);                                                       
+                                                                                
+   %% INITIATE PROCESSING OF FILE                                               
+   TT (#("DO OPS_RUNNER ",$REQ));                                               
+   END;                                                                         
+                                                                                
+\                                                                               
+TT DEFINE * ODTSEQUENCE OPS_RUNNER(MSG):                                        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_RUNNER ODTSEQUENCE TO PROCESS OPSRUNNER REQUEST FILE SPECIFIED       %%  
+%% IN INPUT PARAMETER.                                                      %%  
+%%                                                                          %%  
+%% E.G. WILL LOOK FOR AND PROCESS *PRM/D/OPSRUNNER/<PARAM> ON ####      %%  
+%%                                                                          %%  
+%% MUST RUN UNDER PRIVUSER AND IS CALLED BY OPS_FINDREQ ODTSEQUENCE       %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               ####  OCT '10 GXG    %%  
+%% VERSION 02 RESET VARIABLES AND ADD 1 SECOND     ####  OCT '10 GXG    %%  
+%%            DELAY TO MAIL CALLS TO DETOUR SUPERVISOR BUGS                 %%  
+%% VERSION 03 CHANGE REQUEST FILE FAMILY TO ####    JUN'11 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+                                                                                
+%% CHECK PARAM WAS SUPPLIED, QUIT IF NOT                                        
+IF TEXT = EMPTY THEN                                                            
+   BEGIN                                                                        
+   SHOW ("OPSRUNNER REQUEST IDENTIFIER MUST BE SUPPLIED");                      
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% CHECK OPAL RUNNING UNDER PRIVUSER, QUIT IF NOT                             
+IF WHENID(USER) NEQ "PRIVUSER" THEN                                           
+   BEGIN                                                                        
+   SHOW ("MUST BE RUN UNDER PRIVUSER");                                       
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% CHECK THAT REQUEST FILE IS RESIDENT, QUIT IF NOT                             
+$REQID:=UPPER(TRIM(TEXT));                                                      
+$FILE:=#("*PRM/D/OPSRUNNER/",$REQID," ON ####");                            
+                                                                                
+IF NOT $FILE.PD(RESIDENT) THEN                                                  
+   BEGIN                                                                        
+   SHOW (#("OPSRUNNER REQUEST ID - ",$REQID," : NOT FOUND"));                   
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% READ REQUEST FILE INTO $PG VARIABLE                                          
+$PG:=$$FILE.READ(NOSEQ);                                                        
+                                                                                
+%%BUILD UP KEYIN COMMAND TO CHECK BACKUP FAMILY                                 
+$BACKUP:=KEYIN("DL BACKUP");                                                    
+                                                                                
+%%GET NAME OF BACKUP FAMILY FROM KEYIN RESPONSE                                 
+$BKTEMP:=$BACKUP.SPLIT(/);                                                      
+$BKTEMP:=$BACKUP.SPLIT("ON ");                                                  
+                                                                                
+%%CHECK BACKUP FAMILY ONLINE                                                    
+$PACKCHECK:=KEYIN(#('DU ON ',$BACKUP));                                         
+                                                                                
+IF $PACKCHECK INCL "NOT ONLINE" THEN                                            
+   $BACKUP:="DISK";                                                             
+                                                                                
+%%BUILD UP KEYIN COMMAND TO CHECK LOG FAMILY                                    
+$LOGFAM:=KEYIN("DL LOG");                                                       
+                                                                                
+%%GET NAME OF LOG FAMILY FROM KEYIN RESPONSE                                    
+$LFTEMP:=$LOGFAM.SPLIT(/);                                                      
+$LFTEMP:=$LOGFAM.SPLIT("ON ");                                                  
+                                                                                
+%%CHECK BACKUP FAMILY ONLINE                                                    
+$PACKCHECK:=KEYIN(#('DU ON ',$LOGFAM));                                         
+                                                                                
+IF $PACKCHECK INCL "NOT ONLINE" THEN                                            
+   $LOGFAM:="DISK";                                                             
+                                                                                
+%%SETUP AUDIT FILE TITLE                                                        
+$AUDTITLE:=#("*BD/OPSRUNNER/AUDIT/",TIMEDATE(YYYYMMDDHHMMSS),,"ON",,$BACKUP);   
+$AUDLOG:=#("TITLE=",$AUDTITLE,", FILEKIND=SEQDATA,FILESTRUCTURE=STREAM");       
+                                                                                
+%%SETUP HISTORY FILE TITLE                                                      
+$HISTTITLE:=#("*OPSRUNNER/HISTORY",,"ON",,$LOGFAM);                             
+$HISTLOG:=#("TITLE=",$HISTTITLE,",FILEKIND=SEQDATA,FILESTRUCTURE=STREAM");      
+                                                                                
+$STATUS := #("REQUEST FILE READ OK: ",$FILE);                                   
+$WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));              
+                                                                                
+$STATUS := "READING REQUEST PARAMETERS";                                        
+$WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));              
+                                                                                
+%% SPLIT EACH RECORD IN $PG INTO VARIABLES AND VALUES.                          
+%% $$PARAM MEANS CREATE VARIABLE NAMED AFTER TEXT IN $VAL                       
+WHILE $VAL:=$PG.SPLIT(/) NEQ EMPTY DO                                           
+   BEGIN                                                                        
+   $PARAM:=$VAL.SPLIT(":");                                                     
+   $$PARAM:=$VAL;                                                               
+   END;                                                                         
+                                                                                
+$STATUS:="BUILDING REQUEST";                                                    
+$WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));              
+                                                                                
+%%BUILD UP KEYIN COMMAND TO CHECK DESTINATION HOST/FAMILY                       
+$KCMD:=#('AT REMHOST DU ON ',$DSTFAM);                                             
+                                                                                
+%% CHECK THAT DESTHOST AND DESTPK ARE ONLINE                                    
+$HOSTCHECK:=KEYIN($KCMD);                                                       
+                                                                                
+IF $HOSTCHECK INCL "NOT REACHABLE" THEN                                         
+#DESTERR:=1; %%HOST NOT AVAILABLE                                               
+                                                                                
+IF $HOSTCHECK INCL "NOT ONLINE" THEN                                            
+#DESTERR:=2; %%DESTFAMILY NOT AVAILABLE                                         
+                                                                                
+CASE #DESTERR OF                                                                
+BEGIN                                                                           
+1: BEGIN                                                                        
+   $STATUS:=#("HOST REMHOST NOT AVAILABLE, SKIPPING COPY");                        
+   DISPLAY ($STATUS);                                                           
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));           
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",                     
+      "     *** FILE(S) NOT COPIED ***"));                                      
+   CALL DO "OPS_RUNNER_DELREQ";  %%ODTS TO REMOVE FILE                          
+   WAIT(1);                                                                     
+   CALL DO "OPS_RUNNER_MAIL";    %%ODTS TO MAIL LOG                             
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+2: BEGIN                                                                        
+   $STATUS:=#("FAMILY ",$DSTFAM,,"NOT ONLINE AT REMHOST, SKIPPING COPY");          
+   DISPLAY ($STATUS);                                                           
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));           
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",                     
+      "     *** FILE(S) NOT COPIED ***"));                                      
+   CALL DO "OPS_RUNNER_DELREQ";  %%ODTS TO REMOVE FILE                          
+   WAIT(1);                                                                     
+   CALL DO "OPS_RUNNER_MAIL";    %%ODTS TO MAIL LOG                             
+   EXIT;                                                                        
+   END;                                                                         
+ELSE: BEGIN                                                                     
+      $STATUS:=#("DESTINATION FAMILY/HOST CHECKED & OK");                       
+      DISPLAY ($STATUS);                                                        
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+      END;                                                                      
+END;                                                                            
+                                                                                
+%% CHECK THAT DESTINATION USERCODE SUPPLIED, QUIT IF NOT                        
+IF $DSTUSR = EMPTY THEN                                                         
+   BEGIN                                                                        
+   DISPLAY ("DESTINATION USERCODE REQUIRED");                                   
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% IF SOURCE USERCODE IS NOT SRCUSER, QUIT                                       
+IF $SRCUSR NEQ "SRCUSER" THEN                                                    
+   BEGIN                                                                        
+   DISPLAY ("SOURCE USERCODE MUST BE SRCUSER");                                  
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% QUIT IF NO DESTINATION FILE TITLE SUPPLIED                                   
+IF $DSTTITLE = EMPTY THEN                                                       
+   BEGIN                                                                        
+   DISPLAY ("DESTINATION FILE TITLE REQUIRED");                                 
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% QUIT IF NO DESINATION FAMILY SUPPLIED                                        
+IF $DSTFAM = EMPTY THEN                                                         
+   BEGIN                                                                        
+   DISPLAY ("DESTINATION FAMILY REQUIRED");                                     
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% QUIT IF SRCTAPE AND SRCFILE ARE BOTH Y,                                      
+%% CAN ONLY BE FILE OR TAPE MODE.                                               
+IF $SRCTAPE = "Y" AND $SRCFILE = "Y" THEN                                       
+   BEGIN                                                                        
+   DISPLAY ("MORE THAN ONE SOURCE TYPE SPECIFIED");                             
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+%% QUIT IF NEITHER SRCTAPE OR SRCFILE ARE SET                                   
+IF $SRCTAPE = "N" AND $SRCFILE = "N" THEN                                       
+   BEGIN                                                                        
+   DISPLAY ("NO SOURCE TYPE SPECIFIED");                                        
+   EXIT;                                                                        
+   END;                                                                         
+                                                                                
+IF $MULTICOPY = "Y" THEN                                                        
+   %% PARSING OF MULTICOPY REQUESTS                                             
+   BEGIN                                                                        
+   $STATUS := "MULTICOPY MODE";                                                 
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));           
+   $TMP:=$SRCTITLE;                                                             
+                                                                                
+   %% ZERO COUNTERS                                                             
+   #NUMSRC := 0;                                                                
+   #NUMDST := 0;                                                                
+                                                                                
+   %% COUNT FILES IN SOURCE LIST                                                
+   WHILE $TMP2:=$TMP.SPLIT("!") NEQ EMPTY DO                                    
+      #NUMSRC:=#NUMSRC+1;                                                       
+                                                                                
+   $TMP:=$DSTTITLE;                                                             
+                                                                                
+   %% COUNT FILES IN DEST LIST                                                  
+   WHILE $TMP2:=$TMP.SPLIT("!") NEQ EMPTY DO                                    
+      #NUMDST:=#NUMDST+1;                                                       
+                                                                                
+   %% IF ONLY SINGLE FILE FIND IN SOURCE OR DEST LIST,                          
+   %% NOT ALLOWED IN MULTICOPY MODE, SO QUIT                                    
+   IF NOT $SRCTITLE INCL "!" THEN                                               
+      BEGIN                                                                     
+      DISPLAY ("SINGLE SRC, UNABLE TO PERFORM MULTICOPY, QUITTING");            
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   IF NOT $DSTTITLE INCL "!" THEN                                               
+      BEGIN                                                                     
+      DISPLAY ("SINGLE DEST, UNABLE TO PERFORM MULTICOPY, QUITTING");           
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   $STATUS :=#("SRC TITLES FOUND: ",#NUMSRC,", ","DEST TITLES FOUND: ",#NUMDST);
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));           
+                                                                                
+   %% NUMBER OF FILES IN SOURCE AND DEST LIST MUST BE THE SAME. QUIT IF NOT     
+   IF NOT #NUMSRC = #NUMDST THEN                                                
+      BEGIN                                                                     
+      DISPLAY ("UNMATCHED NUMBER OF SOURCE/DESTINATION FILES, QUITTING");       
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   $TMPSRC:=$SRCTITLE;                                                          
+   $TMPDST:=$DSTTITLE;                                                          
+                                                                                
+   %% ENSURE $TITLES IS EMPTY (FOR MULTI-RUNS)                                  
+   $TITLES := EMPTY;                                                            
+                                                                                
+   %% TAPE SPECIFIC MULTICOPY PARSING                                           
+   IF $SRCTAPE = "Y" THEN                                                       
+      BEGIN                                                                     
+      %% READ THROUGH FILE LISTS CREATING LIST OF FILES TO BE COPIED            
+      %% AND AS WHAT.                                                           
+      WHILE $Z:=$TMPSRC.SPLIT("!") NEQ EMPTY DO                                 
+         BEGIN                                                                  
+         $Y:=$TMPDST.SPLIT("!");                                                
+         $TITLES:=#($TITLES,'(',$SRCUSR,')',$Z,                                 
+            ' AS (',$DSTUSR,')',$REQID,"/",$Y,',');                             
+         END;                                                                   
+                                                                                
+      %% DROP COMMA OFF END OF $TITLES LIST                                     
+      $TITLES:=DROP($TITLES ,-1);                                               
+                                                                                
+      %% BUILD UP COMMAND AS APPROPRIATE FOR COPY BY SERIAL OR BY GENERATION    
+      IF $SRCSERIAL HDIS "GETG" THEN                                            
+         BEGIN                                                                  
+         $CMD:=#('BEGIN JOB OPSRUNNER/',$REQID,';COPY ',$TITLES,' FROM ',       
+         $SRCTAPENAME,                                                          
+            '(SERIALNO="',$SRCSERIAL,'") TO ',$DSTFAM,                          
+               '(PACK,HOSTNAME=REMHOST);END JOB');                                 
+         END                                                                    
+      ELSE                                                                      
+         BEGIN                                                                  
+         $CMD:=#('BEGIN JOB OPSRUNNER/',$REQID,';COPY ',$TITLES,' FROM ',       
+         $SRCTAPENAME,                                                          
+            '(SERIALNO=',$SRCSERIAL,') TO ',$DSTFAM,                            
+               '(PACK,HOSTNAME=REMHOST);END JOB');                                 
+         END;                                                                   
+      $STATUS := ($CMD);                                                        
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% DO THE COPY                                                            
+      CALL DO "OPS_RUNNER_COPY";                                                
+                                                                                
+      %% MAIL THE LOG                                                           
+      WAIT(1);                                                                  
+      CALL DO "OPS_RUNNER_MAIL";                                                
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   IF $SRCFILE = "Y" THEN                                                       
+      %% DISK SPECIFIC MULTICOPY PARSING                                        
+      BEGIN                                                                     
+                                                                                
+      %% QUIT IF SOURCE FAMILY NOT SUPPLIED                                     
+      IF $SRCFAM = EMPTY THEN                                                   
+         BEGIN                                                                  
+         DISPLAY ("SRCFAM MUST BE SUPPLIED");                                   
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+      %% CHECK SOURCE FAMILY IS ONLINE                                          
+      $SKCMD:=#('DU ON ',$SRCFAM);                                              
+      $SRCCHECK:=KEYIN($SKCMD);                                                 
+      IF $SRCCHECK INCL "NOT ONLINE" THEN                                       
+         BEGIN                                                                  
+         $STATUS:=#("SOURCE FAMILY (",$SRCFAM,") NOT ONLINE");                  
+         DISPLAY ($STATUS);                                                     
+         $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));     
+         END;                                                                   
+                                                                                
+      %% CHECK SOURCE FAMILY IS ALLOWED, QUIT IF NOT                            
+      IF $SRCFAM NEQ {"####","####","####"} THEN                     
+         BEGIN                                                                  
+         DISPLAY ("SOURCE FAMILY MUST BE ####, #### OR ####");       
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+      %% READ THROUGH FILE LISTS CREATING LIST OF FILES TO BE COPED             
+      %% AND AS WHAT.                                                           
+      WHILE $Z:=$TMPSRC.SPLIT("!") NEQ EMPTY DO                                 
+         BEGIN                                                                  
+         $Y:=$TMPDST.SPLIT("!");                                                
+         $TITLES:=#($TITLES,'(',$SRCUSR,')',$Z,                                 
+            ' AS (',$DSTUSR,')',$REQID,"/",$Y,',');                             
+         END;                                                                   
+                                                                                
+      %% DROP COMMA OFF END OF $TITLES LIST                                     
+      $TITLES:=DROP($TITLES ,-1);                                               
+                                                                                
+      $STATUS := "REQUEST IS A COPY FROM DISK";                                 
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% BUILD COPY COMMAND                                                     
+      $CMD:=#('BEGIN JOB OPSRUNNER/',$REQID,';COPY ',$TITLES,' FROM ',$SRCFAM,  
+         '(PACK) TO ',$DSTFAM,'(PACK,HOSTNAME=REMHOST);END JOB');                  
+      $STATUS := $CMD;                                                          
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% DO THE COPY                                                            
+      CALL DO "OPS_RUNNER_COPY";                                                
+                                                                                
+      %% MAIL THE LOG                                                           
+      WAIT(1);                                                                  
+      CALL DO "OPS_RUNNER_MAIL";                                                
+      EXIT;                                                                     
+      END;                                                                      
+   END                                                                          
+ELSE                                                                            
+   BEGIN                                                                        
+   %% PARSING FOR SINGLE COPY MODE                                              
+   $STATUS := "SINGLE COPY MODE";                                               
+   $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));           
+                                                                                
+   %% IF MULTICOPY DELIMITER FOUND IN SINGLE COPY MODE, QUIT                    
+   IF "!" ISIN {$SRCTITLE,$DSTTITLE} THEN                                       
+      BEGIN                                                                     
+      DISPLAY ("MULTICOPY DELIMITER(S) FOUND IN SINGLE COPY MODE, QUITTING");   
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   %% CHECK THAT TITLES ARE OF SAME TYPE EG FILE/DIRECTORY                      
+   IF $SRCTITLE TLIS "/=" THEN                                                  
+      BEGIN                                                                     
+      IF NOT $DSTTITLE TLIS "/=" THEN                                           
+         BEGIN                                                                  
+         DISPLAY ("CANNOT COPY A DIRECTORY AS A FILE");                         
+         EXIT;                                                                  
+         END;                                                                   
+      END;                                                                      
+                                                                                
+   IF $DSTTITLE TLIS "/=" THEN                                                  
+      BEGIN                                                                     
+      IF NOT $SRCTITLE TLIS "/=" THEN                                           
+         BEGIN                                                                  
+         DISPLAY ("CANNOT COPY A FILE AS A DIRECTORY");                         
+         EXIT;                                                                  
+         END;                                                                   
+      END;                                                                      
+                                                                                
+   %% CHECK TAPE SPECIFIC PARAMS SUPPLIED IF IN TAPE MODE                       
+   IF $SRCTAPE = "Y" THEN                                                       
+      BEGIN                                                                     
+      IF $SRCSERIAL = EMPTY THEN                                                
+         BEGIN                                                                  
+         DISPLAY ("SRCSERIAL MUST BE SUPPLIED");                                
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+      IF $SRCTAPENAME = EMPTY THEN                                              
+         BEGIN                                                                  
+         DISPLAY ("SRCTAPENAME MUST BE SUPPLIED");                              
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+      $STATUS := "REQUEST IS A COPY FROM TAPE";                                 
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% BUILD COPY COMMAND BASED ON TAPE COPY MODE (BY GEN OR BY SERIAL)       
+      IF $SRCSERIAL HDIS "GETG" THEN                                            
+         BEGIN                                                                  
+         $CMD:=#('BEGIN JOB OPSRUNNER/',$REQID,';COPY (',$SRCUSR,')',$SRCTITLE, 
+            ' AS (',$DSTUSR,')',$REQID,"/",$DSTTITLE,                           
+            ' FROM ',$SRCTAPENAME,'(SERIALNO="',$SRCSERIAL,'") TO ',            
+               $DSTFAM,'(PACK,HOSTNAME=REMHOST);END JOB');                         
+         END                                                                    
+      ELSE                                                                      
+         BEGIN                                                                  
+         $CMD:=#('BEGIN JOB OPSRUNNER/',$REQID,';COPY (',$SRCUSR,')',$SRCTITLE, 
+            ' AS (',$DSTUSR,')',$REQID,"/",$DSTTITLE,                           
+            ' FROM ',$SRCTAPENAME,'(SERIALNO=',$SRCSERIAL,') TO ',              
+               $DSTFAM,'(PACK,HOSTNAME=REMHOST);END JOB');                         
+         END;                                                                   
+      $STATUS := $CMD;                                                          
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% DO THE COPY                                                            
+      CALL DO "OPS_RUNNER_COPY";                                                
+                                                                                
+      %% MAIL THE LOG                                                           
+      WAIT(1);                                                                  
+      CALL DO "OPS_RUNNER_MAIL";                                                
+      END;                                                                      
+                                                                                
+   IF $SRCFILE = "Y" THEN                                                       
+      BEGIN                                                                     
+                                                                                
+      %% CHECK SOURCE FAMILY WAS SUPPLIED, QUIT IF NOT                          
+      IF $SRCFAM = EMPTY THEN                                                   
+         BEGIN                                                                  
+         DISPLAY ("SRCFAM MUST BE SUPPLIED");                                   
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+      %% CHECK SOURCE FAMILY IS ALLOWED, QUIT IF NOT                            
+      IF $SRCFAM NEQ {"####","####","####"} THEN                     
+         BEGIN                                                                  
+         DISPLAY ("SOURCE FAMILY MUST BE #### OR ####");             
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+      $STATUS := "REQUEST IS A COPY FROM DISK";                                 
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% BUILD COPY COMMAND                                                     
+      $CMD:=#('BEGIN JOB OPSRUNNER/',$REQID,';COPY (',$SRCUSR,')',$SRCTITLE,    
+         ' AS (',$DSTUSR,')',$REQID,"/",$DSTTITLE,                              
+         ' FROM ',$SRCFAM,'(PACK) TO ',$DSTFAM,'(PACK,HOSTNAME=REMHOST);END JOB'); 
+      $STATUS := $CMD;                                                          
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      %% DO THE COPY                                                            
+      CALL DO "OPS_RUNNER_COPY";                                                
+                                                                                
+      %% MAIL THE LOG                                                           
+      WAIT(1);                                                                  
+      CALL DO "OPS_RUNNER_MAIL";                                                
+      END;                                                                      
+   END;                                                                         
+\                                                                               
+DEFINE * ODTS OPS_RUNNER_COPY(SYSTEM):                                          
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_RUNNER_COPY ODTSEQUENCE TO COPY FILES DEFINED IN                     %%  
+%% OPSRUNNER REQUEST FILE.                                                  %%  
+%% END OF RUN.                                                              %%  
+%%                                                                          %%  
+%% CALLED BY OPS_RUNNER                                                     %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               ####  OCT '10 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+      %%CHECK DESTPK IS NON-SYSTEM PACK                                         
+      IF $DESTPK = {"DISK",                                                     
+                     "PACK1"}                                              
+      OR $DESTPK INCL "###" THEN                                                
+                                                                                
+      %%NON-SYSTEM PACK SO SKIP FILE COPY                                       
+      BEGIN                                                                     
+      $STATUS:=#("FAMILY ",$DESTPK,,"NOT ALLOWED AT ",$DESTHOST,                
+            ", SKIPPING REQUEST");                                              
+      $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",TIME(TIMEOFDAY)," - ",$STATUS));        
+                                                                                
+      CALL DO "OPS_RUNNER_DELREQ";  %%ODTS TO REMOVE FILE                       
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+      %% USE WFL FUNCTION TO PERFORM THE COPY AND TRACK IT                      
+      IF #CPY:=WFL($CMD,#("OPSRUN_",$REQID)) > 0 THEN                           
+                                                                                
+         %% NEGATIVE RETURN CODE FROM WFL FUNCTION = ERROR, POSITIVE = JOBNO    
+         %% IF POSITIVE THEN WFL FUNCTION RUNNING.                              
+         BEGIN                                                                  
+         ON JOBMESSAGE DO                                                       
+            BEGIN                                                               
+                                                                                
+            %% IF A MESSAGE IS DISPLAYED BY WFL FUNCTION, DISPLAY IT ON SCREEN  
+            IF JOBMSGTYPE = WFLMSG AND                                          
+               JOBTEXT INCL {"SKIPPED","COPIED FROM","REMOVED","SECTORS"} AND   
+               NOT JOBTEXT INCL "FTRECOVERY" THEN                               
+               BEGIN                                                            
+               $STATUS:=(JOBTEXT);                                              
+               DISPLAY ($STATUS);                                               
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+                                                                                
+               $TEMP := $STATUS.SPLIT(":");                                     
+               $TEMP := $STATUS.SPLIT(" COPIED");                               
+               $STATUS := #($TEMP,",",$DSTFAM,",","REMHOST");                      
+               $WRITETOHIST:=$$HISTLOG.WRITE(#(TIMEDATE(YYYYMMDDHHMMSS),        
+                  ",",$STATUS));                                                
+               END;                                                             
+                                                                                
+            IF JOBMSGTYPE = WFLMSG AND                                          
+            JOBTEXT INCL {"SKIPPED","NOT COPIED","NOT ON "} THEN                
+               BEGIN                                                            
+               $STATUS := (JOBTEXT);                                            
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+               #NOCOPY:=#NOCOPY+1;                                              
+               END                                                              
+                                                                                
+            %% IF EOJ RECORD, CHECK IF DSED AND DISPLAY ERROR THEN REMOVE SRC   
+            %% OR IF OK, DISPLAY SUCCESS MSG AND REMOVE SRC                     
+            ELSE                                                                
+               IF JOBMSGTYPE = WFLEOJ THEN                                      
+               BEGIN                                                            
+               $CPYERR:=WFLEOJREASON(#("OPSRUN_",$REQID));                      
+               CASE $CPYERR OF                                                  
+                  BEGIN                                                         
+                  "BADEOJ":  %%COPY FAILED                                      
+                     #COPYRSLT:=1;                                              
+                  "GOODEOJ": %%COPY SUCCESSFUL                                  
+                     #COPYRSLT:=2;                                              
+                  ELSE:                                                         
+                     DISPLAY (#("DEBUG: ",$CPYERR));                            
+                  END;                                                          
+               IF $CPYERR INCL "DS" THEN                                        
+                  #COPYRSLT:=1; %% IF COPY FAILS, FLAG AS SUCH                  
+               END;                                                             
+            END;                                                                
+                                                                                
+            IF #COPYRSLT=1 THEN                                                 
+               BEGIN                                                            
+               $STATUS:=#("COPY FAILED, SKIPPING REQUEST: ",$REQID);            
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+               CALL DO "OPS_RUNNER_DELREQ";                                     
+               EXIT;                                                            
+               END;                                                             
+                                                                                
+            IF #COPYRSLT=2 THEN                                                 
+               BEGIN                                                            
+               IF #NOCOPY = 0 THEN                                              
+                  BEGIN                                                         
+                  $STATUS:=#("COPY SUCCESSFUL, REMOVING REQUEST: ",$REQID);     
+                  $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                            
+                     TIME(TIMEOFDAY)," - ",$STATUS));                           
+                  CALL DO "OPS_RUNNER_DELREQ";                                  
+                  EXIT;                                                         
+                  END;                                                          
+                                                                                
+               IF #NOCOPY > 0 THEN                                              
+                  IF #NOCOPY = #NUMSRC THEN                                     
+                     BEGIN                                                      
+                     $STATUS:=#("NO FILES COPIED, REMOVING REQUEST: ",$REQID);  
+                     $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                         
+                        TIME(TIMEOFDAY)," - ",$STATUS));                        
+                     CALL DO "OPS_RUNNER_DELREQ";                               
+                     EXIT;                                                      
+                     END                                                        
+                 ELSE                                                           
+                     BEGIN                                                      
+                     $STATUS:=#("NOT ALL FILES COPIED, REMOVING REQUEST: ",     
+                        $REQID);                                                
+                     $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                         
+                        TIME(TIMEOFDAY)," - ",$STATUS));                        
+                     CALL DO "OPS_RUNNER_DELREQ";                               
+                     EXIT;                                                      
+                     END;                                                       
+               END;                                                             
+          END                                                                   
+      ELSE                                                                      
+                                                                                
+         %% IF -VE RETURN CODE, WFL FUNCTION FAILED, DISPLAY ERROR              
+         BEGIN                                                                  
+         $ERR:=WFLEOJREASON(#("OPSRUN_",$REQID));                               
+         DISPLAY (#("OPSRUNNER REQUEST ",$REQID," FAILED: ",$ERR,,#CPY));       
+         END;                                                                   
+\                                                                               
+DEFINE * ODTS OPS_RUNNER_DELREQ(SYSTEM):                                        
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_RUNNER_DELREQ ODTSEQUENCE TO DELETE OPSRUNNER REQUEST FILES AT       %%  
+%% END OF RUN.                                                              %%  
+%%                                                                          %%  
+%% CALLED BY OPS_RUNNER_COPY                                                %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               ####  OCT '10 GXG    %%  
+%% VERSION 02 CHANGE REQUEST FILE FAMILY TO LIVEPACK    JUN'11 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+      %% BUILD REMOVE STATEMENT INTO VARIABLE                                   
+      $CMD:=(#("BEGIN JOB REMOVE/",$REQID,                                      
+         ";FAMILY DISK = LIVEPACK OTHERWISE DISK;",                             
+         "REMOVE ",DROP($FILE,-12)," ON ####;END JOB"));                    
+                                                                                
+      %% USE WFL FUNCTION TO PERFORM THE REMOVE AND TRACK IT                    
+      IF #REM:=WFL($CMD,#("OPSDEL_",$REQID)) > 0 THEN                           
+                                                                                
+         %% NEGATIVE RETURN CODE FROM WFL FUNCTION = ERROR, POSITIVE = JOBNO    
+         %% IF POSITIVE THEN WFL FUNCTION RUNNING.                              
+         BEGIN                                                                  
+         ON JOBMESSAGE DO                                                       
+            BEGIN                                                               
+                                                                                
+            %% IF A MESSAGE IS DISPLAYED BY WFL FUNCTION, SHOW IT ON SCREEN     
+            IF JOBMSGTYPE = WFLMSG AND JOBTEXT INCL "REMOVED" THEN              
+               BEGIN                                                            
+               $STATUS:= (JOBTEXT);                                             
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+               END                                                              
+                                                                                
+            %% IF EOJ RECORD, CHECK IF DSED AND DISPLAY ERROR                   
+            %% OR IF OK, DISPLAY SUCCESS MSG                                    
+            ELSE                                                                
+               IF JOBMSGTYPE = WFLEOJ THEN                                      
+               BEGIN                                                            
+               $REMERR:=WFLEOJREASON(#("OPSDEL_",$REQID));                      
+               CASE $REMERR OF                                                  
+                  BEGIN                                                         
+                  "BADEOJ":  %%REMOVE FAILED                                    
+                     #REMRSLT:=1;                                               
+                  "GOODEOJ": %%REMOVE SUCCESSFUL                                
+                     #REMRSLT:=2;                                               
+                  ELSE:                                                         
+                     DISPLAY (#("DEBUG: ",$REMERR));                            
+                  END;                                                          
+               IF $REMERR INCL "DS" THEN                                        
+                  #REMRSLT:=1; %% IF COPY FAILS, FLAG AS SUCH                   
+               END;                                                             
+            END;                                                                
+                                                                                
+            IF #REMRSLT=1 THEN                                                  
+               BEGIN                                                            
+               $STATUS:=#("REMOVE FAILED: ",$FILE);                             
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+               EXIT;                                                            
+               END;                                                             
+                                                                                
+            IF #REMRSLT=2 THEN                                                  
+               BEGIN                                                            
+               $STATUS:=#("REMOVE SUCCESSFUL: ",$FILE);                         
+               $WRITETOLOG:=$$AUDLOG.WRITE(#(" ",                               
+                  TIME(TIMEOFDAY)," - ",$STATUS));                              
+               EXIT;                                                            
+               END;                                                             
+         END                                                                    
+      ELSE                                                                      
+         %% IF -VE RETURN CODE, WFL FUNCTION FAILED, DISPLAY ERROR              
+         BEGIN                                                                  
+         $ERR:=WFLEOJREASON(#("OPSDEL_",$REQID));                               
+         DISPLAY (#("REMOVE OF FILE ",$FILE," FAILED: ",$ERR,,#REM));           
+         END;                                                                   
+\                                                                               
+DEFINE * ODTS OPS_RUNNER_MAIL:                                                  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+%%                                                                          %%  
+%% OPS_RUNNER_MAIL ODTSEQUENCE TO EMAIL OPSRUNNER LOG                       %%  
+%%                                                                          %%  
+%% CALLED BY OPS_RUNNER                                                     %%  
+%%                                                                          %%  
+%% VERSION 01 INITIAL IMPLEMENTATION               ####  OCT '10 GXG    %%  
+%%                                                                          %%  
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%  
+#ML:=MAIL(#('To:',$EMAIL,',####;',                         
+   'Subject:OPSRUNNER - ',$REQID),                                              
+   #('^INCLUDE ',$AUDTITLE));                                                   
+IF #ML < 0 THEN                                                                 
+   BEGIN                                                                        
+   ODT(#('BEGIN JOB OPSRUNNER/MAILERROR',';CLASS=9; STRING S; ',                
+       'S:=ACCEPT("MAIL OF AUDITLOG FAILED: ',MAILERROR(#ML),'");'));           
+   END                                                                          
+                                                                                

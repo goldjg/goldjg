@@ -1,0 +1,338 @@
+   DEFINE + SITUATION OS_RRDXML_LOG(LOGPS=PRINTED):                             
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_RRD_LOG SITUATION                                                %         
+% ~~~~~~~~~~~~~~~~~~~~                                                %         
+%                                                                     %         
+% SITUATION THAT DETECTS PRINT COMPLETED (LOG MAJOR 1, LOG MINOR 14)  %         
+% SUMLOG ENTRIES WHERE DESTINATION BEGINS WITH "RRD"                  %         
+%                                                                     %         
+% *** MUST BE RUN BY OS_RRD_STARTER ODTS ***                          %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+% VERSION 02 GO LIVE                          MAY 2015    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+DESTINATION HdIs "RRD"                                                          
+\                                                                               
+   DEFINE + ODTSEQUENCE OS_RRDXML_LOG(LOGPS):                                   
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_RRD_LOG ODT SEQUENCE                                             %         
+% ~~~~~~~~~~~~~~~~~~~~~~~                                             %         
+%                                                                     %         
+% ODT SEQUENCE THAT INSERTS RRD PRINT ENTRIES FROM OS_RRD_LOG SITU    %         
+% INTO A LOG FILE IN TIME ORDER AND EMAILS TO ##REDACTED## FOR        %         
+% RECONCILIATION AGAINST RRD PRINT LOGS                               %         
+%                                                                     %         
+% *** MUST BE RUN BY OS_RRD_STARTER ODTS ***                          %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+% Version 02   Extended to produce Manifest XML report for RRD        %         
+%                                                        Jul 2012 %         
+% VERSION 02 GO LIVE                          MAY 2015    %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%If this is not the last record in the log time range,                          
+% it's a valid entry to process and add to the log file                         
+IF NOT LASTEVAL THEN                                                            
+BEGIN                                                                           
+   %Get the date of the sumlog entry in YYYYMMDD format with no slashes         
+   $DATE:=DATETOTEXT(LOGTSDAY,YYYYMMDD,NOSLASH);                                
+                                                                                
+   %Get the time of the sumlog entry in HHMMSS format                           
+   $TIME:=TIMETOTEXT(LOGTIME,HHMMSS);                                           
+                                                                                
+   %Get rid of the colons from the log time                                     
+   $TIME:=DECAT($TIME,":",5);  %lose a colon                                    
+   $TIME:=DECAT($TIME,":",5);  %lose another colon                              
+                                                                                
+   %Get the Request name (e.g. XRX/##REDACTED##)                             
+   $REQ:=REQUESTNAME;                                                           
+                                                                                
+   %Get rid of Xerox job node(s) including the slash                            
+   WHILE $REQ HdIs {"XRX/", "TEST/", "XEROX/"} DO                               
+      $REQ := DECAT($REQ, "/", 1);                                              
+                                                                                
+   %File title is stored in backupname attribute with usercode/family           
+   $TITLE:=BACKUPNAME;                                                          
+                                                                                
+   %Standard file name contains /BINnn/nnnn/ where nnnn is job no               
+   IF $JOBNO:=                                                                  
+      DECAT(DECAT(DECAT(BACKUPNAME, "/BIN", 1), "/", 1), "/", 4) = EMPTY THEN   
+         $JOBNO:="0000";                                                        
+   $JobField:=#($REQ,"-",$JOBNO,"|");                                           
+   $ReqLine:=#($JobField,"|",REQUESTNO,"|",BACKUPNAME,"|",$DATE,$TIME);         
+                                                                                
+   % If there's already one or more entres for this job in the list, insert the 
+   % new details at the front and calculate the revised file count              
+   % Else insert as new job at start of list                                    
+   IF $LIST.Includes($JobField&"=") Then                                        
+   BEGIN                                                                        
+      $TMP:=$LIST;                                                              
+      #FileNo:=DECIMAL(DECAT(DECAT($TMP, $JobField, 1),"|",4))+1;               
+      $LIST:=DECAT($TMP, $JobField, 4) &                                        
+             #($JobField,#FileNo,"|",REQUESTNO,"|",BACKUPNAME,"|",$DATE,$TIME) &
+             "," &                                                              
+             DECAT($TMP, $JobField, 3);                                         
+   END                                                                          
+   ELSE                                                                         
+      $LIST.Insert(#($JobField,"1|",REQUESTNO,"|",BACKUPNAME,"|",$DATE,$TIME),  
+                   FRONT);                                                      
+END                                                                             
+ELSE                                                                            
+BEGIN                                                                           
+%All log entries in the eval processed, so write list to file and email         
+                                                                                
+%First, add date params to start of list for use by excel macro                 
+$MSTARTTM:=$STARTTM&"00";                                                       
+$MENDTM:=$ENDTM&"00";                                                           
+$MSTARTDT:=DATETOTEXT(JULIAN($STARTDT),YYYYMMDD,NOSLASH);                       
+$MENDDT:=DATETOTEXT(JULIAN($ENDDT),YYYYMMDD,NOSLASH);                           
+                                                                                
+%% Date params not required for xml version                                     
+%% $LIST.INSERT(#($MSTARTDT,"_",$MSTARTTM,,$MENDDT,"_",$MENDTM),UP,/);          
+                                                                                
+%Setup file title                                                               
+ IF HOSTNAME='##REDACTED##' THEN                                                       
+    $ENVT:="LT"                                                                 
+ ELSE                                                                           
+    $ENVT:="XT";                                                                
+ $MYDATE:=DATETOTEXT(TODAYYYY,DDMMYYYY,NOSLASH);                                
+ $MYTIME:=TIMETOTEXT(TimeOfDay,HHMMSS);                                         
+ %Get rid of the colons from the time                                           
+ $MYTIME:=DECAT($MYTIME,":",5);  %lose a colon                                  
+ $MYTIME:=DECAT($MYTIME,":",5);  %lose another colon                            
+ $MAINTITLE:=#('"MAN' & $ENVT & 'CPYUNBB03' & $MYDATE & $MYTIME & '"');         
+ %                                                                              
+ %DISPLAY("MAINTITLE IS " & $MAINTITLE);                                        
+ %                                                                              
+ $PTITLE:=#('*BD/RRD/AUDIT/' & $MAINTITLE &                                     
+            ' ON ',,DLBACKUP);                                                  
+ $PLOG:=#("LTITLE=",$PTITLE,", FILEKIND=SEQDATA, FILESTRUCTURE=STREAM");        
+                                                                                
+%Write the list to log file (not required for XML version                       
+%%$WRITETOLOG:=$$PLOG.WRITE($LIST);                                             
+                                                                                
+$HeadDate:=take(DATETOTEXT(TODAYYYY,DDMMYYYY),2) & "-" &                        
+           take(drop(DATETOTEXT(TODAYYYY,DDMMYYYY),3),2) & "-" &                
+           take(drop(DATETOTEXT(TODAYYYY,DDMMYYYY),6),4);                       
+                                                                                
+%The first line of the "xml" file will be the name that the uft process should  
+%use for the final file and will be stripped off by the uft process.            
+$XML:='!!' & DROP(DROP($MAINTITLE,1),-1) & '.XML' & #(/);                       
+                                                                                
+$XML:=&'<?xml version="1.0"?><manifest total_files_today="3" file_number="3"' & 
+      ' date_generated="' & $HeadDate &                                         
+      '" cutoff_time="13:00"><customer>' & #(/) &                               
+      TAG("customerName", "CUSTOMER01");                                        
+$JobGroup:=Empty;                                                               
+WHILE $XFile:=$LIST.SPLIT NEQ Empty DO                                          
+BEGIN                                                                           
+   #FoundFiles := #FoundFiles + 1;                                              
+   $JobId:=$XFile.SPLIT("|");                                                   
+   $JobName:=DECAT($JobId, "-", 4);                                             
+   $JobNo:=DECAT($JobId, "-", 1);                                               
+   % 3 files for each backup file - .zip+.ctl+.prn                              
+   #FileCnt:=(DECIMAL($XFile.SPLIT("|"))*3);                                    
+   $ReqNo:=$XFile.SPLIT("|");                                                   
+   $BackupName:=$XFile.SPLIT("|");                                              
+   % SpoolName used to allow uft server to add spool number based on actual file
+   % name.  Have to remove "*" at the beginning of "*BD" files.                 
+   IF $BackupName HDIS {"*"} THEN                                               
+      $SpoolName:=DECAT($BackupName,"*",1)                                      
+   ELSE                                                                         
+      $SpoolName:=$BackupName;                                                  
+   $TimeStamp:=$XFile.SPLIT;                                                    
+   IF $JobId NEQ $JobGroup THEN                                                 
+   BEGIN                                                                        
+      IF $JobGroup NEQ Empty THEN                                               
+         $XML:=&"</fileGroup>" & #(/);                                          
+      $JobGroup:=$JobId;                                                        
+      $XML:=&"<fileGroup>" & #(/) &                                             
+             TAG("groupJobNumber", $JobName) & #(/) &                           
+            %TAG("groupDocumentCount", #(#FileCnt) & #(/));                     
+             TAG("groupDocumentCount", #(#FileCnt)) & #(/);                     
+   END;                                                                         
+   % .zip file detail                                                           
+   $XML:=&"<fileDetail>" & #(/) &                                               
+         TAG("fileJobNumber",$JobNo) & #(/) &                                   
+         TAG("customerFilename",$ReqNo&"!!"&$SpoolName&"!!"&".zip") & #(/) &    
+         TAG("rrdFilename",$ReqNo&"!!"&$SpoolName&"!!"&".zip") & #(/) &         
+         TAG("fileDocumentCount","0") & #(/) & %Unknown                         
+         TAG("transferDateTime",$TimeStamp) & #(/) &                            
+         TAG("size", "0") & #(/) &                                              
+         TAG("fileCount", "2") & #(/); %2 files - .CTL & .PRN                   
+   % Child .ctl file detail                                                     
+   $XML:=&TAG("childFileDetail",                                                
+               TAG("fileJobNumber",$JobNo) & #(/) &                             
+               TAG("customerFilename",$ReqNo&"!!"&$SpoolName&"!!"&".ctl") &     
+                   #(/) &                                                       
+               TAG("rrdFilename",$ReqNo&"!!"&$SpoolName&"!!"&".ctl") & #(/) &   
+               TAG("fileDocumentCount","0") & #(/) & %Unknown                   
+               TAG("transferDateTime",$TimeStamp) & #(/) &                      
+               TAG("size", "0") & #(/)                                          
+              ) & #(/);                                                         
+    % Child .prn file detail                                                    
+   $XML:=&TAG("childFileDetail",                                                
+               TAG("fileJobNumber",$JobNo) & #(/) &                             
+               TAG("customerFilename",$BackupName) & #(/) &                     
+               TAG("rrdFilename",$ReqNo&"!!"&$SpoolName&"!!"&".prn") & #(/) &   
+               %TAG("rrdFilename",$ReqNo&".prn") & #(/) &                       
+               TAG("fileDocumentCount","0") & #(/) & %Unknown                   
+               TAG("transferDateTime",$TimeStamp) & #(/) &                      
+               TAG("size", "0") & #(/)                                          
+              ) & #(/);                                                         
+   $XML:=&'</fileDetail>' & #(/);                                               
+END; %While                                                                     
+                                                                                
+IF #FoundFiles > 0 THEN                                                         
+   $XML:=&'</fileGroup>' & #(/);                                                
+                                                                                
+$XML:= & '</customer></manifest>';                                              
+                                                                                
+$WRITETOLOG:=$$PLOG.WRITE($XML);                                                
+                                                                                
+%Mail the log file to ##REDACTED## mailbox for audit                                     
+MAIL("TO:##REDACTED##;SUBJECT:"&HOSTNAME&" RRD Prints "&                         
+   $STARTDT,#('^ATTACH ',$PTITLE));                                             
+                                                                                
+%The resultant file is "printed" to the server for process via a basic text 
+%print device (driver = "TTY").                                                 
+ ODT('BEGIN JOB; CLASS=9; PRINT ',$PTITLE                                       
+     ' (DESTINATION="##REDACTED##",PAGECOMP="TRANSPARENT",EXTMODE=ASCII)');          
+                                                                                
+END                                                                             
+\                                                                               
+   DEFINE + ODTSEQUENCE OS_RRDXML_STARTER(MSG):                                 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+% OS_RRD_STARTER ODT SEQUENCE                                         %         
+% ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         %         
+%                                                                     %         
+% ODT SEQUENCE THAT BUILDS AND RUNS AN EVAL OF THE OS_RRD_LOG         %         
+% SITU AND ODTS PASSING IN A DATE AND TIME RANGE BUILT FROM           %         
+% PARAMETERS TO THIS SCRIPT.                                          %         
+%                                                                     %         
+% COMMA SEPARATED PARAMS EXPECTED:                                    %         
+% STARTTIME,STARTDATE,ENDTIME,ENDDATE                                 %         
+% E.G 0300,30/01/12,0259,31/01/12                                     %         
+%                                                                     %         
+% TIME MUST NOT HAVE A COLON, DATE MUST BE DD/MM/YY WITH SLASHES      %         
+%                                                                     %         
+% IF NO PARAMS SUPPLIED, DEFAULTS TO YESTERDAY AT 1100 UNTIL          %         
+% 1059 TODAY.                                                         %         
+%                                                                     %         
+% VERSION 01   INITIAL IMPLEMENTATION        GXG MAR 2012    %         
+% VERSION 02 GO LIVE                          MAY 2015    %         
+% VERSION 03 Improve Robustness of Date Arithmetic for yesterday      %         
+%                                            GXG JAN 2016   %         
+%                                                                     %         
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%         
+                                                                                
+%Check if params supplied, if none then set defaults                            
+IF TEXT = EMPTY THEN                                                            
+   BEGIN                                                                        
+   $STARTDT:=DATETOTEXT(NEWDATE(TODAY,-1),DDMMYY);                              
+   $ENDDT:=DATETOTEXT(TODAY,DDMMYY);                                            
+   $STARTTM:="1100";                                                            
+   $ENDTM:="1059";                                                              
+   END                                                                          
+ELSE                                                                            
+   %Params supplied, parse them                                                 
+   BEGIN                                                                        
+   $PARAMS:=TRIM(TEXT);                                                         
+                                                                                
+   %Count number of params by counting number of commas                         
+   $TMP:=$PARAMS;                                                               
+   %% COUNT FILES IN SOURCE LIST                                                
+   WHILE $TMP2:=$TMP.SPLIT(",") NEQ EMPTY DO                                    
+      #NUMPAR:=#NUMPAR+1;                                                       
+                                                                                
+   %If there aren't 4 params, show error and quit                               
+   IF NOT #NUMPAR = 4 THEN                                                      
+      BEGIN                                                                     
+      SHOW("FOUR (4) COMMA SEPARATED COMMANDS REQUIRED");                       
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   %Seperate param string in to variables for use in the eval                   
+   $STARTTM:=$PARAMS.SPLIT(",");                                                
+   $STARTDT:=$PARAMS.SPLIT(",");                                                
+   $ENDTM:=$PARAMS.SPLIT(",");                                                  
+   $ENDDT:=$PARAMS;                                                             
+                                                                                
+   %Check date/time formats                                                     
+   IF ":" ISIN {$STARTTM,$ENDTM} THEN                                           
+      BEGIN                                                                     
+      SHOW("TIME PARAMETER(S) MUST BE IN HHMM FORMAT, NOT HH:MM");              
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   IF DECIMAL(TAKE($STARTTM,2)) > 23 OR DECIMAL(TAKE($ENDTM,2)) > 23 THEN       
+      BEGIN                                                                     
+      SHOW("INVALID HOUR IN TIME PARAMETER(S) - MUST BE BETWEEN 00 AND 23");    
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   IF DECIMAL(TAKE($STARTTM,-2)) > 59 OR DECIMAL(TAKE($ENDTM,-2)) > 59 THEN     
+      BEGIN                                                                     
+      SHOW("INVALID MINUTES IN TIME PARAMETER(S) - MUST BE BETWEEN 00 AND 59"); 
+      EXIT;                                                                     
+      END;                                                                      
+                                                                                
+   IF #J1:=JULIAN($STARTDT) < 0 THEN                                            
+      BEGIN                                                                     
+      CASE ABS(#J1) OF                                                          
+         BEGIN                                                                  
+            1:SHOW("INVALID START DATE : NON-NUMERIC FORMAT");                  
+              EXIT;                                                             
+            2:SHOW("INVALID START DATE : BAD DAY AND/OR MONTH COMBINATION");    
+              EXIT;                                                             
+            3:SHOW("INVALID START DATE : SHORT DATE FORMAT");                   
+              EXIT;                                                             
+            4:SHOW("INVALID START DATE : SLASH EXPECTED");                      
+              EXIT;                                                             
+            5:SHOW("INVALID START DATE : BAD YEAR");                            
+              EXIT;                                                             
+         END;                                                                   
+      END;                                                                      
+                                                                                
+   IF #J2:=JULIAN($ENDDT) < 0 THEN                                              
+      BEGIN                                                                     
+      CASE ABS(#J2) OF                                                          
+         BEGIN                                                                  
+            1:SHOW("INVALID END DATE : NON-NUMERIC FORMAT");                    
+              EXIT;                                                             
+            2:SHOW("INVALID END DATE : BAD DAY AND/OR MONTH COMBINATION");      
+              EXIT;                                                             
+            3:SHOW("INVALID END DATE : SHORT DATE FORMAT");                     
+              EXIT;                                                             
+            4:SHOW("INVALID END DATE : SLASH EXPECTED");                        
+              EXIT;                                                             
+            5:SHOW("INVALID END DATE : BAD YEAR");                              
+              EXIT;                                                             
+         END;                                                                   
+      END;                                                                      
+                                                                                
+   IF DAYS(JULIAN($STARTDT),JULIAN($ENDDT)) = 0                                 
+      AND DECIMAL($STARTTM) > DECIMAL($ENDTM) THEN                              
+         BEGIN                                                                  
+         SHOW("START TIME MUST BE BEFORE END TIME IF SINGLE DAY RANGE");        
+         EXIT;                                                                  
+         END;                                                                   
+                                                                                
+   IF JULIAN($STARTDT) > JULIAN($ENDDT) THEN                                    
+         BEGIN                                                                  
+         SHOW("START DATE CANNOT BE AFTER END DATE");                           
+         EXIT;                                                                  
+         END;                                                                   
+   END;                                                                         
+%                                                                               
+%  DISPLAY("RRDXMLPARAMS ARE " & $STARTTM&" "&$STARTDT&" - "&$ENDTM&" "&$ENDDT);
+%                                                                               
+   %Use TT function to run the eval.                                            
+   TT(#("EV OS_RRDXML_LOG [@",                                                  
+      $STARTTM," ",$STARTDT," - ",$ENDTM," ",$ENDDT,"] DO OS_RRDXML_LOG"));     
+%                                                                               
+%DISPLAY("AFTER EVALUATION");                                                   
+%                                                                               
+\                                                                               

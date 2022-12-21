@@ -4,6 +4,7 @@
 - 💞️ I’m looking to collaborate on anything really
 - 📫 How to reach me - graham@cirriustech.co.uk
 - Also on <a rel="me" href="https://infosec.exchange/@cirriustech">Mastodon</a>
+- Like what I do? [Buy me a coffee](https://ko-fi.com/cirriustech)
 
 <!---
 goldjg/goldjg is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.

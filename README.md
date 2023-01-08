@@ -1,5 +1,5 @@
 - 👋 Hi, I’m @goldjg (aka Graham Gold)
-- 👀 I’m interested in all things Azure, and Security
+- 👀 I’m interested in all things Cloud (currently Azure focussed), and Security
 - 🌱 I’m currently learning Bicep, Power Platform, Terraform
 - 💞️ I’m looking to collaborate on anything really
 - 📫 How to reach me - graham@cirriustech.co.uk

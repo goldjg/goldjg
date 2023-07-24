@@ -1,0 +1,2 @@
+$dataIn=(((Get-Content "$($env:USERDATA)\Scratch2.txt") -replace 'until: ','until ') -replace '(?<=[A-Za-z])\: ',';') -replace 'IssuerAlternativeName','IssuerAlternativeName:'
+$dataIn | ConvertFrom-String -Delimiter ';' | ConvertTo-Csv -NoTypeInformation | Out-File "$($env:USERDATA)\Scratch2.csv"

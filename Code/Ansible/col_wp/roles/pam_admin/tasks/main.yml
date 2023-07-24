@@ -1,0 +1,70 @@
+---
+# tasks file for pam_admin
+
+- name: Output server AD domain
+  ansible.builtin.debug:
+    msg: "{{ ansible_domain }}"
+
+- name: Derive domain NETBIOS name from domain DNS name
+  ansible.builtin.set_fact:
+    pam_admin_netbios_domain: "{{ item.value.netbios_name }}"
+    pam_admin_special_account: "{{ item.value.special_account }}"
+  loop: "{{ domain_map | dict2items }}"
+  when: "ansible_domain in item.key"
+
+- name: Output domain NETBIOS name
+  ansible.builtin.debug:
+    msg: "{{ pam_admin_netbios_domain }}"
+
+- name: Output host inventory groups
+  ansible.builtin.debug:
+    msg: "{{ group_names }}"
+
+- name: Host is not in any pam inventory groups - use pam_base
+  ansible.builtin.set_fact:
+    pam_admin_pam_role: pam_base
+  when: group_names | select('search','pam_') | list | count != 1
+
+- name: Host is in a pam inventory group so use that role group variable
+  ansible.builtin.set_fact:
+    pam_admin_pam_role: "{{ group_names | select('search', 'pam_') | join('') | lower }}"
+  when: group_names | select('search','pam_') | list | count == 1
+
+- name: "Output selected pam role"
+  ansible.builtin.debug:
+    msg: "{{ pam_admin_pam_role }}"
+
+- name: Set grouplist to contents of variable group for pam role
+  ansible.builtin.set_fact:
+    pam_admin_groupslist: "{{ vars[pam_admin_pam_role] }}"
+
+- name: List groupslist value
+  ansible.builtin.debug:
+    msg: "{{ pam_admin_groupslist }}"
+
+- name: Add Local admin to a list
+  ansible.builtin.set_fact:
+    pam_admin_localadmin:
+      - sniwadmin
+
+- name: Concatenate grouplist from role and local admin list
+  ansible.builtin.set_fact:
+    pam_admin_groupslist: "{{ pam_admin_groupslist + pam_admin_localadmin }}"
+
+- name: Replace _dom_ in role variable group with netbios_name for domain from domain_map
+  ansible.builtin.set_fact:
+    pam_admin_groupslist: "{{ pam_admin_groupslist | map('regex_replace', '_dom_', pam_admin_netbios_domain) | list }}"
+
+- name: Replace _cybsvc_ in role variable group with special_account for domain from domain_map
+  ansible.builtin.set_fact:
+    pam_admin_groupslist: "{{ pam_admin_groupslist | map('regex_replace', '_cybsvc_', pam_admin_special_account) | list }}"
+
+- name: "Output group list to be passed to win_group_membership module"
+  ansible.builtin.debug:
+    msg: "{{ pam_admin_groupslist }}"
+
+- name: Update Administrators group
+  ansible.windows.win_group_membership:
+    name: Administrators
+    members: "{{ pam_admin_groupslist }}"
+    state: pure

@@ -1,0 +1,177 @@
+{
+    "definition": {
+        "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+        "actions": {
+            "Call_Login_API_again_with_user_pass_and_csrf_token": {
+                "inputs": {
+                    "body": "username=@{body('Get_ID')?['value']}&password=@{body('Get_Secret')?['value']}",
+                    "cookie": "csrftoken=@{variables('csrf_token')}",
+                    "headers": {
+                        "Referer": "https://controller/api/login/",
+                        "X-CSRFToken": "@{variables('csrf_token')}"
+                    },
+                    "method": "POST",
+                    "uri": "https://controller/api/login/"
+                },
+                "runAfter": {
+                    "Store_CSRF_token": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "Http"
+            },
+            "Call_Login_API_to_get_CSRF_token_for_session": {
+                "inputs": {
+                    "method": "GET",
+                    "uri": "https://controller/api/login/"
+                },
+                "runAfter": {
+                    "Get_Secret": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "Http"
+            },
+            "Get_ID": {
+                "inputs": {
+                    "parameters": {
+                        "secretName": ""
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "keyVault",
+                        "operationId": "getSecret",
+                        "serviceProviderId": "/serviceProviders/keyVault"
+                    }
+                },
+                "runAfter": {},
+                "type": "ServiceProvider"
+            },
+            "Get_Secret": {
+                "inputs": {
+                    "parameters": {
+                        "secretName": ""
+                    },
+                    "serviceProviderConfiguration": {
+                        "connectionName": "keyVault",
+                        "operationId": "getSecret",
+                        "serviceProviderId": "/serviceProviders/keyVault"
+                    }
+                },
+                "runAfter": {
+                    "Get_ID": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "ServiceProvider"
+            },
+            "Initialize_variable": {
+                "inputs": {
+                    "variables": [
+                        {
+                            "name": "csrf_token",
+                            "type": "string"
+                        }
+                    ]
+                },
+                "runAfter": {
+                    "Call_Login_API_to_get_CSRF_token_for_session": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "InitializeVariable"
+            },
+            "Parse_HTTP_Response_Body": {
+                "inputs": {
+                    "content": "@outputs('Call_Login_API_to_get_CSRF_token_for_session')?['headers']",
+                    "schema": {
+                        "properties": {
+                            "Access-Control-Expose-Headers": {
+                                "type": "string"
+                            },
+                            "Cache-Control": {
+                                "type": "string"
+                            },
+                            "Connection": {
+                                "type": "string"
+                            },
+                            "Content-Language": {
+                                "type": "string"
+                            },
+                            "Content-Length": {
+                                "type": "string"
+                            },
+                            "Content-Type": {
+                                "type": "string"
+                            },
+                            "Date": {
+                                "type": "string"
+                            },
+                            "Expires": {
+                                "type": "string"
+                            },
+                            "Pragma": {
+                                "type": "string"
+                            },
+                            "Server": {
+                                "type": "string"
+                            },
+                            "Set-Cookie": {
+                                "type": "string"
+                            },
+                            "Strict-Transport-Security": {
+                                "type": "string"
+                            },
+                            "Vary": {
+                                "type": "string"
+                            },
+                            "X-API-Request-Id": {
+                                "type": "string"
+                            },
+                            "X-API-Total-Time": {
+                                "type": "string"
+                            },
+                            "X-Content-Type-Options": {
+                                "type": "string"
+                            },
+                            "X-Frame-Options": {
+                                "type": "string"
+                            }
+                        },
+                        "type": "object"
+                    }
+                },
+                "runAfter": {
+                    "Initialize_variable": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "ParseJson"
+            },
+            "Store_CSRF_token": {
+                "inputs": {
+                    "name": "csrf_token",
+                    "value": "@{last(split(first(split(body('Parse_HTTP_Response_Body')?['Set-Cookie'],';')),'='))}"
+                },
+                "runAfter": {
+                    "Parse_HTTP_Response_Body": [
+                        "SUCCEEDED"
+                    ]
+                },
+                "type": "SetVariable"
+            }
+        },
+        "contentVersion": "1.0.0.0",
+        "outputs": {},
+        "triggers": {
+            "Recurrence": {
+                "recurrence": {
+                    "frequency": "Month",
+                    "interval": 1,
+                    "timeZone": "GMT Standard Time"
+                },
+                "type": "Recurrence"
+            }
+        }
+    },
+    "kind": "Stateful"
+}

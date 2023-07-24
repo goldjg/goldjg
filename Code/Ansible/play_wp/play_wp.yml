@@ -1,0 +1,7 @@
+---
+- name: Playbook for configuring PAM access on Windows Servers
+  hosts: "{{ target }}"
+  collections:
+    - spc.collection
+  roles:
+    - role

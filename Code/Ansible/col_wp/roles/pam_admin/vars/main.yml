@@ -1,0 +1,31 @@
+---
+# vars file for pam_admin
+
+# map of domain specific attributes/values
+domain_map:
+  "1.local":
+    netbios_name: 1
+    special_account: acc1
+  "2.local":
+    netbios_name: 2
+    special_account: acc2
+  
+
+# base group of administrators group members, all servers unless a specific group is applied
+pam_base:
+  - DOM\grp1
+  - DOM\acc1
+  - DOM\acc2
+  - _dom_\_svc_
+  - DOM\acc4
+  - DOM\acc5
+
+# administrators group members to be setup on servers in inventory group pam_App_nonprod
+pam_app_nonprod:
+  - DOM\grp1
+  - DOM\grp2
+  - DOM\acc1
+  - DOM\acc2
+  - _dom_\_svc_
+  - DOM\acc4
+  - DOM\acc5

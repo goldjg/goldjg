@@ -1,0 +1,6 @@
+---
+collections:
+  - spc.collection
+  - community.windows
+  - ansible.windows
+  - community.general

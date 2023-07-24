@@ -1,0 +1,22 @@
+dir cert:\* -Recurse | ?{$_.Issuer -eq "CN=RootCa" }  | ?{$_.notafter -le $((Get-Date).AddMonths(3))} | ft Store,Subject, Issuer, NotBefore, NotAfter, SerialNumber
+
+dir cert:\* -Recurse | ?{$_.notafter -le $((Get-Date).AddMonths(3))} | ft Store,Subject, Issuer, NotBefore, NotAfter, SerialNumber
+
+dir cert:\* -Recurse | ?{$_.Issuer -eq "CN=RootCa" } | ft Subject, Issuer, NotBefore, NotAfter, SerialNumber
+==================
+
+dir cert:\* -Recurse | ?{$_.notafter -le $((Get-Date).AddMonths(3))} | ft Store,Subject, Issuer, NotBefore, NotAfter, SerialNumber
+
+dir cert:\* -Recurse | ?{$_.SerialNumber -like "13*"} | ft Store,Subject, Issuer, NotBefore, NotAfter, SerialNumber
+
+dir cert:\* -Recurse | Select-Object PSPath, Subject, SubjectAlternativeName, Issuer, NotBefore, NotAfter, SerialNumber | Export-Csv "$($env:userprofile)\$($env:computername)_server_certs.csv" -NoTypeInformation -Force
+
+cd "C:\Program Files\Java\jre1.8.0_131\lib\security"; ..\..\bin\keytool -list -v -keystore cacerts | Select-String "Alias","Entry","Issuer","Serial","Valid" | Out-File "$($env:userprofile)\$($env:computername)_java_certs.txt"
+
+cd "C:\Tomcat\conf"; ."C:\Program Files\Java\jre1.8.0_131\bin\keytool" -list -v -keystore *.jks|Select-String "Alias","Entry","Issuer","Serial","Valid" | Out-File "$($env:userprofile)\$($env:computername)_tomcat_certs.txt"
+
+CD "C:\Program Files\Java\jre1.8.0_131\lib\security"; ..\..\bin\keytool -list -v -keystore cacerts | select-string "Serial number:"
+
+cd "C:\Tomcat\conf"; ."C:\Program Files\Java\jre1.8.0_131\bin\keytool" -list -v -keystore *.jks|Select-String "Serial number:"
+
+keytool -importkeystore -srckeystore source.jks -destkeystore dest.jks

@@ -1,0 +1,61 @@
+{
+  "Rules": [
+    {
+      "SettingName": "AzEnvOk",
+      "Operator": "IsEquals",
+      "DataType": "Boolean",
+      "Operand": true,
+      "MoreInfoUrl": "https://contoso.example/smdi#azenv",
+      "RemediationStrings": [
+        {
+          "Language": "en_US",
+          "Title": "Device not in Azure Public Cloud",
+          "Description": "This device must report azEnvironment = AzurePublicCloud via IMDS. If you're on VPN or a non-Microsoft host, move to your corporate Cloud PC or contact IT."
+        }
+      ]
+    },
+    {
+      "SettingName": "TenantIdOk",
+      "Operator": "IsEquals",
+      "DataType": "Boolean",
+      "Operand": true,
+      "MoreInfoUrl": "https://contoso.example/smdi#tenant",
+      "RemediationStrings": [
+        {
+          "Language": "en_US",
+          "Title": "Wrong Microsoft tenant detected",
+          "Description": "IMDS tag 'tenantid' must be d980314b-cb2f-44e3-9ce7-06d7361ab382. Make sure you're using the company-issued Cloud PC. If this persists, contact IT."
+        }
+      ]
+    },
+    {
+      "SettingName": "SystemManufacturerOk",
+      "Operator": "IsEquals",
+      "DataType": "Boolean",
+      "Operand": true,
+      "MoreInfoUrl": "https://contoso.example/smdi#manufacturer",
+      "RemediationStrings": [
+        {
+          "Language": "en_US",
+          "Title": "Unexpected device manufacturer",
+          "Description": "SystemManufacturer must be 'Microsoft Corporation'. Use your Cloud PC or contact IT if this is a managed exception."
+        }
+      ]
+    },
+    {
+      "SettingName": "SystemProductNamePrefixOk",
+      "Operator": "IsEquals",
+      "DataType": "Boolean",
+      "Operand": true,
+      "MoreInfoUrl": "https://contoso.example/smdi#productname",
+      "RemediationStrings": [
+        {
+          "Language": "en_US",
+          "Title": "Unexpected device product name",
+          "Description": "SystemProductName must start with 'Cloud PC'. Ensure you're signed into your Cloud PC. Open Company Portal and tap Sync after switching."
+        }
+      ]
+    }
+  ],
+  "Operator": "AND"
+}

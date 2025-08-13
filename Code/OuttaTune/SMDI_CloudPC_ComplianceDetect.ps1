@@ -26,6 +26,15 @@ function DoubleBase64([string]$text) {
     }
 }
 
+function DoubleDecode([string]$b64b64) {
+    try {
+        $once = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($b64b64))
+        [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($once))
+    } catch {
+        return $null
+    }
+}
+
 # Defaults
 $azEnv = $null
 $tenantId = $null
@@ -56,7 +65,7 @@ try {
     $expEncSPN = $props.SPN
 } catch {}
 
-# 4) Double-encode live values for comparison
+# 4) Double-encode live values for comparison (kept for SM exact-compare & diagnostics)
 $liveEncSM  = if ($sysMfr)  { DoubleBase64 $sysMfr }  else { $null }
 $liveEncSPN = if ($sysProd) { DoubleBase64 $sysProd } else { $null }
 
@@ -64,23 +73,25 @@ $liveEncSPN = if ($sysProd) { DoubleBase64 $sysProd } else { $null }
 $AzEnvOk  = ($azEnv -eq 'AzurePublicCloud')
 $TenantOk = ($tenantId -eq 'd980314b-cb2f-44e3-9ce7-06d7361ab382')
 
-# SystemManufacturer exact match, using double-encoded comparison via stored expected
+# SystemManufacturer exact match, using double-encoded comparison via stored expected (unchanged)
 $SysMfrOk = $false
 if ($expEncSM -and $liveEncSM) {
     $SysMfrOk = ($liveEncSM -eq $expEncSM)
 }
 
-# SystemProductName "starts with Cloud PC", using double-encoded prefix compare
+# SystemProductName "starts with Cloud PC" — FIXED:
+# decode the stored expected SPN, then compare plain-text prefix with live SystemProductName
 $SysProdPrefixOk = $false
-if ($expEncSPN -and $liveEncSPN) {
-    $SysProdPrefixOk = $liveEncSPN.StartsWith($expEncSPN)
+$expSPNPlain = if ($expEncSPN) { DoubleDecode $expEncSPN } else { $null }
+if ($expSPNPlain -and $sysProd) {
+    $SysProdPrefixOk = $sysProd.StartsWith($expSPNPlain, [StringComparison]::Ordinal)
 }
 
 # Optional: include raw (sanitized) context to help troubleshooting
 $result = [ordered]@{
-    AzEnvOk                = [bool]$AzEnvOk
-    TenantIdOk             = [bool]$TenantOk
-    SystemManufacturerOk   = [bool]$SysMfrOk
+    AzEnvOk                   = [bool]$AzEnvOk
+    TenantIdOk                = [bool]$TenantOk
+    SystemManufacturerOk      = [bool]$SysMfrOk
     SystemProductNamePrefixOk = [bool]$SysProdPrefixOk
 
     # Helpful diag (not used by rules)

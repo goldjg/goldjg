@@ -48,7 +48,7 @@ if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null }
 
 # --- IMDS + entropy (with guard) ---
 $imds = Get-IMDS
-$compute = $imds?.compute
+$compute = $imds.compute
 $entropy = Get-EntropyBytes $compute
 
 # If we can't get entropy, DO NOT attempt v2; keep/refresh v1 so detection still works

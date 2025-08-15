@@ -101,7 +101,7 @@ if (-not $ExpectedValuesPresent) {
 if ($HasV2) {
     $result.UsedV2 = $true
     $imds = Get-IMDS
-    $entropy = Get-EntropyBytes $imds?.compute
+    $entropy = Get-EntropyBytes $imds.compute
     if ($null -eq $entropy) {
         $result.DebugNote = "V2 present but IMDS entropy unavailable."
         $result | ConvertTo-Json -Compress

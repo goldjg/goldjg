@@ -1,12 +1,8 @@
-# SMDI_PR_Remediate_v2.ps1
-# Purpose: Write v2 DPAPI-protected SM/SPN and compressed IMDS compute blob to HKLM:\SOFTWARE\SMDI (64-bit hive).
-# Hardened: REG_BINARY, tight ACLs, no entropy breadcrumbs, optional v1 removal.
+# SMDI_CloudPC_WriteExpectedValues_v2_1.ps1
+# Writes v2 DPAPI(LocalMachine)+IMDS-entropy blobs as REG_BINARY.
+# Removes v1 only after v2 readback succeeds. Forces 64-bit.
 
-param(
-  [bool]$RemoveV1AfterWrite = $true
-)
-
-# --- Force 64-bit host ---
+# --- 64-bit bootstrap ---
 if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
   $env:CI_RUN_IN_64BIT='1'
   & "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
@@ -14,98 +10,78 @@ if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
 }
 $ErrorActionPreference = 'Stop'
 
-# ===== helpers =====
-function DoubleBase64([string]$t){
-  $b1=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($t))
-  [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($b1))
-}
+# --- helpers ---
 function Get-IMDS {
-  Invoke-RestMethod -Headers @{Metadata='true'} -Uri 'http://169.254.169.254/metadata/instance?api-version=2021-02-01' -TimeoutSec 3
+  for ($i=0; $i -lt 3; $i++) {
+    try {
+      return Invoke-RestMethod -Headers @{Metadata='true'} -Uri 'http://169.254.169.254/metadata/instance?api-version=2021-02-01' -TimeoutSec 3
+    } catch { Start-Sleep -Seconds (2 * ($i+1)) }
+  }
+  return $null
 }
 function Get-EntropyBytes($compute){
-  # Choose stable, per-VM fields; not stored anywhere.
+  if (-not $compute) { return $null }
   $parts = @(
     $compute.azEnvironment, $compute.subscriptionId, $compute.resourceGroupName,
     $compute.vmId, $compute.location, $compute.sku, $compute.osType
   ) -join '|'
-  $bytes = [Text.Encoding]::UTF8.GetBytes($parts)
-  $sha = [Security.Cryptography.SHA256]::Create()
-  try { $sha.ComputeHash($bytes) } finally { $sha.Dispose() }
-}
-function Protect-String([string]$plaintext, [byte[]]$entropy){
-  $bytes  = [Text.Encoding]::UTF8.GetBytes($plaintext)
-  $cipher = [Security.Cryptography.ProtectedData]::Protect($bytes, $entropy, [Security.Cryptography.DataProtectionScope]::LocalMachine)
-  $cipher # return raw bytes
-}
-function Compress-ToGzipBase64([string]$text){
-  $in  = [Text.Encoding]::UTF8.GetBytes($text)
-  $ms  = New-Object System.IO.MemoryStream
-  $gz  = New-Object System.IO.Compression.GzipStream($ms, [IO.Compression.CompressionMode]::Compress)
-  $gz.Write($in,0,$in.Length); $gz.Close()
-  [Convert]::ToBase64String($ms.ToArray())
-}
-function Sha256Hex([string]$text){
+  $b = [Text.Encoding]::UTF8.GetBytes($parts)
   $sha=[Security.Cryptography.SHA256]::Create()
-  try { ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($text))|%{ $_.ToString('x2') })-join'' } finally { $sha.Dispose() }
+  try { $sha.ComputeHash($b) } finally { $sha.Dispose() }
+}
+function Protect-String([string]$plaintext,[byte[]]$entropy){
+  $bytes=[Text.Encoding]::UTF8.GetBytes($plaintext)
+  [Security.Cryptography.ProtectedData]::Protect($bytes,$entropy,[Security.Cryptography.DataProtectionScope]::LocalMachine)
+}
+function DoubleBase64([string]$t){
+  $b1=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($t))
+  [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($b1))
 }
 
-# ===== inputs =====
+# --- expected (edit if ever needed) ---
 $expectedSM  = 'Microsoft Corporation'
 $expectedSPN = 'Cloud PC'
 
-# ===== IMDS / entropy =====
-$imds    = Get-IMDS
-$compute = $imds.compute
+# --- ensure 64-bit hive key exists ---
+$reg = 'HKLM:\SOFTWARE\SMDI'
+if (-not (Test-Path $reg)) { New-Item -Path $reg -Force | Out-Null }
+
+# --- IMDS + entropy (with guard) ---
+$imds = Get-IMDS
+$compute = $imds?.compute
 $entropy = Get-EntropyBytes $compute
 
-# ===== protect values & capture compute =====
-[byte[]]$sm_v2_bytes  = Protect-String $expectedSM  $entropy
-[byte[]]$spn_v2_bytes = Protect-String $expectedSPN $entropy
+# If we can't get entropy, DO NOT attempt v2; keep/refresh v1 so detection still works
+$canWriteV2 = ($null -ne $entropy -and $entropy.Length -gt 0)
 
-$computeJson   = ($compute | ConvertTo-Json -Depth 12)
-$computeB64Gz  = Compress-ToGzipBase64 $computeJson
-$computeSha256 = Sha256Hex $computeJson
+# --- always (re)write v1 as safety net unless we prove v2 works ---
+New-ItemProperty -Path $reg -Name 'SM'  -PropertyType String -Value (DoubleBase64 $expectedSM)  -Force | Out-Null
+New-ItemProperty -Path $reg -Name 'SPN' -PropertyType String -Value (DoubleBase64 $expectedSPN) -Force | Out-Null
 
-# ===== write registry (64-bit hive) =====
-$reg64 = 'HKLM:\SOFTWARE\SMDI'
-if (-not (Test-Path $reg64)) { New-Item -Path $reg64 -Force | Out-Null }
+if ($canWriteV2) {
+  try {
+    [byte[]]$sm_v2  = Protect-String $expectedSM  $entropy
+    [byte[]]$spn_v2 = Protect-String $expectedSPN $entropy
 
-# v2 binary blobs
-New-ItemProperty -Path $reg64 -Name 'SM_v2'  -PropertyType Binary -Value $sm_v2_bytes  -Force | Out-Null
-New-ItemProperty -Path $reg64 -Name 'SPN_v2' -PropertyType Binary -Value $spn_v2_bytes -Force | Out-Null
+    New-ItemProperty -Path $reg -Name 'SM_v2'  -PropertyType Binary -Value $sm_v2  -Force | Out-Null
+    New-ItemProperty -Path $reg -Name 'SPN_v2' -PropertyType Binary -Value $spn_v2 -Force | Out-Null
+    New-ItemProperty -Path $reg -Name 'SCHEMA_VERSION' -PropertyType String -Value '2' -Force | Out-Null
 
-# IMDS snapshot (string) + hash
-New-ItemProperty -Path $reg64 -Name 'IMDS_Compute_v2'     -PropertyType String -Value $computeB64Gz  -Force | Out-Null
-New-ItemProperty -Path $reg64 -Name 'IMDS_Compute_SHA_v2' -PropertyType String -Value $computeSha256 -Force | Out-Null
-New-ItemProperty -Path $reg64 -Name 'SCHEMA_VERSION'      -PropertyType String -Value '2'            -Force | Out-Null
+    # verify readback (type + non-empty)
+    $p = Get-ItemProperty -Path $reg -ErrorAction Stop
+    $v2ok = ($p.SM_v2 -is [byte[]] -and $p.SPN_v2 -is [byte[]] -and $p.SM_v2.Length -gt 0 -and $p.SPN_v2.Length -gt 0)
 
-# Back-compat v1 (double-Base64) -- optional removal
-New-ItemProperty -Path $reg64 -Name 'SM'  -PropertyType String -Value (DoubleBase64 $expectedSM)  -Force | Out-Null
-New-ItemProperty -Path $reg64 -Name 'SPN' -PropertyType String -Value (DoubleBase64 $expectedSPN) -Force | Out-Null
-if ($RemoveV1AfterWrite) {
-  Remove-ItemProperty -Path $reg64 -Name 'SM','SPN' -ErrorAction SilentlyContinue
+    if ($v2ok) {
+      # only now remove v1
+      Remove-ItemProperty -Path $reg -Name 'SM','SPN' -ErrorAction SilentlyContinue
+    } else {
+      Write-Host 'SMDI: v2 verification failed; keeping v1.'
+    }
+  } catch {
+    Write-Host "SMDI: v2 write failed ($($_.Exception.Message)); keeping v1."
+  }
+} else {
+  Write-Host 'SMDI: IMDS/entropy unavailable; wrote/kept v1 only.'
 }
-
-# Remove any 32-bit/wow6432 leftovers
-$reg32 = 'HKLM:\SOFTWARE\WOW6432Node\SMDI'
-if (Test-Path $reg32) { try { Remove-Item -Path $reg32 -Recurse -Force } catch {} }
-
-# Tighten ACLs: SYSTEM + Administrators full control
-try {
-  $rk = (Get-Item $reg64).Handle # Opens with default rights; reopen via .NET to set ACLs
-  $key = [Microsoft.Win32.Registry]::LocalMachine.OpenSubKey('SOFTWARE\SMDI', 'ReadWriteSubTree', [System.Security.AccessControl.RegistryRights]::ChangePermissions)
-  $acl = New-Object System.Security.AccessControl.RegistrySecurity
-  $system = New-Object System.Security.Principal.NTAccount('SYSTEM')
-  $admins = New-Object System.Security.Principal.NTAccount('BUILTIN','Administrators')
-  $ruleSys = New-Object System.Security.AccessControl.RegistryAccessRule($system,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
-  $ruleAdm = New-Object System.Security.AccessControl.RegistryAccessRule($admins,'FullControl','ContainerInherit,ObjectInherit','None','Allow')
-  $acl.SetOwner($admins); $acl.SetAccessRule($ruleSys); $acl.AddAccessRule($ruleAdm)
-  $key.SetAccessControl($acl); $key.Close()
-} catch {}
-
-# Zero sensitive variables
-[Array]::Clear($sm_v2_bytes,0,$sm_v2_bytes.Length)
-[Array]::Clear($spn_v2_bytes,0,$spn_v2_bytes.Length)
-$expectedSM=$null; $expectedSPN=$null; $entropy=$null; [GC]::Collect()
 
 exit 0

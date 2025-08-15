@@ -2,14 +2,14 @@
 # Writes SignalB64 and DPAPI-protected SignalProtected
 
 #region Config
-$RegPath = 'HKLM:\SOFTWARE\SMDILite'
+$RegPath = 'HKLM:\SOFTWARE\ISDF'
 $RegNameB64 = 'SignalB64'
 $RegNameProtected = 'SignalProtected'
 $ImdsApiVersion = '2021-02-01'
 #endregion
 
 function Get-DeviceMfrModel {
-    $ctrlKey = 'HKLM:\SYSTEM\CurrentControlSet\Control'
+    $ctrlKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation'
     $manufacturer = $null
     $product = $null
     try {

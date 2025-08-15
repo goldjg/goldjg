@@ -2,7 +2,7 @@
 # Exit 0 = compliant, 1 = needs remediation
 
 #region Config
-$RegPath = 'HKLM:\SOFTWARE\SMDILite'
+$RegPath = 'HKLM:\SOFTWARE\ISDF'
 $RegNameB64 = 'SignalB64'
 $ImdsApiVersion = '2021-02-01'
 $TagHints = @('Windows365','CloudPC','DevBox','Microsoft Dev Box')
@@ -10,7 +10,7 @@ $ExpectedAzEnvironments = @('AzurePublicCloud','AzureCloud','AzureGlobalCloud')
 #endregion
 
 function Get-DeviceMfrModel {
-    $ctrlKey = 'HKLM:\SYSTEM\CurrentControlSet\Control'
+    $ctrlKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation'
     $manufacturer = $null
     $product = $null
     try {

@@ -2,6 +2,24 @@
 # Emits exactly four booleans for Intune Custom Compliance:
 # AzEnvOk, TenantIdOk, SystemManufacturerOk, SystemProductNamePrefixOk
 
+# IMDS compute metadata is stamped at machine provisioning time - doesn't change thereafter unless you reprovision
+
+# "azEnvironment": azure_environment
+#   If not "AzurePublicCloud" then incorrect value or wrong hosting type (gov cloud?)
+#   If not present/null - no IMDS == not a cloud PC despite anything else the host metadata in Intune/Entra say
+
+# osProfile.computerName == hostname at provisioning time
+
+# "tagsList": ["@{name=ms.inv.v0.backedby.origin.sourcearmid.0; value=path_to_resource_in_customer_tenant}"
+#   Providers\Microsoft.DevCenter == DevBox
+#   Providers\Microsoft.DevTestLab == Azure Lab Services (formerly DevTest Labs)
+#   Providers\Microsoft.DesktopVirtualization == Azure Virtual Desktop (WVD too?)
+#   No Providers = W365
+
+# "tagsList": ["@{name=ms.inv.v0.backedby.origin.tenantid; value=customer_tenant_id}",
+
+# "tagsList": ["@{name=ms.inv.v0.backedby.resourceattributes; value=companyname: company_name}",
+
 # -------- Force 64-bit ----------
 if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
     $env:CI_RUN_IN_64BIT = '1'

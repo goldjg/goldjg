@@ -13,15 +13,7 @@ $psExe = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
 $inline = @'
 $ErrorActionPreference = "SilentlyContinue"
 Start-Sleep -Seconds (Get-Random -Minimum 5 -Maximum 45)  # small jitter
-try {
-  $ns  = "root\cimv2\mdm\dmmap"
-  $cls = "MDM_EnterpriseModernAppManagement_AppManagement01"
-  $obj = Get-CimInstance -Namespace $ns -ClassName $cls -ErrorAction Stop
-  Invoke-CimMethod -InputObject $obj -MethodName SyncNow | Out-Null
-} catch {
-  # Intentionally swallow -- best-effort sync.
-  $null = $_
-}
+Get-ScheduledTask -TaskName "PushLaunch"|foreach {$_|Start-ScheduledTask}
 exit 0
 '@
 

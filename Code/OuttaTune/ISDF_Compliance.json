@@ -5,12 +5,12 @@
       "Operator": "IsEquals",
       "DataType": "Boolean",
       "Operand": true,
-      "MoreInfoUrl": "https://contoso.example/smdi#azenv",
+      "MoreInfoUrl": "https://contoso.example/isdf#azenv",
       "RemediationStrings": [
         {
           "Language": "en_US",
           "Title": "Device not in Azure Public Cloud",
-          "Description": "This device must report azEnvironment = AzurePublicCloud via IMDS. If you're on VPN or a non-Microsoft host, move to your corporate Cloud PC or contact IT."
+          "Description": "This device type must report azEnvironment = AzurePublicCloud via IMDS. Suspected malicious device."
         }
       ]
     },
@@ -19,12 +19,12 @@
       "Operator": "IsEquals",
       "DataType": "Boolean",
       "Operand": true,
-      "MoreInfoUrl": "https://contoso.example/smdi#tenant",
+      "MoreInfoUrl": "https://contoso.example/isdf#tenant",
       "RemediationStrings": [
         {
           "Language": "en_US",
           "Title": "Wrong Microsoft tenant detected",
-          "Description": "IMDS tag 'tenantid' must be d980314b-cb2f-44e3-9ce7-06d7361ab382. Make sure you're using the company-issued Cloud PC. If this persists, contact IT."
+          "Description": "IMDS tag 'tenantid' does not match corporate tenant. Suspected malicious device"
         }
       ]
     },
@@ -33,12 +33,12 @@
       "Operator": "IsEquals",
       "DataType": "Boolean",
       "Operand": true,
-      "MoreInfoUrl": "https://contoso.example/smdi#manufacturer",
+      "MoreInfoUrl": "https://contoso.example/isdf#manufacturer",
       "RemediationStrings": [
         {
           "Language": "en_US",
-          "Title": "Unexpected device manufacturer",
-          "Description": "SystemManufacturer must be 'Microsoft Corporation'. Use your Cloud PC or contact IT if this is a managed exception."
+          "Title": "Unexpected device attributes",
+          "Description": "Suspected device tampering to bypass security controls."
         }
       ]
     },
@@ -47,12 +47,12 @@
       "Operator": "IsEquals",
       "DataType": "Boolean",
       "Operand": true,
-      "MoreInfoUrl": "https://contoso.example/smdi#productname",
+      "MoreInfoUrl": "https://contoso.example/isdf#productname",
       "RemediationStrings": [
         {
           "Language": "en_US",
-          "Title": "Unexpected device product name",
-          "Description": "SystemProductName must start with 'Cloud PC'. Ensure you're signed into your Cloud PC. Open Company Portal and tap Sync after switching."
+          "Title": "Unexpected device attributes",
+          "Description": "Suspected device tampering to bypass security controls."
         }
       ]
     }

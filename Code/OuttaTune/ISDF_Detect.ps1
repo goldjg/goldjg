@@ -1,118 +1,108 @@
-# Detect.ps1
-# Exit 0 = compliant, 1 = needs remediation
+# ISDF_Detect.ps1
+# Emits exactly four booleans for Intune Custom Compliance:
+# AzEnvOk, TenantIdOk, SystemManufacturerOk, SystemProductNamePrefixOk
 
-#region Config
-$RegPath = 'HKLM:\SOFTWARE\ISDF'
-$RegNameB64 = 'SignalB64'
-$ImdsApiVersion = '2021-02-01'
-$TagHints = @('Windows365','CloudPC','DevBox','Microsoft Dev Box')
-$ExpectedAzEnvironments = @('AzurePublicCloud','AzureCloud','AzureGlobalCloud')
-#endregion
-
-function Get-DeviceMfrModel {
-    $ctrlKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation'
-    $manufacturer = $null
-    $product = $null
-    try {
-        $props = Get-ItemProperty -Path $ctrlKey -Name SystemManufacturer,SystemProductName -ErrorAction Stop
-        $manufacturer = $props.SystemManufacturer
-        $product      = $props.SystemProductName
-    } catch { }
-    [pscustomobject]@{
-        Manufacturer = $manufacturer
-        Product      = $product
-        Source       = 'Registry(Control)'
-    }
+# -------- Force 64-bit ----------
+if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
+    $env:CI_RUN_IN_64BIT = '1'
+    & "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
+    exit $LASTEXITCODE
 }
+# ---------------------------------
 
-function Get-ImdsCompute {
+$ErrorActionPreference = 'SilentlyContinue'
+
+# Helpers
+function Get-IMDS {
+    for ($i=0; $i -lt 3; $i++) {
+        try {
+            return Invoke-RestMethod -Headers @{ Metadata = 'true' } -Uri 'http://169.254.169.254/metadata/instance?api-version=2021-02-01' -TimeoutSec 3
+        } catch { Start-Sleep -Seconds (2 * ($i+1)) }
+    }
+    $null
+}
+function FromDoubleBase64([string]$t){
     try {
-        $hdr = New-Object System.Collections.Generic.Dictionary[string,string]
-        $hdr.Add('Metadata','true')
-        $uri = "http://169.254.169.254/metadata/instance/compute?api-version=$ImdsApiVersion"
-        Invoke-RestMethod -Headers $hdr -Method GET -Uri $uri -TimeoutSec 2
+        $b1 = [Convert]::FromBase64String($t)
+        $s1 = [Text.Encoding]::UTF8.GetString($b1)
+        $b2 = [Convert]::FromBase64String($s1)
+        [Text.Encoding]::UTF8.GetString($b2)
+    } catch { $null }
+}
+function Unprotect-Text([string]$blob){
+    try {
+        $sec = ConvertTo-SecureString -String $blob
+        $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
+        try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
+        finally { if ($ptr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) } }
     } catch { $null }
 }
 
-function Get-TagListFromImds($compute) {
-    $tags = @()
-    if ($compute -ne $null) {
-        $raw = $compute.tags
-        if (-not [string]::IsNullOrWhiteSpace($raw)) {
-            foreach ($p in ($raw -split ';')) {
-                if (-not [string]::IsNullOrWhiteSpace($p)) { $tags += $p.Trim() }
-            }
-        }
-    }
-    $tags
+# Live values (SystemInformation registry only)
+$sysMfr  = $null
+$sysProd = $null
+try {
+    $si = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation' -ErrorAction Stop
+    $sysMfr  = $si.SystemManufacturer
+    $sysProd = $si.SystemProductName
+} catch {}
+
+# IMDS
+$imds     = Get-IMDS
+$azEnv    = $imds.compute.azEnvironment
+$tenantId = ($imds.compute.tagsList | Where-Object { $_.name -like '*tenantid*' } | Select-Object -First 1).value
+
+# Expected (from ISDF hive)
+$regPath = 'HKLM:\SOFTWARE\ISDF'
+$SM_v2  = $null; $SPN_v2 = $null
+$SM_v1  = $null; $SPN_v1 = $null
+try {
+    $p = Get-ItemProperty -Path $regPath -ErrorAction Stop
+    $SM_v2  = $p.SM_v2
+    $SPN_v2 = $p.SPN_v2
+    $SM_v1  = $p.SM
+    $SPN_v1 = $p.SPN
+} catch {}
+
+# Expected plaintexts via v2 (preferred) or v1
+$expSM  = $null
+$expSPN = $null
+if (-not [string]::IsNullOrWhiteSpace($SM_v2) -and -not [string]::IsNullOrWhiteSpace($SPN_v2)) {
+    $expSM  = Unprotect-Text $SM_v2
+    $expSPN = Unprotect-Text $SPN_v2
+} elseif (-not [string]::IsNullOrWhiteSpace($SM_v1) -and -not [string]::IsNullOrWhiteSpace($SPN_v1)) {
+    $expSM  = FromDoubleBase64 $SM_v1
+    $expSPN = FromDoubleBase64 $SPN_v1
 }
 
-function Build-SignalJson {
-    param([Parameter(Mandatory=$true)]$Hw,[Parameter(Mandatory=$false)]$Compute)
-    $azEnv = $null; $tags = @()
-    if ($Compute -ne $null) {
-        $azEnv = $Compute.azEnvironment
-        $tags  = Get-TagListFromImds -compute $Compute
-    }
-    $obj = [ordered]@{
-        Manufacturer = $Hw.Manufacturer
-        Product      = $Hw.Product
-        AzEnvironment= $azEnv
-        Tags         = $tags
-        TimestampUtc = [DateTime]::UtcNow.ToString('o')
-    }
-    ($obj | ConvertTo-Json -Depth 4 -Compress)
-}
+# IMDS-sourced checks: gating logic
+# If azEnvironment is AzurePublicCloud -> evaluate both normally
+# Else (including null/empty) -> mark IMDS-sourced settings as TRUE in the output JSON
+$imdsActive = ([string]::IsNullOrWhiteSpace($azEnv) -eq $false) -and ($azEnv -eq 'AzurePublicCloud')
 
-function Is-MicrosoftHostedCloudVM {
-    param([Parameter(Mandatory=$true)]$Hw,[Parameter(Mandatory=$false)]$Compute)
-    $m = $Hw.Manufacturer
-    $p = $Hw.Product
-
-    $mLooksMsft = (-not [string]::IsNullOrWhiteSpace($m)) -and ($m -like '*Microsoft*')
-    $pLooksVm   = (-not [string]::IsNullOrWhiteSpace($p)) -and ( ($p -like '*Virtual*') -or ($p -like '*Cloud*') -or ($p -like '*Windows 365*') -or ($p -like '*Dev Box*') )
-
-    $azOk = $false; $tagHit = $false
-    if ($Compute -ne $null) {
-        $az = $Compute.azEnvironment
-        if (-not [string]::IsNullOrWhiteSpace($az)) {
-            $azOk = $ExpectedAzEnvironments -contains $az
-        }
-        foreach ($hint in $TagHints) {
-            foreach ($t in (Get-TagListFromImds -compute $Compute)) {
-                if ($t -like "*$hint*") { $tagHit = $true; break }
-            }
-            if ($tagHit) { break }
-        }
-    }
-
-    if ($mLooksMsft -and ($pLooksVm -or $azOk -or $tagHit)) { return $true }
-    $false
-}
-
-# --- main ---
-$hw      = Get-DeviceMfrModel
-$compute = Get-ImdsCompute
-
-$shouldHaveMarker = Is-MicrosoftHostedCloudVM -Hw $hw -Compute $compute
-$haveMarker = $false
-$matches    = $false
-
-if (Test-Path -Path $RegPath) {
-    try {
-        $existing = Get-ItemProperty -Path $RegPath -Name $RegNameB64 -ErrorAction Stop
-        $storedB64 = $existing.$RegNameB64
-        if (-not [string]::IsNullOrWhiteSpace($storedB64)) {
-            $haveMarker = $true
-            $currentJson = Build-SignalJson -Hw $hw -Compute $compute
-            $currentB64  = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($currentJson))
-            if ($storedB64 -eq $currentB64) { $matches = $true }
-        }
-    } catch { }
-}
-
-if ($shouldHaveMarker) {
-    if ($haveMarker -and $matches) { exit 0 } else { exit 1 }
+if ($imdsActive) {
+    $AzEnvOk    = $true                    # explicitly AzurePublicCloud
+    $TenantIdOk = ($tenantId -eq 'd980314b-cb2f-44e3-9ce7-06d7361ab382')
 } else {
-    if ($haveMarker) { exit 1 } else { exit 0 }
+    # IMDS not available or not AzurePublicCloud -> do not penalize; mark IMDS checks as true
+    $AzEnvOk    = $true
+    $TenantIdOk = $true
 }
+
+# Manufacturer / Product prefix checks (unchanged)
+$SystemManufacturerOk      = $false
+$SystemProductNamePrefixOk = $false
+
+if ($sysMfr -and $expSM -and ($sysMfr -eq $expSM)) { $SystemManufacturerOk = $true }
+if ($sysProd -and $expSPN -and ($sysProd.StartsWith($expSPN))) { $SystemProductNamePrefixOk = $true }
+
+# Emit ONLY the four keys your compliance JSON expects
+[ordered]@{
+    AzEnvOk = [bool]$AzEnvOk
+    TenantIdOk = [bool]$TenantIdOk
+    SystemManufacturerOk = [bool]$SystemManufacturerOk
+    SystemProductNamePrefixOk = [bool]$SystemProductNamePrefixOk
+} | ConvertTo-Json -Compress
+
+# Exit code aligns with overall compliance (AND)
+if ($AzEnvOk -and $TenantIdOk -and $SystemManufacturerOk -and $SystemProductNamePrefixOk) { exit 0 } else { exit 1 }

@@ -1,6 +1,7 @@
-# ISDF_Remediate.ps1
+# ISDFRemediate.ps1
 # Writes expected values into HKLM:\SOFTWARE\ISDF using SecureString + -Key (per-machine entropy).
-# Falls back to double-Base64 only if SecureString -Key isn’t available/supported.
+# Falls back to double-Base64 only if SecureString -Key isn't available/supported.
+# Idempotent. 64-bit forced.
 
 # -------- Force 64-bit ----------
 if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
@@ -11,11 +12,9 @@ if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
 # ---------------------------------
 $ErrorActionPreference = 'Stop'
 
-# ==== Expected plaintexts (constants) ====
+# Constants
 $ExpectedManufacturer = 'Microsoft Corporation'
-# Channel-specific SPN prefix is decided after we discover the channel
 $RegPath = 'HKLM:\SOFTWARE\ISDF'
-# ========================================
 
 # Helpers
 function Get-IMDSCompute {
@@ -50,14 +49,26 @@ function Parse-TagValue($compute, [string]$needle) {
   }
   return $val
 }
+
+# >>> Fixed classification <<<
 function Get-Channel($compute) {
   $src = Parse-TagValue -compute $compute -needle 'origin.sourcearmid.0'
-  if (-not $src) { return 'W365' }
-  if ($src -match 'Providers/Microsoft\.DevCenter')             { return 'DevBox' }
-  if ($src -match 'Providers/Microsoft\.DesktopVirtualization')  { return 'AVD' }
-  if ($src -match 'Providers/Microsoft\.DevTestLab')             { return 'DevTestLab' }
-  'W365'
+  if (-not $src) { return 'Unknown' }
+
+  $sid = $null
+  if ($src -match '/subscriptions/([0-9a-fA-F-]{36})') { $sid = $matches[1] }
+  $hasProviders = ($src -match '/providers/')
+  $isZeroSid = $false
+  if ($sid) { $isZeroSid = (($sid -replace '-', '') -match '^0{32}$') }
+
+  if ($isZeroSid -and -not $hasProviders) { return 'W365' }
+  if ($src -match 'Providers/Microsoft\.DevCenter')            { return 'DevBox' }
+  if ($src -match 'Providers/Microsoft\.DesktopVirtualization'){ return 'AVD' }
+  if ($src -match 'Providers/Microsoft\.DevTestLab')           { return 'DevTestLab' }
+  return 'Unknown'
 }
+# -----------------------------
+
 function Get-OriginTenantId($compute) {
   Parse-TagValue -compute $compute -needle 'origin.tenantid'
 }
@@ -88,14 +99,17 @@ if (-not (Test-Path $RegPath)) { New-Item -Path $RegPath -Force | Out-Null }
 
 # IMDS + channel
 $compute  = Get-IMDSCompute
-if (-not $compute) { exit 0 } # not cloud-backed fabric; nothing to stamp
+if (-not $compute) { exit 0 }  # not in Azure fabric or IMDS blocked; skip stamping
 $channel  = Get-Channel $compute
 $provName = if ($compute.PSObject.Properties.Name -contains 'osProfile' -and $compute.osProfile) { $compute.osProfile.computerName } else { $null }
 
 # Channel-specific SPN prefix
 $ExpectedSpnPrefix = switch ($channel) {
-  'DevBox' { 'Microsoft Dev Box' }
-  default  { 'Cloud PC' }
+  'DevBox'    { 'Microsoft Dev Box' }
+  'AVD'       { '' }              # SPN not enforced (hostname check is used instead)
+  'DevTestLab'{ '' }
+  'W365'      { 'Cloud PC' }
+  default     { 'Cloud PC' }      # conservative default
 }
 
 # Derive per-machine key
@@ -104,24 +118,25 @@ $wroteV2 = $false
 if ($keyBytes -and $keyBytes.Length -eq 16) {
   try {
     $encSM   = Protect-Text-WithKey $ExpectedManufacturer $keyBytes
-    $encSPN  = Protect-Text-WithKey $ExpectedSpnPrefix   $keyBytes
+    $encSPN  = if ($ExpectedSpnPrefix) { Protect-Text-WithKey $ExpectedSpnPrefix $keyBytes } else { $null }
     $encHost = if ($provName) { Protect-Text-WithKey $provName $keyBytes } else { $null }
 
-    New-ItemProperty -Path $RegPath -Name 'SM_v2'     -PropertyType String -Value $encSM  -Force | Out-Null
-    New-ItemProperty -Path $RegPath -Name 'SPN_v2'    -PropertyType String -Value $encSPN -Force | Out-Null
-    if ($encHost) {
-      New-ItemProperty -Path $RegPath -Name 'ProvName_v2' -PropertyType String -Value $encHost -Force | Out-Null
-    }
+    New-ItemProperty -Path $RegPath -Name 'SM_v2'      -PropertyType String -Value $encSM   -Force | Out-Null
+    if ($encSPN) { New-ItemProperty -Path $RegPath -Name 'SPN_v2'     -PropertyType String -Value $encSPN  -Force | Out-Null }
+    if ($encHost){ New-ItemProperty -Path $RegPath -Name 'ProvName_v2' -PropertyType String -Value $encHost -Force | Out-Null }
     New-ItemProperty -Path $RegPath -Name 'SCHEMA_VERSION' -PropertyType String -Value '2' -Force | Out-Null
-    New-ItemProperty -Path $RegPath -Name 'Channel' -PropertyType String -Value $channel -Force | Out-Null
+    New-ItemProperty -Path $RegPath -Name 'Channel'        -PropertyType String -Value $channel -Force | Out-Null
+
     $wroteV2 = $true
   } catch { $wroteV2 = $false }
 }
 
 if (-not $wroteV2) {
-  # Fallback only if SecureString -Key missed
-  New-ItemProperty -Path $RegPath -Name 'SM'      -PropertyType String -Value (DoubleB64 $ExpectedManufacturer) -Force | Out-Null
-  New-ItemProperty -Path $RegPath -Name 'SPN'     -PropertyType String -Value (DoubleB64 $ExpectedSpnPrefix)   -Force | Out-Null
+  # Fallback only if SecureString -Key wasn't usable
+  New-ItemProperty -Path $RegPath -Name 'SM'  -PropertyType String -Value (DoubleB64 $ExpectedManufacturer) -Force | Out-Null
+  if ($ExpectedSpnPrefix) {
+    New-ItemProperty -Path $RegPath -Name 'SPN' -PropertyType String -Value (DoubleB64 $ExpectedSpnPrefix) -Force | Out-Null
+  }
   if ($provName) {
     New-ItemProperty -Path $RegPath -Name 'ProvName' -PropertyType String -Value (DoubleB64 $provName) -Force | Out-Null
   }

@@ -55,6 +55,20 @@
           "Description": "Suspected device tampering to bypass security controls."
         }
       ]
+    },
+    {
+      "SettingName": "HostnameOk",
+      "Operator": "IsEquals",
+      "DataType": "Boolean",
+      "Operand": true,
+      "MoreInfoUrl": "https://contoso.example/isdf#hostname",
+      "RemediationStrings": [
+        {
+          "Language": "en_US",
+          "Title": "Hostname mismatch detected",
+          "Description": "Current hostname does not match the IMDS-provisioned hostname. Device may have been tampered with."
+        }
+      ]
     }
   ],
   "Operator": "AND"

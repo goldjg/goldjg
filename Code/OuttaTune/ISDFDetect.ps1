@@ -1,9 +1,6 @@
 # ISDFDetect.ps1
-# Emits ONLY the four booleans your compliance JSON expects:
-# AzEnvOk, TenantIdOk, SystemManufacturerOk, SystemProductNamePrefixOk
-# - IMDS-sourced checks default to TRUE when IMDS is inactive (not AzurePublicCloud / null)
-# - Bootstrap: if IMDS is active and ISDF hive missing, seed it (lightweight) so Watchdog has state
-# - 64-bit forced; no WMI; SystemInformation registry only
+# Emits exactly 5 booleans for ISDF compliance:
+# AzEnvOk, TenantIdOk, SystemManufacturerOk, SystemProductNamePrefixOk, HostnameOk
 
 # -------- Force 64-bit ----------
 if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
@@ -19,7 +16,7 @@ $RegPath = 'HKLM:\SOFTWARE\ISDF'
 $ExpectedManufacturer = 'Microsoft Corporation'
 $CorpTenant = 'd980314b-cb2f-44e3-9ce7-06d7361ab382'
 
-# Helpers
+# ---------- Helpers ----------
 function Get-IMDS {
     for ($i=0; $i -lt 3; $i++) {
         try {
@@ -52,8 +49,7 @@ function Parse-TagValue($compute, [string]$needle) {
     }
     return $val
 }
-
-# >>> Fixed classification <<<
+# Channel classification (W365 = zero subscription GUID AND no /providers/ in origin.sourcearmid.0)
 function Get-Channel($compute) {
     $src = Parse-TagValue -compute $compute -needle 'origin.sourcearmid.0'
     if (-not $src) { return 'Unknown' }
@@ -65,13 +61,11 @@ function Get-Channel($compute) {
     if ($sid) { $isZeroSid = (($sid -replace '-', '') -match '^0{32}$') }
 
     if ($isZeroSid -and -not $hasProviders) { return 'W365' }
-    if ($src -match 'Providers/Microsoft\.DevCenter')            { return 'DevBox' }
-    if ($src -match 'Providers/Microsoft\.DesktopVirtualization'){ return 'AVD' }
-    if ($src -match 'Providers/Microsoft\.DevTestLab')           { return 'DevTestLab' }
+    if ($src -match 'Providers/Microsoft\.DevCenter')             { return 'DevBox' }
+    if ($src -match 'Providers/Microsoft\.DesktopVirtualization') { return 'AVD' }
+    if ($src -match 'Providers/Microsoft\.DevTestLab')            { return 'DevTestLab' }
     return 'Unknown'
 }
-# -----------------------------
-
 function Get-OriginTenantId($compute) {
     Parse-TagValue -compute $compute -needle 'origin.tenantid'
 }
@@ -112,8 +106,9 @@ function FromDoubleB64([string]$s) {
         [Text.Encoding]::UTF8.GetString($b2)
     } catch { $null }
 }
+# -----------------------------
 
-# Live values (SystemInformation only)
+# Live values (SystemInformation only; no WMI)
 $sysMfr  = $null
 $sysProd = $null
 try {
@@ -129,9 +124,15 @@ $azEnv   = if ($compute -and $compute.PSObject.Properties.Name -contains 'azEnvi
 $tenantId= Get-OriginTenantId $compute
 $channel = if ($compute) { Get-Channel $compute } else { $null }
 $provName= if ($compute -and $compute.PSObject.Properties.Name -contains 'osProfile' -and $compute.osProfile) { $compute.osProfile.computerName } else { $null }
-$localHost = ($env:COMPUTERNAME -split '\.')[0]
 
-# IMDS gating
+# Hostname boolean: compare LIVE hostname vs IMDS osProfile.computerName (case-insensitive, ignore domain)
+$localHost = ($env:COMPUTERNAME -split '\.')[0]
+$HostnameOk = $true
+if ($compute -and $provName) {
+    $HostnameOk = ($localHost.Trim().ToUpper() -eq $provName.Trim().ToUpper())
+}
+
+# IMDS gating (do not penalize when IMDS inactive/not AzurePublicCloud)
 $AzEnvOk    = $true
 $TenantIdOk = $true
 $SystemManufacturerOk      = $true
@@ -148,20 +149,22 @@ if ($imdsActive) {
             $haveAny = ($pre.PSObject.Properties.Name -contains 'SM_v2') -or
                        ($pre.PSObject.Properties.Name -contains 'SPN_v2') -or
                        ($pre.PSObject.Properties.Name -contains 'ProvName_v2') -or
+                       ($pre.PSObject.Properties.Name -contains 'Channel_v2') -or
                        ($pre.PSObject.Properties.Name -contains 'SM') -or
                        ($pre.PSObject.Properties.Name -contains 'SPN') -or
-                       ($pre.PSObject.Properties.Name -contains 'ProvName')
+                       ($pre.PSObject.Properties.Name -contains 'ProvName') -or
+                       ($pre.PSObject.Properties.Name -contains 'Channel')
         } catch { $haveAny = $false }
     }
     if (-not $haveAny) {
         if (-not (Test-Path $RegPath)) { New-Item -Path $RegPath -Force | Out-Null }
         $keyBytes = Derive-KeyBytes16 $compute
         $expSpn = switch ($channel) {
-            'DevBox'    { 'Microsoft Dev Box' }
-            'AVD'       { '' }
-            'DevTestLab'{ '' }
-            'W365'      { 'Cloud PC' }
-            default     { 'Cloud PC' }
+            'DevBox'     { 'Microsoft Dev Box' }
+            'AVD'        { '' }
+            'DevTestLab' { '' }
+            'W365'       { 'Cloud PC' }
+            default      { 'Cloud PC' }
         }
         $seedOk = $false
         if ($keyBytes -and $keyBytes.Length -eq 16) {
@@ -176,26 +179,28 @@ if ($imdsActive) {
                     $encHost = Protect-Text-WithKey $provName $keyBytes
                     New-ItemProperty -Path $RegPath -Name 'ProvName_v2' -PropertyType String -Value $encHost -Force | Out-Null
                 }
+                $encChan = Protect-Text-WithKey $channel $keyBytes
+                New-ItemProperty -Path $RegPath -Name 'Channel_v2' -PropertyType String -Value $encChan -Force | Out-Null
                 New-ItemProperty -Path $RegPath -Name 'SCHEMA_VERSION' -PropertyType String -Value '2' -Force | Out-Null
-                New-ItemProperty -Path $RegPath -Name 'Channel'        -PropertyType String -Value $channel -Force | Out-Null
                 $seedOk = $true
             } catch { $seedOk = $false }
         }
         if (-not $seedOk) {
             # b64 fallback
-            New-ItemProperty -Path $RegPath -Name 'SM' -PropertyType String -Value (DoubleB64 $ExpectedManufacturer) -Force | Out-Null
-            if ($expSpn) { New-ItemProperty -Path $RegPath -Name 'SPN' -PropertyType String -Value (DoubleB64 $expSpn) -Force | Out-Null }
-            if ($provName) { New-ItemProperty -Path $RegPath -Name 'ProvName' -PropertyType String -Value (DoubleB64 $provName) -Force | Out-Null }
+            New-ItemProperty -Path $RegPath -Name 'SM'       -PropertyType String -Value (DoubleB64 $ExpectedManufacturer) -Force | Out-Null
+            if ($expSpn)  { New-ItemProperty -Path $RegPath -Name 'SPN'      -PropertyType String -Value (DoubleB64 $expSpn) -Force | Out-Null }
+            if ($provName){ New-ItemProperty -Path $RegPath -Name 'ProvName' -PropertyType String -Value (DoubleB64 $provName) -Force | Out-Null }
+            New-ItemProperty -Path $RegPath -Name 'Channel'  -PropertyType String -Value (DoubleB64 $channel) -Force | Out-Null
         }
     }
 }
 
-# ---- Evaluate compliance ----
+# ---- Evaluate compliance when IMDS is active ----
 if ($imdsActive) {
     $AzEnvOk    = $true
     $TenantIdOk = ($tenantId -eq $CorpTenant)
 
-    # Expected values from registry (prefer v2; else v1)
+    # Read expected values (prefer v2; else v1)
     $SM_v2=$null;$SPN_v2=$null;$Prov_v2=$null;$SM_v1=$null;$SPN_v1=$null;$Prov_v1=$null
     try {
         $p = Get-ItemProperty -Path $RegPath -ErrorAction Stop
@@ -210,11 +215,11 @@ if ($imdsActive) {
     $keyBytes = Derive-KeyBytes16 $compute
     $expSM  = $ExpectedManufacturer
     $expSPN = switch ($channel) {
-        'DevBox'    { 'Microsoft Dev Box' }
-        'AVD'       { '' }
-        'DevTestLab'{ '' }
-        'W365'      { 'Cloud PC' }
-        default     { 'Cloud PC' }
+        'DevBox'     { 'Microsoft Dev Box' }
+        'AVD'        { '' }
+        'DevTestLab' { '' }
+        'W365'       { 'Cloud PC' }
+        default      { 'Cloud PC' }
     }
     $expProv= $provName
 
@@ -245,24 +250,26 @@ if ($imdsActive) {
     # Manufacturer
     $SystemManufacturerOk = ($sysMfr -eq $expSM)
 
-    # Channel-aware final check
+    # Channel-aware model/hostname check
     if ($channel -in @('W365','DevBox')) {
         $SystemProductNamePrefixOk = ($sysProd -and $expSPN -and $sysProd.StartsWith($expSPN))
     } elseif ($channel -in @('AVD','DevTestLab')) {
-        $SystemProductNamePrefixOk = ($expProv -and ($env:COMPUTERNAME.Split('.')[0].Trim().ToUpper() -eq $expProv.Trim().ToUpper()))
+        # For AVD/DTL we omit model check; rely on HostnameOk
+        $SystemProductNamePrefixOk = $true
     } else {
-        # Unknown: require Cloud PC prefix conservatively
+        # Unknown: conservative default
         $SystemProductNamePrefixOk = ($sysProd -and $sysProd.StartsWith('Cloud PC'))
     }
 }
 
-# Emit only the four booleans
+# Emit only the five booleans
 [ordered]@{
     AzEnvOk = [bool]$AzEnvOk
     TenantIdOk = [bool]$TenantIdOk
     SystemManufacturerOk = [bool]$SystemManufacturerOk
     SystemProductNamePrefixOk = [bool]$SystemProductNamePrefixOk
+    HostnameOk = [bool]$HostnameOk
 } | ConvertTo-Json -Compress
 
 # Exit by AND
-if ($AzEnvOk -and $TenantIdOk -and $SystemManufacturerOk -and $SystemProductNamePrefixOk) { exit 0 } else { exit 1 }
+if ($AzEnvOk -and $TenantIdOk -and $SystemManufacturerOk -and $SystemProductNamePrefixOk -and $HostnameOk) { exit 0 } else { exit 1 }

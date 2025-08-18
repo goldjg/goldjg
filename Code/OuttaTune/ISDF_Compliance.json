@@ -57,7 +57,7 @@
       ]
     },
     {
-      "SettingName": "HostnameOk",
+      "SettingName": "HostnameMatchesProvisioned",
       "Operator": "IsEquals",
       "DataType": "Boolean",
       "Operand": true,

@@ -1,143 +1,97 @@
 # ISDFRemediate.ps1
-# Stamps expected values into HKLM:\SOFTWARE\ISDF using DPAPI SecureString with -Key (per-machine entropy).
-# Falls back to double-Base64 only if -Key path isn't usable. 64-bit forced. No WMI.
+# Ensures baseline registry is present and stores protected channel.
+# PS 5.1 compatible.
 
-# -------- Force 64-bit ----------
+# ------------------------------
+# Force 64-bit Bootstrap
+# ------------------------------
 if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
-  $env:CI_RUN_IN_64BIT='1'
-  & "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
-  exit $LASTEXITCODE
-}
-# ---------------------------------
-$ErrorActionPreference = 'Stop'
-
-# Constants
-$RegPath = 'HKLM:\SOFTWARE\ISDF'
-$ExpectedManufacturer = 'Microsoft Corporation'
-
-# ---------- Helpers ----------
-function Get-IMDSCompute {
-  for ($i=0; $i -lt 3; $i++) {
-    try {
-      return Invoke-RestMethod -Headers @{ Metadata='true' } -Uri 'http://169.254.169.254/metadata/instance/compute?api-version=2021-02-01' -TimeoutSec 3
-    } catch { Start-Sleep -Seconds (2 * ($i+1)) }
-  }
-  return $null
-}
-function Parse-TagValue($compute, [string]$needle) {
-  if (-not $compute) { return $null }
-  $val = $null
-  if ($compute.PSObject.Properties.Name -contains 'tagsList' -and $compute.tagsList) {
-    foreach ($e in $compute.tagsList) {
-      $s = [string]$e
-      if ($s -like "*$needle*") {
-        $txt = $s.Trim('@','{','}')
-        $name = $null; $value = $null
-        foreach ($p in ($txt -split ';')) {
-          $kv = $p.Trim()
-          if ($kv -like 'name=*')  { $name  = $kv.Substring(5) }
-          if ($kv -like 'value=*') { $value = $kv.Substring(6) }
-        }
-        $val = $value; break
-      }
+    $env:CI_RUN_IN_64BIT = '1'
+    $argList = $MyInvocation.UnboundArguments | ForEach-Object {
+        if ($_ -is [string] -and $_.Contains(' ')) { '"{0}"' -f $_ } else { $_ }
     }
-  }
-  if (-not $val -and $compute.PSObject.Properties.Name -contains 'tags' -and $compute.tags) {
-    $flat = [string]$compute.tags
-    if ($flat -match "$([Regex]::Escape($needle)):([^;]+)") { $val = $matches[1].Trim() }
-  }
-  return $val
-}
-function Get-Channel($compute) {
-  $src = Parse-TagValue -compute $compute -needle 'origin.sourcearmid.0'
-  if (-not $src) { return 'Unknown' }
-
-  $sid = $null
-  if ($src -match '/subscriptions/([0-9a-fA-F-]{36})') { $sid = $matches[1] }
-  $hasProviders = ($src -match '/providers/')
-  $isZeroSid = $false
-  if ($sid) { $isZeroSid = (($sid -replace '-', '') -match '^0{32}$') }
-
-  if ($isZeroSid -and -not $hasProviders) { return 'W365' }
-  if ($src -match 'Providers/Microsoft\.DevCenter')             { return 'DevBox' }
-  if ($src -match 'Providers/Microsoft\.DesktopVirtualization') { return 'AVD' }
-  if ($src -match 'Providers/Microsoft\.DevTestLab')            { return 'DevTestLab' }
-  return 'Unknown'
-}
-function Get-OriginTenantId($compute) {
-  Parse-TagValue -compute $compute -needle 'origin.tenantid'
-}
-function Derive-KeyBytes16($compute) {
-  if (-not $compute) { return $null }
-  $azEnv = if ($compute.PSObject.Properties.Name -contains 'azEnvironment') { $compute.azEnvironment } else { $null }
-  $subId = if ($compute.PSObject.Properties.Name -contains 'subscriptionId') { $compute.subscriptionId } else { $null }
-  $rg    = if ($compute.PSObject.Properties.Name -contains 'resourceGroupName') { $compute.resourceGroupName } else { $null }
-  $vmId  = if ($compute.PSObject.Properties.Name -contains 'vmId') { $compute.vmId } else { $null }
-  $offer = if ($compute.PSObject.Properties.Name -contains 'offer') { $compute.offer } else { $null }
-  $tenId = Get-OriginTenantId $compute
-  $parts = @($azEnv,$subId,$rg,$vmId,$offer,$tenId) -join '|'
-  $sha = [Security.Cryptography.SHA256]::Create()
-  try { $digest = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($parts)) } finally { $sha.Dispose() }
-  return $digest[0..15]
-}
-function Protect-Text-WithKey([string]$plain, [byte[]]$key) {
-  $sec = ConvertTo-SecureString -String $plain -AsPlainText -Force
-  ConvertFrom-SecureString -SecureString $sec -Key $key
-}
-function DoubleB64([string]$s) {
-  $b1=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s))
-  [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($b1))
-}
-# -----------------------------
-
-# Ensure key exists
-if (-not (Test-Path $RegPath)) { New-Item -Path $RegPath -Force | Out-Null }
-
-# IMDS + channel
-$compute  = Get-IMDSCompute
-if (-not $compute) { exit 0 }  # IMDS unavailable → skip stamping (non-CloudPC scenarios)
-$channel  = Get-Channel $compute
-$provName = if ($compute.PSObject.Properties.Name -contains 'osProfile' -and $compute.osProfile) { $compute.osProfile.computerName } else { $null }
-
-# Channel-specific SPN prefix
-$ExpectedSpnPrefix = switch ($channel) {
-  'DevBox'     { 'Microsoft Dev Box' }
-  'AVD'        { '' }               # SPN not enforced
-  'DevTestLab' { '' }
-  'W365'       { 'Cloud PC' }
-  default      { 'Cloud PC' }
+    $ps64 = Join-Path $env:WINDIR 'SysNative\WindowsPowerShell\v1.0\powershell.exe'
+    & $ps64 -NoProfile -ExecutionPolicy Bypass -File $MyInvocation.MyCommand.Path @argList
+    exit $LASTEXITCODE
 }
 
-# Derive per-machine key + write protected values
-$keyBytes = Derive-KeyBytes16 $compute
-$wroteV2 = $false
-if ($keyBytes -and $keyBytes.Length -eq 16) {
-  try {
-    $encSM     = Protect-Text-WithKey $ExpectedManufacturer $keyBytes
-    $encSPN    = if ($ExpectedSpnPrefix) { Protect-Text-WithKey $ExpectedSpnPrefix $keyBytes } else { $null }
-    $encHost   = if ($provName) { Protect-Text-WithKey $provName $keyBytes } else { $null }
-    $encChan   = Protect-Text-WithKey $channel $keyBytes
+$ErrorActionPreference = 'SilentlyContinue'
 
-    New-ItemProperty -Path $RegPath -Name 'SM_v2'        -PropertyType String -Value $encSM   -Force | Out-Null
-    if ($encSPN)  { New-ItemProperty -Path $RegPath -Name 'SPN_v2'       -PropertyType String -Value $encSPN  -Force | Out-Null }
-    if ($encHost) { New-ItemProperty -Path $RegPath -Name 'ProvName_v2'  -PropertyType String -Value $encHost -Force | Out-Null }
-    New-ItemProperty -Path $RegPath -Name 'Channel_v2'   -PropertyType String -Value $encChan -Force | Out-Null
-    New-ItemProperty -Path $RegPath -Name 'SCHEMA_VERSION' -PropertyType String -Value '2'    -Force | Out-Null
+# ------------------------------
+# Config
+# ------------------------------
+$IMDSApiVersion = '2021-02-01'
+$RegPath        = 'HKLM:\SOFTWARE\ISDF'
+$RegNameProtChan= 'ChannelProtected'
 
-    $wroteV2 = $true
-  } catch { $wroteV2 = $false }
+# ------------------------------
+# Helpers (PS 5.1 safe)
+# ------------------------------
+function Get-Prop {
+    param($obj,[string]$name)
+    if ($null -ne $obj -and $obj.PSObject.Properties[$name]) { return $obj.$name }
+    return $null
 }
 
-if (-not $wroteV2) {
-  # Fallback only if SecureString -Key wasn't usable
-  New-ItemProperty -Path $RegPath -Name 'SM'       -PropertyType String -Value (DoubleB64 $ExpectedManufacturer) -Force | Out-Null
-  if ($ExpectedSpnPrefix) {
-    New-ItemProperty -Path $RegPath -Name 'SPN'    -PropertyType String -Value (DoubleB64 $ExpectedSpnPrefix)   -Force | Out-Null
-  }
-  if ($provName) {
-    New-ItemProperty -Path $RegPath -Name 'ProvName' -PropertyType String -Value (DoubleB64 $provName)          -Force | Out-Null
-  }
-  New-ItemProperty -Path $RegPath -Name 'Channel'  -PropertyType String -Value (DoubleB64 $channel)              -Force | Out-Null
+function Get-IMDSCompute {
+    try {
+        $hdr = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+        $hdr.Add('Metadata','true')
+        $uri = "http://169.254.169.254/metadata/instance?api-version=$IMDSApiVersion"
+        $raw = Invoke-RestMethod -Headers $hdr -Method GET -Uri $uri -TimeoutSec 2
+        return (Get-Prop $raw 'compute')
+    } catch { $null }
 }
 
+function Get-ChannelFromIMDS {
+    param($compute)
+
+    $channel = 'Unknown'
+    if ($null -eq $compute) { return $channel }
+
+    $tagsList = @()
+    if ($compute.PSObject.Properties['tagsList']) {
+        $tagsList = @($compute.tagsList)
+    }
+
+    $sourceArm = $null
+    foreach ($t in $tagsList) {
+        if ($t -like '*origin.sourcearmid.0*') { $sourceArm = $t; break }
+    }
+
+    if ($sourceArm -and ($sourceArm -match 'value=([^}]*)')) {
+        $val = $Matches[1]
+        if ($val -match '/subscriptions/00000000-0000-0000-0000-000000000000($|/)') { return 'Windows365' }
+        if ($val -match '/providers/Microsoft\.DevCenter')             { return 'DevBox' }
+        if ($val -match '/providers/Microsoft\.DesktopVirtualization') { return 'AVD' }
+        if ($val -match '/providers/Microsoft\.DevTestLab')            { return 'DevTestLab' }
+    }
+
+    return $channel
+}
+
+function Protect-Text {
+    param([Parameter(Mandatory=$true)][string]$Plain)
+    # DPAPI (machine/SYSTEM) via SecureString
+    $sec  = ConvertTo-SecureString -String $Plain -AsPlainText -Force
+    $blob = $sec | ConvertFrom-SecureString
+    return $blob
+}
+
+# ------------------------------
+# Ensure baseline + write protected channel
+# ------------------------------
+if (-not (Test-Path $RegPath)) {
+    New-Item -Path $RegPath -Force | Out-Null
+}
+
+$compute = Get-IMDSCompute
+$channel = Get-ChannelFromIMDS -compute $compute
+if ([string]::IsNullOrWhiteSpace($channel)) { $channel = 'Unknown' }
+
+# Store channel protected to reduce tampering
+$prot = Protect-Text -Plain $channel
+New-ItemProperty -Path $RegPath -Name $RegNameProtChan -Value $prot -PropertyType String -Force | Out-Null
+
+# Nothing else needs to be emitted for remediation; exit success
 exit 0

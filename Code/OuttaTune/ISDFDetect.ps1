@@ -1,275 +1,199 @@
-# ISDFDetect.ps1
-# Emits exactly 5 booleans for ISDF compliance:
-# AzEnvOk, TenantIdOk, SystemManufacturerOk, SystemProductNamePrefixOk, HostnameOk
+# ISDF_Detect.ps1  -- single self-healing detection (PS 5.1 safe)
 
-# -------- Force 64-bit ----------
-if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:CI_RUN_IN_64BIT) {
-    $env:CI_RUN_IN_64BIT = '1'
-    & "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
+# -------- 64-bit trampoline --------
+if ($env:PROCESSOR_ARCHITEW6432 -and -not $env:ISDF_RUN_64) {
+    $env:ISDF_RUN_64 = '1'
+    $ps64 = Join-Path $env:WINDIR 'SysNative\WindowsPowerShell\v1.0\powershell.exe'
+    & $ps64 -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
     exit $LASTEXITCODE
 }
-# ---------------------------------
+# -----------------------------------
+
 $ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference    = 'SilentlyContinue'
 
-# Constants
-$RegPath = 'HKLM:\SOFTWARE\ISDF'
+# ----------------- Config -----------------
+$RegPath              = 'HKLM:\SOFTWARE\ISDF'
+$Name_SignalB64       = 'SignalB64'
+$Name_SignalProt      = 'SignalProtected'      # DPAPI (legacy fallback)
+$Name_ChannelProt     = 'ChannelProtected'     # DPAPI (legacy fallback)
+$Name_SignalProtV2    = 'SignalProtected_v2'   # Protected with per-VM Key
+$Name_ChannelProtV2   = 'ChannelProtected_v2'  # Protected with per-VM Key
+$Name_Version         = 'Version'
+$SchemaVersion        = '2'
+
+$ImdsApiVersion       = '2021-02-01'
+$SysInfoKey           = 'HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation'
 $ExpectedManufacturer = 'Microsoft Corporation'
-$CorpTenant = 'd980314b-cb2f-44e3-9ce7-06d7361ab382'
+$ExpectedTenantId     = 'd980314b-cb2f-44e3-9ce7-06d7361ab382'
+$Prefix_W365          = 'Cloud PC'
+$Prefix_DevBox        = 'Microsoft Dev Box'
+# -------------------------------------------
 
-# ---------- Helpers ----------
-function Get-IMDS {
-    for ($i=0; $i -lt 3; $i++) {
+# ---------- Helpers (PS 5.1 safe) ----------
+function Get-ImdsCompute {
+    $hdr = New-Object 'System.Collections.Generic.Dictionary[string,string]'
+    $hdr.Add('Metadata','true')
+    $uri = "http://169.254.169.254/metadata/instance?api-version=$ImdsApiVersion"
+    for ($i=0; $i -lt 2; $i++) {
         try {
-            return Invoke-RestMethod -Headers @{ Metadata='true' } -Uri 'http://169.254.169.254/metadata/instance?api-version=2021-02-01' -TimeoutSec 3
-        } catch { Start-Sleep -Seconds (2 * ($i+1)) }
+            $resp = Invoke-RestMethod -Headers $hdr -Method GET -Uri $uri -TimeoutSec 2
+            if ($resp -and $resp.compute) { return $resp.compute }
+        } catch { Start-Sleep -Milliseconds (200 * ($i+1)) }
     }
-    $null
+    return $null
 }
-function Parse-TagValue($compute, [string]$needle) {
-    if (-not $compute) { return $null }
-    $val = $null
-    if ($compute.PSObject.Properties.Name -contains 'tagsList' -and $compute.tagsList) {
-        foreach ($e in $compute.tagsList) {
-            $s = [string]$e
-            if ($s -like "*$needle*") {
-                $txt = $s.Trim('@','{','}')
-                $name = $null; $value = $null
-                foreach ($p in ($txt -split ';')) {
-                    $kv = $p.Trim()
-                    if ($kv -like 'name=*')  { $name  = $kv.Substring(5) }
-                    if ($kv -like 'value=*') { $value = $kv.Substring(6) }
-                }
-                $val = $value; break
-            }
+function Get-SystemInfo {
+    $m=$null;$p=$null
+    try {
+        $si = Get-ItemProperty -Path $SysInfoKey -ErrorAction Stop
+        $m = [string]$si.SystemManufacturer
+        $p = [string]$si.SystemProductName
+    } catch {}
+    [pscustomobject]@{ Manufacturer=$m; Product=$p }
+}
+function Get-TagsMap($compute) {
+    $map=@{}
+    if ($compute -and $compute.tagsList) {
+        foreach ($t in $compute.tagsList) { if ($t -and $t.name) { $map[$t.name]=$t.value } }
+    }
+    $map
+}
+function Derive-Channel($compute) {
+    if (-not $compute) { return 'Unknown' }
+    $vals=@()
+    if ($compute.tagsList) {
+        foreach ($t in $compute.tagsList) {
+            if ($t.name -like 'ms.inv.v0.backedby.origin.sourcearmid*' -and $t.value) { $vals += [string]$t.value }
         }
     }
-    if (-not $val -and $compute.PSObject.Properties.Name -contains 'tags' -and $compute.tags) {
-        $flat = [string]$compute.tags
-        if ($flat -match "$([Regex]::Escape($needle)):([^;]+)") { $val = $matches[1].Trim() }
+    $srcText = ($vals -join ';')
+    if ([string]::IsNullOrEmpty($srcText)) { return 'Unknown' }
+    if ($srcText -match '/subscriptions/00000000-0000-0000-0000-000000000000') { return 'W365' }
+    if ($srcText -match '/providers/Microsoft\.DevCenter')             { return 'DevBox' }
+    if ($srcText -match '/providers/Microsoft\.DesktopVirtualization') { return 'AVD' }
+    if ($srcText -match '/providers/Microsoft\.DevTestLab')            { return 'DTL' }
+    'Unknown'
+}
+function Build-SignalJson($tenantId,$azEnv,$provHost,$channel) {
+    $obj=[ordered]@{
+        TenantId            = $tenantId
+        AzEnvironment       = $azEnv
+        ProvisionedHostname = $provHost
+        Channel             = $channel
+        TimestampUtc        = [DateTime]::UtcNow.ToString('o')
     }
-    return $val
+    $obj | ConvertTo-Json -Depth 4 -Compress
 }
-# Channel classification (W365 = zero subscription GUID AND no /providers/ in origin.sourcearmid.0)
-function Get-Channel($compute) {
-    $src = Parse-TagValue -compute $compute -needle 'origin.sourcearmid.0'
-    if (-not $src) { return 'Unknown' }
-
-    $sid = $null
-    if ($src -match '/subscriptions/([0-9a-fA-F-]{36})') { $sid = $matches[1] }
-    $hasProviders = ($src -match '/providers/')
-    $isZeroSid = $false
-    if ($sid) { $isZeroSid = (($sid -replace '-', '') -match '^0{32}$') }
-
-    if ($isZeroSid -and -not $hasProviders) { return 'W365' }
-    if ($src -match 'Providers/Microsoft\.DevCenter')             { return 'DevBox' }
-    if ($src -match 'Providers/Microsoft\.DesktopVirtualization') { return 'AVD' }
-    if ($src -match 'Providers/Microsoft\.DevTestLab')            { return 'DevTestLab' }
-    return 'Unknown'
-}
-function Get-OriginTenantId($compute) {
-    Parse-TagValue -compute $compute -needle 'origin.tenantid'
-}
-function Derive-KeyBytes16($compute) {
+function Derive-KeyBytes16($compute,$tagsMap) {
     if (-not $compute) { return $null }
-    $azEnv = if ($compute.PSObject.Properties.Name -contains 'azEnvironment') { $compute.azEnvironment } else { $null }
-    $subId = if ($compute.PSObject.Properties.Name -contains 'subscriptionId') { $compute.subscriptionId } else { $null }
-    $rg    = if ($compute.PSObject.Properties.Name -contains 'resourceGroupName') { $compute.resourceGroupName } else { $null }
-    $vmId  = if ($compute.PSObject.Properties.Name -contains 'vmId') { $compute.vmId } else { $null }
-    $offer = if ($compute.PSObject.Properties.Name -contains 'offer') { $compute.offer } else { $null }
-    $tenId = Get-OriginTenantId $compute
-    $parts = @($azEnv,$subId,$rg,$vmId,$offer,$tenId) -join '|'
+    $az    = if ($compute.azEnvironment)      { [string]$compute.azEnvironment }      else { '' }
+    $sub   = if ($compute.subscriptionId)     { [string]$compute.subscriptionId }     else { '' }
+    $rg    = if ($compute.resourceGroupName)  { [string]$compute.resourceGroupName }  else { '' }
+    $vmid  = if ($compute.vmId)               { [string]$compute.vmId }               else { '' }
+    $offer = if ($compute.offer)              { [string]$compute.offer }              else { '' }
+    $ten   = if ($tagsMap.ContainsKey('ms.inv.v0.backedby.origin.tenantid')) { [string]$tagsMap['ms.inv.v0.backedby.origin.tenantid'] } else { '' }
+    $canon = ($az.ToLower()+'|'+$sub.ToLower()+'|'+$rg.ToLower()+'|'+$vmid.ToLower()+'|'+$offer.ToLower()+'|'+$ten.ToLower())
     $sha = [Security.Cryptography.SHA256]::Create()
-    try { $digest = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($parts)) } finally { $sha.Dispose() }
-    return $digest[0..15]
+    try { $digest = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($canon)) } finally { $sha.Dispose() }
+    return $digest[0..15] # 16-byte key for ConvertFrom/To-SecureString -Key
 }
-function Protect-Text-WithKey([string]$plain, [byte[]]$key) {
-    $sec = ConvertTo-SecureString -String $plain -AsPlainText -Force
-    ConvertFrom-SecureString -SecureString $sec -Key $key
-}
-function Unprotect-WithKey([string]$blob, [byte[]]$key) {
+function Protect-WithKey([string]$plain,[byte[]]$key) {
     try {
-        $sec = ConvertTo-SecureString -String $blob -Key $key
-        $ptr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($sec)
-        try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr) }
-        finally { if ($ptr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($ptr) } }
-    } catch { $null }
+        $sec = ConvertTo-SecureString -String $plain -AsPlainText -Force
+        return (ConvertFrom-SecureString -SecureString $sec -Key $key)
+    } catch { return $null }
 }
-function DoubleB64([string]$s) {
-    $b1=[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s))
-    [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($b1))
-}
-function FromDoubleB64([string]$s) {
+function Protect-DPAPI([string]$plain) {
     try {
-        $b1 = [Convert]::FromBase64String($s)
-        $s1 = [Text.Encoding]::UTF8.GetString($b1)
-        $b2 = [Convert]::FromBase64String($s1)
-        [Text.Encoding]::UTF8.GetString($b2)
-    } catch { $null }
+        $sec = ConvertTo-SecureString -String $plain -AsPlainText -Force
+        return ($sec | ConvertFrom-SecureString)
+    } catch { return $null }
 }
-# -----------------------------
+# --------------------------------------------
 
-# Live values (SystemInformation only; no WMI)
-$sysMfr  = $null
-$sysProd = $null
-try {
-    $si = Get-ItemProperty -Path 'HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation' -ErrorAction Stop
-    $sysMfr  = $si.SystemManufacturer
-    $sysProd = $si.SystemProductName
-} catch {}
-
-# IMDS and channel
-$imds    = Get-IMDS
-$compute = if ($imds -and $imds.PSObject.Properties.Name -contains 'compute') { $imds.compute } else { $null }
-$azEnv   = if ($compute -and $compute.PSObject.Properties.Name -contains 'azEnvironment') { $compute.azEnvironment } else { $null }
-$tenantId= Get-OriginTenantId $compute
-$channel = if ($compute) { Get-Channel $compute } else { $null }
-$provName= if ($compute -and $compute.PSObject.Properties.Name -contains 'osProfile' -and $compute.osProfile) { $compute.osProfile.computerName } else { $null }
-
-# Hostname boolean: compare LIVE hostname vs IMDS osProfile.computerName (case-insensitive, ignore domain)
-$localHost = ($env:COMPUTERNAME -split '\.')[0]
-$HostnameOk = $true
-if ($compute -and $provName) {
-    $HostnameOk = ($localHost.Trim().ToUpper() -eq $provName.Trim().ToUpper())
+# -------- Gather live signals --------
+$compute   = Get-ImdsCompute
+$sys       = Get-SystemInfo
+$azEnv     = $null
+$provHost  = $null
+$tenantId  = $null
+$channel   = 'Unknown'
+$tagsMap   = @{}
+if ($compute) {
+    $azEnv    = $compute.azEnvironment
+    if ($compute.osProfile -and $compute.osProfile.computerName) { $provHost = [string]$compute.osProfile.computerName }
+    $tagsMap  = Get-TagsMap -compute $compute
+    if ($tagsMap.ContainsKey('ms.inv.v0.backedby.origin.tenantid')) { $tenantId = $tagsMap['ms.inv.v0.backedby.origin.tenantid'] }
+    $channel  = Derive-Channel -compute $compute
 }
+$liveHost  = $env:COMPUTERNAME
 
-# IMDS gating (do not penalize when IMDS inactive/not AzurePublicCloud)
-$AzEnvOk    = $true
-$TenantIdOk = $true
-$SystemManufacturerOk      = $true
-$SystemProductNamePrefixOk = $true
+# -------- Self-heal baseline (uses per-VM key when possible) --------
+if ($compute) {
+    $signal   = Build-SignalJson -tenantId $tenantId -azEnv $azEnv -provHost $provHost -channel $channel
+    $signalB64= [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($signal))
+    $keyBytes = Derive-KeyBytes16 -compute $compute -tagsMap $tagsMap
 
-$imdsActive = ($azEnv -and $azEnv -eq 'AzurePublicCloud')
+    if (-not (Test-Path -LiteralPath $RegPath)) { New-Item -Path $RegPath -Force | Out-Null }
 
-# ---- Bootstrap: seed ISDF hive if IMDS is active and values are missing ----
-if ($imdsActive) {
-    $haveAny = $false
-    if (Test-Path $RegPath) {
-        try {
-            $pre = Get-ItemProperty -Path $RegPath -ErrorAction Stop
-            $haveAny = ($pre.PSObject.Properties.Name -contains 'SM_v2') -or
-                       ($pre.PSObject.Properties.Name -contains 'SPN_v2') -or
-                       ($pre.PSObject.Properties.Name -contains 'ProvName_v2') -or
-                       ($pre.PSObject.Properties.Name -contains 'Channel_v2') -or
-                       ($pre.PSObject.Properties.Name -contains 'SM') -or
-                       ($pre.PSObject.Properties.Name -contains 'SPN') -or
-                       ($pre.PSObject.Properties.Name -contains 'ProvName') -or
-                       ($pre.PSObject.Properties.Name -contains 'Channel')
-        } catch { $haveAny = $false }
-    }
-    if (-not $haveAny) {
-        if (-not (Test-Path $RegPath)) { New-Item -Path $RegPath -Force | Out-Null }
-        $keyBytes = Derive-KeyBytes16 $compute
-        $expSpn = switch ($channel) {
-            'DevBox'     { 'Microsoft Dev Box' }
-            'AVD'        { '' }
-            'DevTestLab' { '' }
-            'W365'       { 'Cloud PC' }
-            default      { 'Cloud PC' }
-        }
-        $seedOk = $false
-        if ($keyBytes -and $keyBytes.Length -eq 16) {
-            try {
-                $encSM   = Protect-Text-WithKey $ExpectedManufacturer $keyBytes
-                New-ItemProperty -Path $RegPath -Name 'SM_v2' -PropertyType String -Value $encSM -Force | Out-Null
-                if ($expSpn) {
-                    $encSPN = Protect-Text-WithKey $expSpn $keyBytes
-                    New-ItemProperty -Path $RegPath -Name 'SPN_v2' -PropertyType String -Value $encSPN -Force | Out-Null
-                }
-                if ($provName) {
-                    $encHost = Protect-Text-WithKey $provName $keyBytes
-                    New-ItemProperty -Path $RegPath -Name 'ProvName_v2' -PropertyType String -Value $encHost -Force | Out-Null
-                }
-                $encChan = Protect-Text-WithKey $channel $keyBytes
-                New-ItemProperty -Path $RegPath -Name 'Channel_v2' -PropertyType String -Value $encChan -Force | Out-Null
-                New-ItemProperty -Path $RegPath -Name 'SCHEMA_VERSION' -PropertyType String -Value '2' -Force | Out-Null
-                $seedOk = $true
-            } catch { $seedOk = $false }
-        }
-        if (-not $seedOk) {
-            # b64 fallback
-            New-ItemProperty -Path $RegPath -Name 'SM'       -PropertyType String -Value (DoubleB64 $ExpectedManufacturer) -Force | Out-Null
-            if ($expSpn)  { New-ItemProperty -Path $RegPath -Name 'SPN'      -PropertyType String -Value (DoubleB64 $expSpn) -Force | Out-Null }
-            if ($provName){ New-ItemProperty -Path $RegPath -Name 'ProvName' -PropertyType String -Value (DoubleB64 $provName) -Force | Out-Null }
-            New-ItemProperty -Path $RegPath -Name 'Channel'  -PropertyType String -Value (DoubleB64 $channel) -Force | Out-Null
-        }
-    }
-}
-
-# ---- Evaluate compliance when IMDS is active ----
-if ($imdsActive) {
-    $AzEnvOk    = $true
-    $TenantIdOk = ($tenantId -eq $CorpTenant)
-
-    # Read expected values (prefer v2; else v1)
-    $SM_v2=$null;$SPN_v2=$null;$Prov_v2=$null;$SM_v1=$null;$SPN_v1=$null;$Prov_v1=$null
+    $needWrite = $true
     try {
-        $p = Get-ItemProperty -Path $RegPath -ErrorAction Stop
-        if ($p.PSObject.Properties.Name -contains 'SM_v2')      { $SM_v2  = $p.SM_v2 }
-        if ($p.PSObject.Properties.Name -contains 'SPN_v2')     { $SPN_v2 = $p.SPN_v2 }
-        if ($p.PSObject.Properties.Name -contains 'ProvName_v2'){ $Prov_v2= $p.ProvName_v2 }
-        if ($p.PSObject.Properties.Name -contains 'SM')         { $SM_v1  = $p.SM }
-        if ($p.PSObject.Properties.Name -contains 'SPN')        { $SPN_v1 = $p.SPN }
-        if ($p.PSObject.Properties.Name -contains 'ProvName')   { $Prov_v1= $p.ProvName }
+        $cur = Get-ItemProperty -Path $RegPath -ErrorAction Stop
+        if ($cur.$Name_SignalB64 -and ($cur.$Name_SignalB64 -eq $signalB64)) { $needWrite = $false }
     } catch {}
 
-    $keyBytes = Derive-KeyBytes16 $compute
-    $expSM  = $ExpectedManufacturer
-    $expSPN = switch ($channel) {
-        'DevBox'     { 'Microsoft Dev Box' }
-        'AVD'        { '' }
-        'DevTestLab' { '' }
-        'W365'       { 'Cloud PC' }
-        default      { 'Cloud PC' }
-    }
-    $expProv= $provName
-
-    if ($keyBytes -and $SM_v2) {
-        $tmp = Unprotect-WithKey $SM_v2 $keyBytes
-        if ($tmp) { $expSM = $tmp }
-    } elseif ($SM_v1) {
-        $tmp = FromDoubleB64 $SM_v1
-        if ($tmp) { $expSM = $tmp }
-    }
-    if ($expSPN) {
-        if ($keyBytes -and $SPN_v2) {
-            $tmp = Unprotect-WithKey $SPN_v2 $keyBytes
-            if ($tmp) { $expSPN = $tmp }
-        } elseif ($SPN_v1) {
-            $tmp = FromDoubleB64 $SPN_v1
-            if ($tmp) { $expSPN = $tmp }
+    if ($needWrite) {
+        $protV2  = $null
+        $chanV2  = $null
+        if ($keyBytes -and $keyBytes.Length -eq 16) {
+            $protV2 = Protect-WithKey -plain $signal -key $keyBytes
+            $chanV2 = Protect-WithKey -plain $channel -key $keyBytes
         }
-    }
-    if ($keyBytes -and $Prov_v2) {
-        $tmp = Unprotect-WithKey $Prov_v2 $keyBytes
-        if ($tmp) { $expProv = $tmp }
-    } elseif ($Prov_v1) {
-        $tmp = FromDoubleB64 $Prov_v1
-        if ($tmp) { $expProv = $tmp }
-    }
-
-    # Manufacturer
-    $SystemManufacturerOk = ($sysMfr -eq $expSM)
-
-    # Channel-aware model/hostname check
-    if ($channel -in @('W365','DevBox')) {
-        $SystemProductNamePrefixOk = ($sysProd -and $expSPN -and $sysProd.StartsWith($expSPN))
-    } elseif ($channel -in @('AVD','DevTestLab')) {
-        # For AVD/DTL we omit model check; rely on HostnameOk
-        $SystemProductNamePrefixOk = $true
-    } else {
-        # Unknown: conservative default
-        $SystemProductNamePrefixOk = ($sysProd -and $sysProd.StartsWith('Cloud PC'))
+        # Always store SignalB64 for deterministic compare; store v2 when available; also keep DPAPI fallback fields for legacy readers.
+        New-ItemProperty -Path $RegPath -Name $Name_SignalB64    -Value $signalB64 -PropertyType String -Force | Out-Null
+        if ($protV2)  { New-ItemProperty -Path $RegPath -Name $Name_SignalProtV2  -Value $protV2  -PropertyType String -Force | Out-Null }
+        if ($chanV2)  { New-ItemProperty -Path $RegPath -Name $Name_ChannelProtV2 -Value $chanV2  -PropertyType String -Force | Out-Null }
+        # DPAPI legacy fallbacks (don’t depend on them for comparison)
+        $dpSig = Protect-DPAPI -plain $signal
+        $dpCha = Protect-DPAPI -plain $channel
+        if ($dpSig) { New-ItemProperty -Path $RegPath -Name $Name_SignalProt  -Value $dpSig -PropertyType String -Force | Out-Null }
+        if ($dpCha) { New-ItemProperty -Path $RegPath -Name $Name_ChannelProt -Value $dpCha -PropertyType String -Force | Out-Null }
+        New-ItemProperty -Path $RegPath -Name $Name_Version -Value $SchemaVersion -PropertyType String -Force | Out-Null
     }
 }
 
-# Emit only the five booleans
-[ordered]@{
-    AzEnvOk = [bool]$AzEnvOk
-    TenantIdOk = [bool]$TenantIdOk
-    SystemManufacturerOk = [bool]$SystemManufacturerOk
-    SystemProductNamePrefixOk = [bool]$SystemProductNamePrefixOk
-    HostnameOk = [bool]$HostnameOk
-} | ConvertTo-Json -Compress
+# -------- Evaluate booleans (IMDS gating) --------
+$AzEnvOk = $false
+if (-not [string]::IsNullOrEmpty($azEnv)) { $AzEnvOk = ($azEnv -eq 'AzurePublicCloud') }
 
-# Exit by AND
-if ($AzEnvOk -and $TenantIdOk -and $SystemManufacturerOk -and $SystemProductNamePrefixOk -and $HostnameOk) { exit 0 } else { exit 1 }
+# Gate the rest: when not in AzurePublicCloud (or IMDS absent), they default to TRUE
+$TenantIdOk                  = $true
+$SystemManufacturerOk        = $true
+$SystemProductNamePrefixOk   = $true
+$HostnameMatchesProvisioned  = $true
+
+if ($AzEnvOk) {
+    $TenantIdOk           = ($tenantId -eq $ExpectedTenantId)
+    $SystemManufacturerOk = ($sys.Manufacturer -eq $ExpectedManufacturer)
+
+    if     ($channel -eq 'W365')   { $SystemProductNamePrefixOk = ($sys.Product -like "$Prefix_W365*") }
+    elseif ($channel -eq 'DevBox') { $SystemProductNamePrefixOk = ($sys.Product -like "$Prefix_DevBox*") }
+    elseif ($channel -in @('AVD','DTL')) { $SystemProductNamePrefixOk = $true }  # omitted for these
+    else { $SystemProductNamePrefixOk = $true }
+
+    if (-not [string]::IsNullOrEmpty($provHost) -and -not [string]::IsNullOrEmpty($liveHost)) {
+        $HostnameMatchesProvisioned = ([string]::Equals($liveHost,$provHost,[StringComparison]::OrdinalIgnoreCase))
+    } else {
+        $HostnameMatchesProvisioned = $true
+    }
+}
+
+# -------- Emit ONLY the JSON expected by your compliance policy --------
+[ordered]@{
+    AzEnvOk                    = [bool]$AzEnvOk
+    TenantIdOk                 = [bool]$TenantIdOk
+    SystemManufacturerOk       = [bool]$SystemManufacturerOk
+    SystemProductNamePrefixOk  = [bool]$SystemProductNamePrefixOk
+    HostnameMatchesProvisioned = [bool]$HostnameMatchesProvisioned
+} | ConvertTo-Json -Compress | Write-Output

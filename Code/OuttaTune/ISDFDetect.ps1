@@ -197,3 +197,6 @@ if ($AzEnvOk) {
     SystemProductNamePrefixOk  = [bool]$SystemProductNamePrefixOk
     HostnameMatchesProvisioned = [bool]$HostnameMatchesProvisioned
 } | ConvertTo-Json -Compress | Write-Output
+
+# Exit code aligns with overall compliance (AND)
+if ($AzEnvOk -and $TenantIdOk -and $SystemManufacturerOk -and $SystemProductNamePrefixOk -and $HostnameMatchesProvisioned) { exit 0 } else { exit 1 }

@@ -1,59 +1,77 @@
-# Ensures a Scheduled Task exists that ONLY triggers an Intune/MDM compliance sync.
-# Safe to re-run (idempotent). Scope this deployment to your "enhanced monitoring" devices.
+# Registers/repairs \Microsoft\ISDF\Watchdog to run every 15m using -EncodedCommand.
+# The payload locates detect.ps1 by matching the first-line header you specified.
 
-#Requires -RunAsAdministrator
-$ErrorActionPreference = 'Stop'
-$InformationPreference = 'Continue'
+$taskName    = '\Microsoft\ISDF\Watchdog'
+$intervalMin = 15
+$ps64        = "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe"
 
-$taskPath = '\ISDF\'
-$taskName = 'ComplianceSync'
+# --- Compact watchdog payload (PS 5.1-safe) ---
+$payload = @'
+$ErrorActionPreference='SilentlyContinue';$ProgressPreference='SilentlyContinue';
+# 0) Always nudge device mgmt sync
+schtasks /run /tn "\Microsoft\Intune\PushLaunch" | Out-Null;
 
-# 1) Build the action: 64-bit PowerShell, hidden window, tiny jitter, then SyncNow via MDM Bridge WMI
-$psExe = "$env:WINDIR\System32\WindowsPowerShell\v1.0\powershell.exe"
-$inline = @'
-$ErrorActionPreference = "SilentlyContinue"
-Start-Sleep -Seconds (Get-Random -Minimum 5 -Maximum 45)  # small jitter
-Get-ScheduledTask -TaskName "PushLaunch"|foreach {$_|Start-ScheduledTask}
-exit 0
+# 1) Find the correct detect.ps1 by matching the first line
+$root='C:\Windows\IMECache\HealthScripts';
+$expected='# ISDF_Detect.ps1  -- single self-healing detection (PS 5.1 safe)';
+$detect=$null;
+if(Test-Path -LiteralPath $root){
+ $dirs=Get-ChildItem -LiteralPath $root -Directory -EA SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending;
+ foreach($d in $dirs){
+  $p=Join-Path $d.FullName 'detect.ps1';
+  if(Test-Path -LiteralPath $p){
+   $first=(Get-Content -LiteralPath $p -TotalCount 1 -EA SilentlyContinue);
+   if($first -and ($first.Trim() -eq $expected)){ $detect=$p; break }
+  }
+ }
+ # Fallback: if no header match found, use newest detect.ps1 (optional)
+ if(-not $detect){
+  $firstDir=$dirs | Select-Object -First 1;
+  if($firstDir){ $tmp=Join-Path $firstDir.FullName 'detect.ps1'; if(Test-Path -LiteralPath $tmp){ $detect=$tmp } }
+ }
+}
+
+if(-not $detect){ return }
+
+# OPTIONAL: if you later stamp an expected hash in HKLM:\SOFTWARE\ISDF\ExpectedDetectHash (SHA256 hex),
+# uncomment the block below to enforce it before running.
+<# 
+try{
+ $h=(Get-ItemProperty -Path 'HKLM:\SOFTWARE\ISDF' -EA Stop).ExpectedDetectHash
+ if($h){
+   $fh=(Get-FileHash -LiteralPath $detect -Algorithm SHA256).Hash
+   if(-not [string]::Equals($fh,$h,[System.StringComparison]::OrdinalIgnoreCase)){ return }
+ }
+}catch{}
+#>
+
+# 2) Run detect via 64-bit host and parse JSON
+$out=& "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $detect 2>$null;
+if([string]::IsNullOrWhiteSpace($out)){ return }
+try{ $o=$out|ConvertFrom-Json }catch{ return }
+
+# 3) If any boolean false -> trigger IME compliance eval now
+$keys='AzEnvOk','TenantIdOk','SystemManufacturerOk','SystemProductNamePrefixOk','HostnameMatchesProvisioned';
+$vals=@(); foreach($k in $keys){ if($o.PSObject.Properties[$k]){ $vals+=[bool]$o.$k } }
+if(($vals.Count -gt 0) -and ($vals -contains $false)){
+  try{ Start-Process 'intunemanagementextension://synccompliance' -WindowStyle Hidden | Out-Null }catch{}
+  schtasks /run /tn "\Microsoft\Intune\PushLaunch" | Out-Null
+}
+
+Start-Sleep -Milliseconds (Get-Random -Minimum 100 -Maximum 1000);
 '@
 
-# Use -EncodedCommand to avoid quoting/length issues (UTF-16LE)
-$encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($inline))
-$arg = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -EncodedCommand ' + $encoded
+# Encode for -EncodedCommand (UTF-16LE -> Base64)
+$enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($payload))
 
-$action = New-ScheduledTaskAction -Execute $psExe -Argument $arg
+# Create/repair the SYSTEM task
+$create = @(
+  '/Create','/TN', $taskName,
+  '/SC','MINUTE','/MO',"$intervalMin",
+  '/RU','SYSTEM','/RL','HIGHEST','/F',
+  '/TR', ('"'+$ps64+'" -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -EncodedCommand ' + $enc)
+)
+Start-Process schtasks.exe -ArgumentList $create -WindowStyle Hidden -Wait | Out-Null
 
-# 2) Triggers: at startup, at logon, and every 15 minutes (all day, today). The -Once start is midnight today.
-$trigStartup = New-ScheduledTaskTrigger -AtStartup
-$trigLogon   = New-ScheduledTaskTrigger -AtLogOn
-$trigRepeat  = New-ScheduledTaskTrigger -Once -At (Get-Date).Date `
-               -RepetitionInterval (New-TimeSpan -Minutes 15) `
-               -RepetitionDuration (New-TimeSpan -Days 1)
-
-# 3) Run as SYSTEM, highest privileges
-$principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest -LogonType ServiceAccount
-
-# 4) Settings: allow on battery, wake not required, stop if running > 5 min, ignore overlapping runs
-$settings = New-ScheduledTaskSettingsSet `
-  -AllowStartIfOnBatteries `
-  -DontStopIfGoingOnBatteries `
-  -StartWhenAvailable `
-  -ExecutionTimeLimit (New-TimeSpan -Minutes 5) `
-  -Compatibility Win8 `
-  -MultipleInstances IgnoreNew
-
-# 5) Register (create or update in place)
-$task = New-ScheduledTask -Action $action -Trigger @($trigStartup,$trigLogon,$trigRepeat) `
-        -Principal $principal -Settings $settings
-
-try {
-  if (-not (Get-ScheduledTask -TaskPath $taskPath -TaskName $taskName -ErrorAction SilentlyContinue)) {
-    Register-ScheduledTask -TaskPath $taskPath -TaskName $taskName -InputObject $task | Out-Null
-  } else {
-    Register-ScheduledTask -TaskPath $taskPath -TaskName $taskName -InputObject $task -Force | Out-Null
-  }
-  Write-Information "ISDF: ComplianceSync task is present and up to date."
-} catch {
-  Register-ScheduledTask -TaskPath $taskPath -TaskName $taskName -InputObject $task | Out-Null
-  Write-Information "ISDF: ComplianceSync task created."
-}
+# Kick it once now
+schtasks /run /tn $taskName | Out-Null

@@ -1,63 +1,44 @@
 # Registers/repairs \Microsoft\ISDF\Watchdog to run every 15m using -EncodedCommand.
-# The payload locates detect.ps1 by matching the first-line header you specified.
 
 $taskName    = '\Microsoft\ISDF\Watchdog'
 $intervalMin = 15
 $ps64        = "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe"
 
-# --- Compact watchdog payload (PS 5.1-safe) ---
+# --- Minimal watchdog payload (PS 5.1-safe): only do the 3 things requested ---
 $payload = @'
 $ErrorActionPreference='SilentlyContinue';$ProgressPreference='SilentlyContinue';
-# 0) Always nudge device mgmt sync
-schtasks /run /tn "\Microsoft\Intune\PushLaunch" | Out-Null;
 
-# 1) Find the correct detect.ps1 by matching the first line
-$root='C:\Windows\IMECache\HealthScripts';
-$expected='# ISDF_Detect.ps1  -- single self-healing detection (PS 5.1 safe)';
-$detect=$null;
-if(Test-Path -LiteralPath $root){
- $dirs=Get-ChildItem -LiteralPath $root -Directory -EA SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending;
- foreach($d in $dirs){
-  $p=Join-Path $d.FullName 'detect.ps1';
-  if(Test-Path -LiteralPath $p){
-   $first=(Get-Content -LiteralPath $p -TotalCount 1 -EA SilentlyContinue);
-   if($first -and ($first.Trim() -eq $expected)){ $detect=$p; break }
+# Gather all task names (CSV is easiest on PS 5.1)
+$rows = schtasks /Query /FO CSV 2>$null
+$taskNames = @()
+
+try {
+  $csv = $rows | ConvertFrom-Csv
+  if($csv -and ($csv[0].PSObject.Properties.Name -contains 'TaskName')){
+    $taskNames = $csv | ForEach-Object { $_.TaskName }
   }
- }
- # Fallback: if no header match found, use newest detect.ps1 (optional)
- if(-not $detect){
-  $firstDir=$dirs | Select-Object -First 1;
-  if($firstDir){ $tmp=Join-Path $firstDir.FullName 'detect.ps1'; if(Test-Path -LiteralPath $tmp){ $detect=$tmp } }
- }
+} catch {}
+
+# Fallback CSV-first-column parse if header was localized or ConvertFrom-Csv failed
+if(-not $taskNames -or $taskNames.Count -eq 0){
+  foreach($line in $rows){
+    $m = [regex]::Match($line,'^"([^"]+)",')
+    if($m.Success){ $taskNames += $m.Groups[1].Value }
+  }
 }
 
-if(-not $detect){ return }
+# 1) Run all copies of PushLaunch
+$push = $taskNames | Where-Object { $_ -match '(^|\\)PushLaunch$' } | Sort-Object -Unique
+foreach($tn in $push){ schtasks /Run /TN $tn | Out-Null }
 
-# OPTIONAL: if you later stamp an expected hash in HKLM:\SOFTWARE\ISDF\ExpectedDetectHash (SHA256 hex),
-# uncomment the block below to enforce it before running.
-<# 
-try{
- $h=(Get-ItemProperty -Path 'HKLM:\SOFTWARE\ISDF' -EA Stop).ExpectedDetectHash
- if($h){
-   $fh=(Get-FileHash -LiteralPath $detect -Algorithm SHA256).Hash
-   if(-not [string]::Equals($fh,$h,[System.StringComparison]::OrdinalIgnoreCase)){ return }
- }
-}catch{}
-#>
+# 2) Run all copies whose name starts with "Schedule #3"
+$sche3 = $taskNames | Where-Object { $_ -match '(^|\\)Schedule #3.*$' } | Sort-Object -Unique
+foreach($tn in $sche3){ schtasks /Run /TN $tn | Out-Null }
 
-# 2) Run detect via 64-bit host and parse JSON
-$out=& "$env:WINDIR\SysNative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File $detect 2>$null;
-if([string]::IsNullOrWhiteSpace($out)){ return }
-try{ $o=$out|ConvertFrom-Json }catch{ return }
+# 3) Trigger compliance sync via IME URI
+try { Start-Process 'intunemanagementextension://synccompliance' -WindowStyle Hidden | Out-Null } catch {}
 
-# 3) If any boolean false -> trigger IME compliance eval now
-$keys='AzEnvOk','TenantIdOk','SystemManufacturerOk','SystemProductNamePrefixOk','HostnameMatchesProvisioned';
-$vals=@(); foreach($k in $keys){ if($o.PSObject.Properties[$k]){ $vals+=[bool]$o.$k } }
-if(($vals.Count -gt 0) -and ($vals -contains $false)){
-  try{ Start-Process 'intunemanagementextension://synccompliance' -WindowStyle Hidden | Out-Null }catch{}
-  schtasks /run /tn "\Microsoft\Intune\PushLaunch" | Out-Null
-}
-
+# Small jitter to avoid thundering herd effects if deployed widely
 Start-Sleep -Milliseconds (Get-Random -Minimum 100 -Maximum 1000);
 '@
 

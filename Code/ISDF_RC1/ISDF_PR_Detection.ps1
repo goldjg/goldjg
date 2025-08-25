@@ -77,7 +77,7 @@ function Unprotect([string]$c,[byte[]]$k){ try{ $s=ConvertTo-SecureString -Strin
 $compute=Get-IMDSCompute
 $sys=Get-SystemInfo
 $tags=Parse-Tags $compute
-$txt = (& "$env:SystemRoot\System32\dsregcmd.exe" /status) | Out-String
+$txt = (& "dsregcmd.exe" /status) | Out-String
 $tenant = ([regex]::Match($txt,'^\s*(TenantId|AzureAdTenantId)\s*:\s*([0-9a-fA-F-]{36})\s*$', 'Multiline').Groups[2].Value)
 
 # Hostname + provisioned name

@@ -34,7 +34,7 @@ function Set-Reg { param([string]$Name,[object]$Value,[Microsoft.Win32.RegistryV
 function Get-RegOrNull { param([string]$Name) try { (Get-ItemProperty -Path $RegBase -Name $Name -ErrorAction Stop).$Name } catch { $null } }
 
 # ---------- AAD / IMDS ----------
-function Get-DsRegStatusText { try { (& "$env:SystemRoot\System32\dsregcmd.exe" /status) | Out-String } catch { '' } }
+function Get-DsRegStatusText { try { (& "dsregcmd.exe" /status) | Out-String } catch { '' } }
 function Parse-GuidFromText { param([string]$Text,[string[]]$Labels)
     foreach ($label in $Labels) {
         $m = [regex]::Match($Text, "^\s*$label\s*:\s*([0-9a-fA-F-]{36})\s*$", 'Multiline')

@@ -400,7 +400,7 @@ if ($mode -eq 'Cloud' -and $webhookUrl) {
             ea2             = $ea2Blob
             signalHash      = $signalHash
             originTupleHash = $originTupleHash
-            baselineVer     = $baselineVer
+            baselineVer     = $ISDF.ISDF_baselineVer
             timestampUtc    = (Get-Date).ToUniversalTime().ToString('o')
         }
     } | ConvertTo-Json -Depth 5

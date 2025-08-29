@@ -178,7 +178,7 @@ function Derive-Channel {
     if ($ridL -match 'microsoft\.desktopvirtualization/hostpools') { return 'ISDF:AVD' }
     if (Has-DTLHiddenTags -compute $compute -tagsMap $tagsMap)     { return 'ISDF:DevTestLabs' }
 
-    $nameL = ([string]$compute.name).ToLower()
+    $nameL = ([string]$compute.osProfile.computerName).ToLower()
     $isCloudPC = ($compute.isHostCompatibilityLayerVm -eq $true) -or ($nameL -like 'cpc_*')
     if ($isCloudPC) { return 'ISDF:W365' }
 
@@ -278,7 +278,7 @@ $channelOk = Channel-Ok     -channel $channel -compute $compute -tagsMap $tagsMa
 
 $signalOrdered = [ordered]@{
     Version=2; TimestampUtc=$NowUtc.ToString('o')
-    Hostname=$hostname; ProvisionedHostname=$compute.name
+    Hostname=$hostname; ProvisionedHostname=$compute.osProfile.computerName
     SystemManufacturer=$sys.SystemManufacturer; SystemProductName=$sys.SystemProductName
     AzEnvironment=$compute.azEnvironment; SubscriptionId=$compute.subscriptionId; ResourceGroup=$compute.resourceGroupName; VMId=$compute.vmId
     AadTenantId=$aad.TenantId; Channel=$channel; ResourceId=$compute.resourceId
@@ -321,7 +321,7 @@ $ISDF.ISDF_Mode                       = $mode
 $ISDF.ISDF_Channel                    = $channel
 $ISDF.ISDF_ChannelOk                  = [bool]$channelOk
 $ISDF.ISDF_AzEnvOk                    = ($compute.azEnvironment -eq 'AzurePublicCloud')
-$ISDF.ISDF_HostnameMatchesProvisioned = ($hostname -eq $compute.osProfile.computerName)
+$ISDF.ISDF_HostnameMatchesProvisioned = [string]::Equals($hostname, $provName,'InvariantCultureIgnoreCase')
 $ISDF.ISDF_SignalHash      = $signalHash
 $ISDF.ISDF_OriginTupleHash = $originTupleHash
 $manOk  = ([string]$sys.SystemManufacturer -match '^(?i)microsoft corporation$')

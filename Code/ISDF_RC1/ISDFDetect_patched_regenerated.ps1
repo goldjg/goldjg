@@ -1,4 +1,4 @@
-# ISDF_Detect.ps1  -- single self-healing detection (PS 5.1 safe)
+ # ISDF_Detect.ps1  -- single self-healing detection (PS 5.1 safe)
 # Mode-aware detection for ISDF. Emits ISDF_* JSON, then:
 # exit 0 only if ALL required booleans are true, else exit 1.
 
@@ -100,7 +100,7 @@ function Parse-Tags {
     if ($compute -and $compute.tagsList) {
         foreach ($t in $compute.tagsList) {
             if ($t -is [string]) {
-                $m = [regex]::Match($t, 'name\s*=\s*([^;]+);\s*value\s*=\s*(.+)\}?$')
+                $m = [regex]::Match($t, 'name\s*=\s*([^;]+);\s*value\s*=(.+)\}?$')
                 if ($m.Success) { $map[$m.Groups[1].Value.Trim().ToLower()] = $m.Groups[2].Value.Trim() }
             } elseif ($t -and $t.name) {
                 $map[[string]$t.name.ToLower()] = [string]$t.value
@@ -174,12 +174,10 @@ function Derive-Channel {
         if ($srcText -match '/providers/microsoft\.devtestlab')                  { return 'ISDF:DevTestLabs' }
     }
 
-    # Fallbacks when origin chain is absent
     $ridL  = ([string]$compute.resourceId).ToLower()
     if ($ridL -match 'microsoft\.desktopvirtualization/hostpools') { return 'ISDF:AVD' }
     if (Has-DTLHiddenTags -compute $compute -tagsMap $tagsMap)     { return 'ISDF:DevTestLabs' }
 
-    # Pragmatic W365 hints (no Offer/SKU present on Cloud PC)
     $nameL = ([string]$compute.name).ToLower()
     $isCloudPC = ($compute.isHostCompatibilityLayerVm -eq $true) -or ($nameL -like 'cpc_*')
     if ($isCloudPC) { return 'ISDF:W365' }
@@ -191,7 +189,6 @@ function Channel-Ok {
     param($channel, $compute, $tagsMap, $sys)
     $ridL  = ([string]$compute.resourceId).ToLower()
     $manOk = ($sys.SystemManufacturer -like 'Microsoft*')
-    # Broadened product match for CloudPC/Dev Box
     $prodOk = ($sys.SystemProductName -match '^(Virtual($| )|Virtual Machine|Cloud PC|Microsoft Dev Box)')
 
     switch ($channel) {
@@ -208,7 +205,7 @@ function Channel-Ok {
 }
 
 # ================================================================================================
-# 5) Crypto helpers (PS 5.1 DPAPI w/ 16-byte key)
+# 5) Crypto helpers
 # ================================================================================================
 function To-JsonMin { param([hashtable]$Ordered) ($Ordered | ConvertTo-Json -Depth 8 -Compress) }
 
@@ -243,7 +240,7 @@ function Sha256Hex {
 }
 
 # ================================================================================================
-# Certificate discovery and APIM call helpers
+# Certificate discovery
 # ================================================================================================
 function Get-IsdfDeviceCert {
     param(
@@ -273,55 +270,30 @@ $sys     = Get-SystemInfo
 $aad     = Get-AADIds
 $hostname = $env:COMPUTERNAME
 
-# Provisioned name (prefer osProfile.computerName; fall back to compute.name)
-$provComputer = $null
-try {
-    if ($compute -and ($compute | Get-Member -Name osProfile -ErrorAction SilentlyContinue)) {
-        $osProf = $compute.osProfile
-        if ($osProf -is [System.Collections.Hashtable]) {
-            if ($osProf.keys -contains 'computerName') { $provComputer = [string]$osProf['computerName'] }
-        } else {
-            $provComputer = [string]$osProf.computerName
-        }
-    }
-} catch {}
-$provName = if ([string]::IsNullOrWhiteSpace($provComputer)) { [string]$compute.name } else { $provComputer }
-
-$azEnv      = $compute.azEnvironment
-$subId      = $compute.subscriptionId
-$rg         = $compute.resourceGroupName
-$vmId       = $compute.vmId
-$resourceId = $compute.resourceId
-
 # ================================================================================================
-# 7) Channel + baseline signal (and protected storage)
+# 7) Channel + baseline signal
 # ================================================================================================
 $channel   = Derive-Channel -compute $compute -tagsMap $tagsMap -sys $sys
 $channelOk = Channel-Ok     -channel $channel -compute $compute -tagsMap $tagsMap -sys $sys
 
 $signalOrdered = [ordered]@{
     Version=2; TimestampUtc=$NowUtc.ToString('o')
-    Hostname=$hostname; ProvisionedHostname=$provName
+    Hostname=$hostname; ProvisionedHostname=$compute.name
     SystemManufacturer=$sys.SystemManufacturer; SystemProductName=$sys.SystemProductName
-    AzEnvironment=$azEnv; SubscriptionId=$subId; ResourceGroup=$rg; VMId=$vmId
-    AadTenantId=$aad.TenantId; Channel=$channel; ResourceId=$resourceId
+    AzEnvironment=$compute.azEnvironment; SubscriptionId=$compute.subscriptionId; ResourceGroup=$compute.resourceGroupName; VMId=$compute.vmId
+    AadTenantId=$aad.TenantId; Channel=$channel; ResourceId=$compute.resourceId
 }
 $signalJson=To-JsonMin $signalOrdered
 
-# Derive 16-byte key from stable tuple (entropy)
-$tuple = "{0}|{1}|{2}|{3}|{4}|{5}" -f $azEnv,$subId,$rg,$vmId,'',$aad.TenantId
+$tuple = "{0}|{1}|{2}|{3}|{4}|{5}" -f $compute.azEnvironment,$compute.subscriptionId,$compute.resourceGroupName,$compute.vmId,'',$aad.TenantId
 $key16 = Get-Key16FromTuple $tuple
 
-# --- Hashes used both in local state and Cloud payload ---
 $signalHash      = Sha256Hex $signalJson
 $originTupleHash = Sha256Hex $tuple
-
-# Protect values for local storage + Entra EA2 payload
 $signalCipherV2  = Protect-Plaintext -Plain $signalJson -Key16 $key16
 $channelCipherV2 = Protect-Plaintext -Plain $channel    -Key16 $key16
 $ea2Blob         = To-Base64String $signalCipherV2
 
-# Self-healing local baseline (no remediation script required)
 Ensure-RegKey $RegBase
 Set-Reg -Name 'Version'             -Value 2 -Kind DWord
 Set-Reg -Name 'SignalB64'           -Value (To-Base64String $signalJson)
@@ -329,19 +301,17 @@ Set-Reg -Name 'SignalProtected_v2'  -Value $signalCipherV2
 Set-Reg -Name 'ChannelProtected_v2' -Value $channelCipherV2
 Set-Reg -Name 'BaselineVer'         -Value 2 -Kind DWord
 
-# Quick integrity checks
 $decOk,$decPlain    = Unprotect-Cipher -Cipher $signalCipherV2 -Key16 $key16
 $liveEqualsDecrypted= ($decOk -and $decPlain -eq $signalJson)
 
 # ================================================================================================
-# 8) Settings (PS 5.1-safe defaults)
+# 8) Settings
 # ================================================================================================
 $mode = Get-RegOrNull 'Mode'; if ([string]::IsNullOrWhiteSpace($mode)) { $mode='Local' }
 $webhookUrl = Get-RegOrNull 'WebhookUrl'
 $syncTtlHrsRaw = Get-RegOrNull 'SyncTTLHours'
 if ([string]::IsNullOrWhiteSpace($syncTtlHrsRaw)) { $syncTtlHrs = 48 } else { $syncTtlHrs = [int]$syncTtlHrsRaw }
 $lastCloudWriteUtc = Get-RegOrNull 'LastCloudWriteUtc'
-$lastCloudWriteDt  = $null; if ($lastCloudWriteUtc) { [DateTime]::TryParse($lastCloudWriteUtc,[ref]$lastCloudWriteDt) | Out-Null }
 
 # ================================================================================================
 # 9) Compute ISDF_* booleans
@@ -350,19 +320,16 @@ $ISDF=[ordered]@{}
 $ISDF.ISDF_Mode                       = $mode
 $ISDF.ISDF_Channel                    = $channel
 $ISDF.ISDF_ChannelOk                  = [bool]$channelOk
-$ISDF.ISDFChannelOk                   = $ISDF.ISDF_ChannelOk
-$ISDF.ISDF_AzEnvOk                    = ($azEnv -eq 'AzurePublicCloud')
-$ISDF.ISDF_HostnameMatchesProvisioned = ($hostname -eq $provName)
+$ISDF.ISDF_AzEnvOk                    = ($compute.azEnvironment -eq 'AzurePublicCloud')
+$ISDF.ISDF_HostnameMatchesProvisioned = ($hostname -eq $compute.osProfile.computerName)
 $ISDF.ISDF_SignalHash      = $signalHash
 $ISDF.ISDF_OriginTupleHash = $originTupleHash
-
 $manOk  = ([string]$sys.SystemManufacturer -match '^(?i)microsoft corporation$')
 $expectedPrefixByChannel = @{ 'ISDF:W365'='^(?i)(Cloud PC|Virtual( Machine)?)'; 'ISDF:DevBox'='^(?i)(Microsoft Dev Box|Dev Box|Virtual( Machine)?)'; 'ISDF:AVD'='^(?i)Virtual( Machine)?'; 'ISDF:DevTestLabs'='^(?i)Virtual( Machine)?'; 'ISDF:AzureVM'='^(?i)Virtual( Machine)?' }
 $pattern = $expectedPrefixByChannel[$channel]
 $prodOk = ([string]$sys.SystemProductName -match $pattern)
 $ISDF.ISDF_SystemManufacturerOk       = $manOk
 $ISDF.ISDF_SystemProductNamePrefixOk  = $prodOk
-
 # TenantId OK: prefer origin.tenantid; fallback 'tenantid' tag; else OK
 $tenantTag = $null
 if ($tagsMap -and ($tagsMap.Keys -contains 'ms.inv.v0.backedby.origin.tenantid')) {
@@ -371,11 +338,8 @@ if ($tagsMap -and ($tagsMap.Keys -contains 'ms.inv.v0.backedby.origin.tenantid')
     $tenantTag = $tagsMap['tenantid']
 }
 $ISDF.ISDF_TenantIdOK = if ($tenantTag) { [string]::Equals($tenantTag,$aad.TenantId,'InvariantCultureIgnoreCase') } else { $true }
-
 $ISDF.ISDF_EA2_Decrypts       = [bool]$decOk
 $ISDF.ISDF_LiveEqualsDecrypted= [bool]$liveEqualsDecrypted
-$ISDF.ISDF_SignalHash         = Sha256Hex $signalJson
-$ISDF.ISDF_OriginTupleHash    = Sha256Hex $tuple
 $ISDF.ISDF_BaselineVer        = 2
 $ISDF.ISDF_WebhookConfigured  = $false
 $ISDF.ISDF_WebhookLastOk      = $false
@@ -384,7 +348,7 @@ $ISDF.ISDF_EA2_Matches        = $false
 $ISDF.ISDF_LastSyncFresh      = $false
 
 # ================================================================================================
-# 10) Optional Cloud Sync (client cert)
+# 10) Optional Cloud Sync
 # ================================================================================================
 if ($mode -eq 'Cloud' -and $webhookUrl) {
     $ISDF.ISDF_WebhookConfigured = $true
@@ -407,31 +371,35 @@ if ($mode -eq 'Cloud' -and $webhookUrl) {
 
     try {
         $cert = Get-IsdfDeviceCert
-
         $resp = Invoke-RestMethod -Method POST -Uri $webhookUrl -Certificate $cert `
             -Body $payload -ContentType 'application/json' -TimeoutSec 30
 
-        # New success criteria
         if ($resp -and $resp.syncResult -eq 'Success' -and $resp.echo.aadDeviceId -eq $aad.DeviceId) {
             $ISDF.ISDF_WebhookLastOk = $true
-        } else {
-            $ISDF.ISDF_WebhookLastOk = $false
-        }
-
-        # Record processedAtUtc if supplied
-        if ($resp.processedAtUtc) {
-            $pt = $null
-            if ([DateTime]::TryParse([string]$resp.processedAtUtc, [ref]$pt)) {
-                Set-Reg -Name 'LastCloudWriteUtc' -Value ($pt.ToUniversalTime().ToString('o'))
             }
+
+        if ($resp.echo.originTupleHash -eq $originTupleHash) { 
+            $ISDF.ISDF_EA1_Matches = $true
+           }
+
+        if ($resp.echo.signalHash      -eq $signalHash)      {
+            $ISDF.ISDF_EA2_Matches = $true 
+           }
+
+        if ([datetime]$resp.processedAtUtc) {
+            $utc = [datetime]$resp.processedAtUtc
+            Set-Reg -Name 'LastCloudWriteUtc' -Value ($utc.ToUniversalTime().ToString('o'))
+            $ISDF.ISDF_LastSyncFresh = ($utc -gt ([DateTime]::UtcNow).AddHours(-$syncTtlHrs))
         }
     }
     catch {
-        $ISDF.ISDF_WebhookLastOk = $false
+        #if (-not $ISDF.ISDF_WebhookLastOk) {
+            #$ISDF.ISDF_WebhookLastOk = $false
+        #}
     }
 }
 
-# When NOT in Cloud mode, harmonize cloud flags to True so local-only deployments pass
+# When NOT in Cloud mode, harmonize
 if ($mode -ne 'Cloud') {
     $ISDF.ISDF_WebhookConfigured = $true
     $ISDF.ISDF_WebhookLastOk     = $true
@@ -445,6 +413,7 @@ if ($mode -ne 'Cloud') {
 # ================================================================================================
 $payloadJson = ($ISDF | ConvertTo-Json -Compress)
 $payloadJson
+$ISDF
 
 function Get-RequiredSettingNames([string]$m){
     $base = @(
@@ -470,4 +439,4 @@ foreach ($n in $required) {
     if (-not ($ISDF.Keys -contains "$n" -and $ISDF[$n] -eq $true)) { $allTrue = $false; break }
 }
 
-if ($allTrue) { exit 0 } else { exit 1 }
+if ($allTrue) { exit 0 } else { exit 1 } 

@@ -1,4 +1,4 @@
-# ISDF_Detect.ps1  -- single self-healing detection (PS 5.1 safe)
+# ISDF_Detect.ps1  RC1 -- single self-healing detection (PS 5.1 safe)
 # Mode-aware detection for ISDF. Emits ISDF_* JSON, then:
 # exit 0 only if ALL required booleans are true, else exit 1.
 

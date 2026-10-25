@@ -29,7 +29,7 @@ distro-info==1.1+ubuntu0.2
 exceptiongroup==1.2.0
 fake-useragent==1.4.0
 h11==0.14.0
-httplib2==0.20.2
+httplib2==0.32.0
 hyperlink==21.0.0
 idna==3.6
 importlib-metadata==4.6.4

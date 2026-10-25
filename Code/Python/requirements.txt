@@ -71,7 +71,7 @@ PySocks==1.7.1
 python-apt==2.4.0+ubuntu4
 pytz==2022.1
 PyYAML==5.4.1
-requests==2.31.0
+requests==2.33.0
 requests-html==0.10.0
 ruamel.yaml==0.18.6
 ruamel.yaml.clib==0.2.8

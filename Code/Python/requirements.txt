@@ -86,7 +86,7 @@ systemd-python==234
 tqdm==4.66.1
 trio==0.23.1
 trio-websocket==0.11.1
-Twisted==22.1.0
+Twisted==26.10.0rc1
 typing_extensions==4.12.2
 ubuntu-pro-client==8001
 ufw==0.36.1

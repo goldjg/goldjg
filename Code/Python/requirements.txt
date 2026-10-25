@@ -91,7 +91,7 @@ typing_extensions==4.12.2
 ubuntu-pro-client==8001
 ufw==0.36.1
 unattended-upgrades==0.1
-urllib3==1.26.18
+urllib3==2.8.0
 validators==0.22.0
 w3lib==2.1.2
 wadllib==1.3.6

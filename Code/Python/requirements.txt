@@ -19,7 +19,7 @@ click==8.0.3
 cloud-init==24.3.1
 colorama==0.4.4
 command-not-found==0.3
-configobj==5.0.6
+configobj==5.0.9
 constantly==15.1.0
 cryptography==3.4.8
 cssselect==1.2.0
